@@ -3,16 +3,18 @@ from croissant.utils import read_jsonlines
 import numpy as np
 from sklearn.model_selection import StratifiedShuffleSplit
 from torch.utils.data import Dataset, Subset
-from torchvision import transforms
+
+from Subset import Subset as SubsetWithTransform
 
 
 class SlcDataset(Dataset):
-    def __init__(self, manifest_path, project_name, image_dim, debug=False):
+    def __init__(self, manifest_path, project_name, image_dim, debug=False, additional_train_transform=None):
         super().__init__()
 
         self.manifest_path = manifest_path
         self.project_name = project_name
         self.image_dim = image_dim
+        self.additional_train_transform = additional_train_transform
 
         self.manifest = read_jsonlines(uri=self.manifest_path)
         self.manifest = [x for x in self.manifest]
@@ -26,16 +28,8 @@ class SlcDataset(Dataset):
 
         self.observations = self._construct_observations()
 
-        self.transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
-        ])
-
     def __getitem__(self, index):
         input = self.observations[index]
-
-        if self.transform:
-            input = self.transform(input)
 
         target = self.y[index]
 
@@ -49,7 +43,10 @@ class SlcDataset(Dataset):
         train_index, test_index = next(sss.split(np.zeros(len(self.y)), self.y))
 
         train_subset = Subset(dataset=self, indices=train_index)
+        train_subset = SubsetWithTransform(subset=train_subset, additional_transforms=self.additional_train_transform)
+
         test_subset = Subset(dataset=self, indices=test_index)
+        test_subset = SubsetWithTransform(subset=test_subset)
 
         train_y = self.y[train_index]
 

@@ -9,10 +9,12 @@ from CNN import CNN
 from Classifier import Classifier
 from SlcDataset import SlcDataset
 from KfoldDataLoader import KfoldDataLoader
+from Subset import Subset
 
 parser = argparse.ArgumentParser(description='CNN model for classifying segmentation data')
 parser.add_argument('manifest_path', help='Path to manifest file')
 parser.add_argument('project_name', help='Project name')
+parser.add_argument('-additional_train_transform_path', help='Data augmentation for train set', required=False)
 parser.add_argument('--debug', default=False, required=False, action='store_true',
                     help='Whether to debug on a tiny sample')
 args = parser.parse_args()
@@ -29,12 +31,18 @@ torch.manual_seed(1234)
 
 
 def main():
+    if args.additional_train_transform_path:
+        additional_train_transform = torch.load(args.additional_train_transform_path)
+    else:
+        additional_train_transform = None
+
     slcDataset = SlcDataset(manifest_path=args.manifest_path, project_name=args.project_name,
-                            image_dim=(128, 128), debug=args.debug)
+                            image_dim=(128, 128), additional_train_transform=additional_train_transform,
+                            debug=args.debug)
 
     if args.debug:
         train_loader = DataLoader(
-            slcDataset,
+            Subset(subset=slcDataset, additional_transforms=additional_train_transform),
             batch_size=64,
             shuffle=True)
         kfoldDataLoader = None
@@ -44,7 +52,8 @@ def main():
         train_loader = DataLoader(dataset=train_dataset, batch_size=64, shuffle=True)
         test_loader = DataLoader(dataset=test_dataset, batch_size=64)
         kfoldDataLoader = KfoldDataLoader(train_dataset=train_dataset, y=train_y, n_splits=5, batch_size=64,
-                                          shuffle=True, random_state=1234)
+                                          shuffle=True, additional_train_transform=additional_train_transform,
+                                          random_state=1234)
 
     model = CNN(input_dim=128)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
