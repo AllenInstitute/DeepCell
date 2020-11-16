@@ -1,6 +1,6 @@
 import numpy as np
 from sklearn.model_selection import StratifiedKFold
-from torch.utils.data import Subset, DataLoader as TorchDataLoader
+from torch.utils.data import Subset, DataLoader
 
 
 class KfoldDataLoader:
@@ -17,6 +17,6 @@ class KfoldDataLoader:
         for train_index, test_index in skf.split(np.zeros(len(self.train_dataset)), self.y):
             train = Subset(dataset=self.train_dataset, indices=train_index)
             valid = Subset(dataset=self.train_dataset, indices=test_index)
-            train_loader = TorchDataLoader(train, batch_size=self.batch_size, shuffle=True)
-            valid_loader = TorchDataLoader(valid, batch_size=self.batch_size)
+            train_loader = DataLoader(train, batch_size=self.batch_size, shuffle=True)
+            valid_loader = DataLoader(valid, batch_size=self.batch_size)
             yield train_loader, valid_loader
