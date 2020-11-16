@@ -1,5 +1,6 @@
 import logging
 import numpy as np
+import os
 import torch
 from torch.utils.data import DataLoader
 
@@ -22,6 +23,9 @@ class Classifier:
         self.kfoldDataLoader = kfoldDataLoader
         self.debug = debug
 
+        if not os.path.exists(f'{self.save_path}'):
+            os.makedirs(f'{self.save_path}')
+            
         torch.save(self.model.state_dict(), f'{self.save_path}/model_init.pt')
 
     def fit(self):
