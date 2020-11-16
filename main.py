@@ -15,6 +15,7 @@ parser = argparse.ArgumentParser(description='CNN model for classifying segmenta
 parser.add_argument('manifest_path', help='Path to manifest file')
 parser.add_argument('project_name', help='Project name')
 parser.add_argument('-additional_train_transform_path', help='Data augmentation for train set', required=False)
+parser.add_argument('-n_epochs', help='Number of training epochs', default=20, type=int)
 parser.add_argument('--debug', default=False, required=False, action='store_true',
                     help='Whether to debug on a tiny sample')
 args = parser.parse_args()
@@ -59,7 +60,7 @@ def main():
     criterion = torch.nn.BCELoss()
     classifier = Classifier(
         model=model,
-        n_epochs=20,
+        n_epochs=args.n_epochs,
         train_loader=train_loader,
         kfoldDataLoader=kfoldDataLoader,
         test_loader=test_loader,
