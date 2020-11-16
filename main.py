@@ -24,6 +24,9 @@ logging.basicConfig(
     datefmt='%m/%d/%Y %I:%M:%S %p'
 )
 
+# Make results deterministic
+torch.manual_seed(1234)
+
 
 def main():
     slcDataset = SlcDataset(manifest_path=args.manifest_path, project_name=args.project_name,
