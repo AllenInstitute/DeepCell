@@ -2,8 +2,8 @@ from PIL import Image
 from croissant.utils import read_jsonlines
 import numpy as np
 from sklearn.model_selection import StratifiedShuffleSplit
-from torch.utils.data import Dataset, Subset
-from torchvision import transforms
+from torch.utils.data import Dataset
+from Subset import Subset
 
 
 class SlcDataset(Dataset):
@@ -24,32 +24,25 @@ class SlcDataset(Dataset):
             self.manifest = [self.manifest[not_cell_idx], self.manifest[cell_idx]]
             self.y = np.array([0, 1])
 
-        self.observations = self._construct_observations()
-
-        self.transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
-        ])
-
     def __getitem__(self, index):
-        input = self.observations[index]
+        obs = self.manifest[index]
 
-        if self.transform:
-            input = self.transform(input)
+        input = self._extract_channels(obs=obs)
+        input = Image.fromarray(input)
 
         target = self.y[index]
 
         return input, target
 
     def __len__(self):
-        return len(self.observations)
+        return len(self.manifest)
 
-    def get_train_test_datasets(self, test_size, seed=None):
+    def get_train_test_datasets(self, test_size, seed=None, apply_transform=False):
         sss = StratifiedShuffleSplit(n_splits=2, test_size=test_size, random_state=seed)
         train_index, test_index = next(sss.split(np.zeros(len(self.y)), self.y))
 
-        train_subset = Subset(dataset=self, indices=train_index)
-        test_subset = Subset(dataset=self, indices=test_index)
+        train_subset = Subset(dataset=self, indices=train_index, apply_transform=apply_transform)
+        test_subset = Subset(dataset=self, indices=test_index, apply_transform=apply_transform)
 
         train_y = self.y[train_index]
 
@@ -60,12 +53,6 @@ class SlcDataset(Dataset):
         labels = [int(x == 'cell') for x in labels]
         labels = np.array(labels)
         return labels
-
-    def _construct_observations(self):
-        res = np.zeros((len(self.manifest), *self.image_dim, 3), dtype=np.uint8)
-        for i, obs in enumerate(self.manifest):
-            res[i] = self._extract_channels(obs=obs)
-        return res
 
     def _extract_channels(self, obs):
         roi_id = obs['roi-id']
