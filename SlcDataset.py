@@ -1,7 +1,8 @@
 from PIL import Image
 from croissant.utils import read_jsonlines
 import numpy as np
-from torch.utils.data import Dataset
+from sklearn.model_selection import StratifiedShuffleSplit
+from torch.utils.data import Dataset, Subset
 from torchvision import transforms
 
 
@@ -43,10 +44,20 @@ class SlcDataset(Dataset):
     def __len__(self):
         return len(self.observations)
 
+    def get_train_test_datasets(self, test_size, seed=None):
+        sss = StratifiedShuffleSplit(n_splits=2, test_size=test_size, random_state=seed)
+        train_index, test_index = next(sss.split(np.zeros(len(self.y)), self.y))
+
+        train_subset = Subset(dataset=self, indices=train_index)
+        test_subset = Subset(dataset=self, indices=test_index)
+
+        train_y = self.y[train_index]
+
+        return train_subset, train_y, test_subset
+
     def _get_labels(self):
         labels = [x[self.project_name]['majorityLabel'] for x in self.manifest]
         labels = [int(x == 'cell') for x in labels]
-        # labels = np.array(labels, dtype=np.float32).reshape(-1, 1)
         labels = np.array(labels)
         return labels
 
