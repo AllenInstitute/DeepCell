@@ -18,14 +18,17 @@ class Subset(Dataset):
         self.indices = indices
         self.apply_transform = apply_transform
 
-        default_transforms = [
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
-        ]
         if additional_transform:
-            transform = additional_transform + default_transforms
+            transform = [
+                transforms.ToTensor(),
+                *additional_transform,
+                transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+            ]
         else:
-            transform = default_transforms
+            transform = [
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+            ]
         transform = transforms.Compose(transform)
 
         self.transform = transform
