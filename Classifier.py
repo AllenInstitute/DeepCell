@@ -67,10 +67,6 @@ class Classifier:
         logger.info(f'Mean precision: {mean_precision}')
         logger.info(f'Mean recall: {mean_recall}')
 
-        # refit on entire training set
-        logger.info(f'Refitting on entire training set for {n_epochs} epochs')
-        self._train(train_loader=self.train_loader, n_epochs=n_epochs)
-
     def _train(self, n_epochs, train_loader: DataLoader, valid_loader: DataLoader = None, save_model=False):
         train_losses = np.zeros(n_epochs)
         valid_losses = np.zeros(n_epochs)
