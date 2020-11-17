@@ -57,7 +57,7 @@ def main():
 
     model = CNN(input_dim=128)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-    criterion = torch.nn.BCELoss()
+    criterion = torch.nn.BCEWithLogitsLoss()
     classifier = Classifier(
         model=model,
         n_epochs=args.n_epochs,

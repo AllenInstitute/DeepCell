@@ -118,7 +118,8 @@ class Classifier:
                         loss = self.criterion(output, target.float())
                         valid_loss += loss.item() / len(valid_loader)   # Loss*bs/N = (Sum of all l)/N
 
-                        y_pred = output > .5
+                        y_score = torch.sigmoid(output)
+                        y_pred = y_score > .5
                         TP += ((target == 1) & (y_pred == 1)).sum().item()
                         FN += ((target == 1) & (y_pred == 0)).sum().item()
                         FP += ((target == 0) & (y_pred == 1)).sum().item()
@@ -162,7 +163,8 @@ class Classifier:
             with torch.no_grad():
                 output = self.model(data)
                 output = output.squeeze()
-                y_pred = output > .5
+                y_score = torch.sigmoid(output)
+                y_pred = y_score > .5
                 TP += ((target == 1) & (y_pred == 1)).sum().item()
                 FN += ((target == 1) & (y_pred == 0)).sum().item()
                 FP += ((target == 0) & (y_pred == 1)).sum().item()
