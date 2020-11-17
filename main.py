@@ -14,6 +14,7 @@ from Subset import Subset
 parser = argparse.ArgumentParser(description='CNN model for classifying segmentation data')
 parser.add_argument('manifest_path', help='Path to manifest file')
 parser.add_argument('project_name', help='Project name')
+parser.add_argument('model_config_path', help='Path to pickled model config')
 parser.add_argument('-additional_train_transform_path', help='Data augmentation for train set', required=False)
 parser.add_argument('-n_epochs', help='Number of training epochs', default=20, type=int)
 parser.add_argument('--debug', default=False, required=False, action='store_true',
@@ -32,6 +33,8 @@ torch.manual_seed(1234)
 
 
 def main():
+    model_config = torch.load(args.model_config_path)
+
     if args.additional_train_transform_path:
         additional_train_transform = torch.load(args.additional_train_transform_path)
     else:
@@ -55,7 +58,7 @@ def main():
                                           shuffle=True, random_state=1234,
                                           additional_train_transform=additional_train_transform)
 
-    model = CNN(input_dim=128)
+    model = CNN(cfg=model_config)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
     criterion = torch.nn.BCEWithLogitsLoss()
     classifier = Classifier(

@@ -32,16 +32,16 @@ class Classifier:
         torch.save(self.model.state_dict(), f'{self.save_path}/model_init.pt')
 
     def fit(self):
-        best_epochs = []
-        best_epoch_precisions = []
-        best_epoch_recalls = []
-
         if self.debug:
             data_loaders = [(self.train_loader, None)]
             n_folds = 1
         else:
             data_loaders = self.kfoldDataLoader.run()
             n_folds = self.kfoldDataLoader.n_splits
+
+        best_epochs = np.zeros(len(data_loaders))
+        best_epoch_precisions = np.zeros(len(data_loaders))
+        best_epoch_recalls = np.zeros(len(data_loaders))
 
         logger.info(f'Train evaluate on {n_folds} folds')
 
@@ -53,9 +53,9 @@ class Classifier:
                 save_model=False
             )
             best_epoch = valid_losses.argmin()
-            best_epochs.append(best_epoch)
-            best_epoch_precisions.append(precisions[best_epoch])
-            best_epoch_recalls.append(recalls[best_epoch])
+            best_epochs[i] = best_epoch
+            best_epoch_precisions[i] = precisions[best_epoch]
+            best_epoch_recalls[i] = recalls[best_epoch]
 
             logger.info(f'Best epoch is {best_epoch}')
 
@@ -64,15 +64,20 @@ class Classifier:
             state_dict = torch.load(f'{self.save_path}/model_init.pt')
             self.model.load_state_dict(state_dict)
 
-        n_epochs = int(np.median(best_epochs))
-        mean_precision = sum(best_epoch_precisions) / len(best_epoch_precisions)
-        mean_recall = sum(best_epoch_recalls) / len(best_epoch_recalls)
+        res = {
+            'mean_val_precision': best_epoch_precisions.mean(),
+            'std_val_precision': best_epoch_precisions.std(),
+            'mean_val_recall': best_epoch_recalls.mean(),
+            'std_val_recall': best_epoch_recalls.std(),
+            'median_best_epoch': int(np.median(best_epochs)),
+            'std_best_epoch': best_epochs.std()
+        }
 
         logger.info(f'Done train/evaluate for {n_folds} folds')
 
-        logger.info(f'Mean best epoch: {n_epochs}')
-        logger.info(f'Mean precision: {mean_precision}')
-        logger.info(f'Mean recall: {mean_recall}')
+        logger.info(res)
+
+        return res
 
     def _train(self, n_epochs, train_loader: DataLoader, valid_loader: DataLoader = None, save_model=False):
         train_losses = np.zeros(n_epochs)
