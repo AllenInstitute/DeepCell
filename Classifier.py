@@ -39,9 +39,9 @@ class Classifier:
             data_loaders = self.kfoldDataLoader.run()
             n_folds = self.kfoldDataLoader.n_splits
 
-        best_epochs = np.zeros(len(data_loaders))
-        best_epoch_precisions = np.zeros(len(data_loaders))
-        best_epoch_recalls = np.zeros(len(data_loaders))
+        best_epochs = np.zeros(self.kfoldDataLoader.n_splits)
+        best_epoch_precisions = np.zeros(self.kfoldDataLoader.n_splits)
+        best_epoch_recalls = np.zeros(self.kfoldDataLoader.n_splits)
 
         logger.info(f'Train evaluate on {n_folds} folds')
 
