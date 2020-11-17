@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class Classifier:
     def __init__(self, model: torch.nn.Module, n_epochs: int, test_loader: DataLoader, optimizer, criterion, save_path,
-                 train_loader: DataLoader, kfoldDataLoader: KfoldDataLoader = None, debug=False):
+                 train_loader: DataLoader = None, kfoldDataLoader: KfoldDataLoader = None, debug=False):
         self.n_epochs = n_epochs
         self.train_loader = train_loader
         self.test_loader = test_loader
@@ -100,7 +100,7 @@ class Classifier:
                 loss.backward()
                 self.optimizer.step()
 
-                train_loss += loss.item() / len(self.train_loader)
+                train_loss += loss.item() / len(train_loader)
 
             train_losses[epoch] = train_loss
 
