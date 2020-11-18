@@ -64,7 +64,7 @@ def main():
                                           shuffle=True, random_state=1234,
                                           additional_train_transform=additional_train_transform)
 
-    model = CNN(cfg=model_config)
+    model = CNN(cfg=model_config, dropout_prob=args.dropout_prob)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
     criterion = torch.nn.BCEWithLogitsLoss()
     classifier = Classifier(
