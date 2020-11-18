@@ -13,7 +13,8 @@ logger = logging.getLogger(__name__)
 
 class Classifier:
     def __init__(self, model: torch.nn.Module, n_epochs: int, test_loader: DataLoader, optimizer, scheduler, criterion,
-                 save_path, train_loader: DataLoader = None, kfoldDataLoader: KfoldDataLoader = None, debug=False):
+                 save_path, train_loader: DataLoader = None, kfoldDataLoader: KfoldDataLoader = None, debug=False,
+                 use_learning_rate_scheduler=False):
         self.n_epochs = n_epochs
         self.train_loader = train_loader
         self.test_loader = test_loader
@@ -27,6 +28,7 @@ class Classifier:
         self.save_path = save_path
         self.kfoldDataLoader = kfoldDataLoader
         self.debug = debug
+        self.use_learning_rate_scheduler = use_learning_rate_scheduler
 
         if not os.path.exists(f'{self.save_path}'):
             os.makedirs(f'{self.save_path}')
@@ -156,7 +158,9 @@ class Classifier:
                         output = self.model(data)
                         output = output.squeeze()
                         loss = self.criterion(output, target.float())
-                        self.scheduler.step(loss)
+
+                        if self.use_learning_rate_scheduler:
+                            self.scheduler.step(loss)
 
                         epoch_val_metrics.update_loss(loss=loss.item(), num_batches=len(valid_loader))
                         epoch_val_metrics.update_accuracies(y_true=target, y_out=output)

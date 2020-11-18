@@ -23,7 +23,10 @@ parser.add_argument('-n_epochs', help='Number of training epochs', default=20, t
 parser.add_argument('-learning_rate', help='Learning rate', default=1e-3, type=float)
 parser.add_argument('-dropout_prob', help='Dropout prob', default=0.5, type=float)
 parser.add_argument('-weight_decay', help='Weight decay (L2 regularizaion)', default=0.0, type=float)
-parser.add_argument('-crop_to_center', help='Whether to crop the input to the area surrounding the mask', default=True)
+parser.add_argument('--crop_to_center', help='Whether to crop the input to the area surrounding the mask', default=True,
+                    action='store_true')
+parser.add_argument('--use_learning_rate_scheduler', help='Use learning rate scheduler', default=False,
+                    action='store_true')
 parser.add_argument('--debug', default=False, required=False, action='store_true',
                     help='Whether to debug on a tiny sample')
 args = parser.parse_args()
@@ -80,6 +83,7 @@ def main():
         scheduler=scheduler,
         criterion=criterion,
         save_path='./saved_models',
+        use_learning_rate_scheduler=args.use_learning_rate_scheduler,
         debug=args.debug
     )
     cv_res = classifier.cross_validate()
