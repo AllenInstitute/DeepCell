@@ -4,7 +4,8 @@ import torch.nn.functional as F
 
 
 class CNN(nn.Module):
-    def __init__(self, cfg, batch_norm=True, batch_norm_before_nonlin=True, num_classes=1):
+    def __init__(self, cfg, batch_norm=True, batch_norm_before_nonlin=True, num_classes=1,
+                 dropout_prob=0.5):
         super().__init__()
         self.features = self._make_layers(cfg=cfg, batch_norm=batch_norm,
                                           batch_norm_before_nonlin=batch_norm_before_nonlin)
@@ -12,7 +13,7 @@ class CNN(nn.Module):
         self.classifier = nn.Sequential(
             nn.Linear(64 * 7 * 7, 512),
             nn.ReLU(inplace=True),
-            nn.Dropout(),
+            nn.Dropout(p=dropout_prob),
             nn.Linear(512, num_classes),
         )
 
