@@ -60,7 +60,7 @@ class Classifier:
             )
             best_epochs[i] = val_metrics.losses.argmin()
             precisions[i] = val_metrics.precisions
-            recalls[i] = val_metrics.precisions
+            recalls[i] = val_metrics.recalls
             val_f1s[i] = val_metrics.f1s
 
             train_f1s[i] = train_metrics.f1s

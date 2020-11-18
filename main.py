@@ -12,9 +12,10 @@ from SlcDataset import SlcDataset
 from KfoldDataLoader import KfoldDataLoader
 from Subset import Subset
 
+manifest_path = 's3://prod.slapp.alleninstitute.org/behavior_slc_oct_2020/20201020135214/expert_output/ophys-experts-slc-oct-2020/manifests/output/output.manifest'
+project_name = 'ophys-experts-slc-oct-2020'
+
 parser = argparse.ArgumentParser(description='CNN model for classifying segmentation data')
-parser.add_argument('manifest_path', help='Path to manifest file')
-parser.add_argument('project_name', help='Project name')
 parser.add_argument('model_config_path', help='Path to pickled model config')
 parser.add_argument('experiment_name', help='Experiment name')
 parser.add_argument('-additional_train_transform_path', help='Data augmentation for train set', required=False)
@@ -43,7 +44,7 @@ def main():
     else:
         additional_train_transform = None
 
-    slcDataset = SlcDataset(manifest_path=args.manifest_path, project_name=args.project_name,
+    slcDataset = SlcDataset(manifest_path=manifest_path, project_name=project_name,
                             image_dim=(128, 128), debug=args.debug)
 
     if args.debug:
