@@ -29,7 +29,7 @@ class Subset(Dataset):
 
         if center_crop:
             default_transforms.insert(0, transforms.CenterCrop(60))
-            
+
         transform = transforms.Compose(transform)
 
         self.transform = transform

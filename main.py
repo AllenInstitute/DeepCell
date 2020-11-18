@@ -22,7 +22,7 @@ parser.add_argument('-additional_train_transform_path', help='Data augmentation 
 parser.add_argument('-n_epochs', help='Number of training epochs', default=20, type=int)
 parser.add_argument('-learning_rate', help='Learning rate', default=1e-3, type=float)
 parser.add_argument('-dropout_prob', help='Dropout prob', default=0.5, type=float)
-parser.add_argument('-weight_decay', help='Weight decay (L2 regularizaion)', default=None, type=float)
+parser.add_argument('-weight_decay', help='Weight decay (L2 regularizaion)', default=0.0, type=float)
 parser.add_argument('--debug', default=False, required=False, action='store_true',
                     help='Whether to debug on a tiny sample')
 args = parser.parse_args()
