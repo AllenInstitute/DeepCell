@@ -16,13 +16,14 @@ manifest_path = 's3://prod.slapp.alleninstitute.org/behavior_slc_oct_2020/202010
 project_name = 'ophys-experts-slc-oct-2020'
 
 parser = argparse.ArgumentParser(description='CNN model for classifying segmentation data')
-parser.add_argument('model_config_path', help='Path to pickled model config')
-parser.add_argument('experiment_name', help='Experiment name')
+parser.add_argument('-model_config_path', help='Path to pickled model config')
+parser.add_argument('-experiment_name', help='Experiment name')
 parser.add_argument('-additional_train_transform_path', help='Data augmentation for train set', required=False)
 parser.add_argument('-n_epochs', help='Number of training epochs', default=20, type=int)
 parser.add_argument('-learning_rate', help='Learning rate', default=1e-3, type=float)
 parser.add_argument('-dropout_prob', help='Dropout prob', default=0.5, type=float)
 parser.add_argument('-weight_decay', help='Weight decay (L2 regularizaion)', default=0.0, type=float)
+parser.add_argument('-crop_to_center', help='Whether to crop the input to the area surrounding the mask', default=True)
 parser.add_argument('--debug', default=False, required=False, action='store_true',
                     help='Whether to debug on a tiny sample')
 args = parser.parse_args()
@@ -51,7 +52,8 @@ def main():
 
     if args.debug:
         train_loader = DataLoader(
-            Subset(dataset=slcDataset, indices=range(len(slcDataset)), apply_transform=True),
+            Subset(dataset=slcDataset, indices=range(len(slcDataset)), apply_transform=True,
+                   center_crop=args.crop_to_center),
             batch_size=64,
             shuffle=True)
         kfoldDataLoader = None
