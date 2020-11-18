@@ -165,7 +165,7 @@ class Classifier:
 
             logger.info(f'Epoch: {epoch + 1} \tTrain Loss: {epoch_train_metrics.loss:.6f} '
                         f'\tTrain F1: {epoch_train_metrics.F1:.6f}'
-                        f'\tVal F1: {epoch_val_metrics.F1}')
+                        f'\tVal F1: {epoch_val_metrics.F1:.6f}')
 
         if save_model:
             torch.save(self.model.state_dict(), f'{self.save_path}/model.pt')
