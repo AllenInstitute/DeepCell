@@ -23,8 +23,8 @@ parser.add_argument('-n_epochs', help='Number of training epochs', default=20, t
 parser.add_argument('-learning_rate', help='Learning rate', default=1e-3, type=float)
 parser.add_argument('-dropout_prob', help='Dropout prob', default=0.5, type=float)
 parser.add_argument('-weight_decay', help='Weight decay (L2 regularizaion)', default=0.0, type=float)
-parser.add_argument('--crop_to_center', help='Whether to crop the input to the area surrounding the mask', default=True,
-                    action='store_true')
+parser.add_argument('--crop_to_center', help='Whether to crop the input to the area surrounding the mask',
+                    default=False, action='store_true')
 parser.add_argument('--use_learning_rate_scheduler', help='Use learning rate scheduler', default=False,
                     action='store_true')
 parser.add_argument('--debug', default=False, required=False, action='store_true',
