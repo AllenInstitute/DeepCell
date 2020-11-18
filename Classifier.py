@@ -18,8 +18,10 @@ class Classifier:
         self.train_loader = train_loader
         self.test_loader = test_loader
         self.model = model
-        self.optimizer = optimizer
-        self.scheduler = scheduler
+        self.optimizer_constructor = optimizer
+        self.scheduler_contructor = scheduler
+        self.optimizer = optimizer()
+        self.scheduler = scheduler(self.optimizer)
         self.criterion = criterion
         self.use_cuda = torch.cuda.is_available()
         self.save_path = save_path
@@ -69,10 +71,10 @@ class Classifier:
             train_losses[i] = train_metrics.losses
             val_losses[i] = val_metrics.losses
 
-            # Reset model weights
-            logger.info('Resetting model weights')
-            state_dict = torch.load(f'{self.save_path}/model_init.pt')
-            self.model.load_state_dict(state_dict)
+            # Reset
+            logger.info('Resetting model')
+            self._reset()
+
 
         best_epoch_precisions = np.array(
             [precisions[row][col] for row, col in zip(range(precisions.shape[0]), best_epochs)]
@@ -201,3 +203,15 @@ class Classifier:
 
         print(f'Precision: {precision:.3f}')
         print(f'Recall: {recall:.3f}')
+
+    def _reset(self):
+        # reset model weights
+        state_dict = torch.load(f'{self.save_path}/model_init.pt')
+        self.model.load_state_dict(state_dict)
+
+        # reset optimizer
+        self.optimizer = self.optimizer_constructor()
+
+        # reset scheduler
+        self.scheduler = self.scheduler_contructor(self.optimizer)
+
