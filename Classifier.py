@@ -5,6 +5,8 @@ import torch
 from torch.utils.data import DataLoader
 
 from KfoldDataLoader import KfoldDataLoader
+from Metrics import Metrics
+from TrainingMetrics import TrainingMetrics
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +33,7 @@ class Classifier:
 
         torch.save(self.model.state_dict(), f'{self.save_path}/model_init.pt')
 
-    def fit(self):
+    def cross_validate(self):
         if self.debug:
             data_loaders = [(self.train_loader, None)]
             n_folds = 1
@@ -39,59 +41,83 @@ class Classifier:
             data_loaders = self.kfoldDataLoader.run()
             n_folds = self.kfoldDataLoader.n_splits
 
-        best_epochs = np.zeros(self.kfoldDataLoader.n_splits)
-        best_epoch_precisions = np.zeros(self.kfoldDataLoader.n_splits)
-        best_epoch_recalls = np.zeros(self.kfoldDataLoader.n_splits)
+        train_losses = np.zeros((n_folds, self.n_epochs))
+        val_losses = np.zeros((n_folds, self.n_epochs))
+        precisions = np.zeros((n_folds, self.n_epochs))
+        recalls = np.zeros((n_folds, self.n_epochs))
+        train_f1s = np.zeros((n_folds, self.n_epochs))
+        val_f1s = np.zeros((n_folds, self.n_epochs))
+        best_epochs = np.zeros(n_folds, dtype=np.int)
 
         logger.info(f'Train evaluate on {n_folds} folds')
 
         for i, (train_loader, valid_loader) in enumerate(data_loaders):
             logger.info(f'Train/evaluate on fold {i}')
 
-            train_losses, valid_losses, precisions, recalls = self._train(
+            train_metrics, val_metrics = self._train(
                 n_epochs=self.n_epochs, train_loader=train_loader, valid_loader=valid_loader,
                 save_model=False
             )
-            best_epoch = valid_losses.argmin()
-            best_epochs[i] = best_epoch
-            best_epoch_precisions[i] = precisions[best_epoch]
-            best_epoch_recalls[i] = recalls[best_epoch]
+            best_epochs[i] = val_metrics.losses.argmin()
+            precisions[i] = val_metrics.precisions
+            recalls[i] = val_metrics.precisions
+            val_f1s[i] = val_metrics.f1s
 
-            logger.info(f'Best epoch is {best_epoch}')
+            train_f1s[i] = train_metrics.f1s
+
+            train_losses += train_metrics.losses
+            val_losses += val_metrics.losses
 
             # Reset model weights
             logger.info('Resetting model weights')
             state_dict = torch.load(f'{self.save_path}/model_init.pt')
             self.model.load_state_dict(state_dict)
 
+        best_epoch_precisions = np.array(
+            [precisions[row][col] for row, col in zip(range(precisions.shape[0]), best_epochs)]
+        )
+        best_epoch_recalls = np.array(
+            [recalls[row][col] for row, col in zip(range(recalls.shape[0]), best_epochs)]
+        )
+        best_epoch_f1s = np.array(
+            [val_f1s[row][col] for row, col in zip(range(val_f1s.shape[0]), best_epochs)]
+        )
+
         res = {
-            'mean_val_precision': best_epoch_precisions.mean(),
-            'std_val_precision': best_epoch_precisions.std(),
-            'mean_val_recall': best_epoch_recalls.mean(),
-            'std_val_recall': best_epoch_recalls.std(),
-            'median_best_epoch': int(np.median(best_epochs)),
-            'std_best_epoch': best_epochs.std()
+            'all_val_precision': precisions.mean(axis=0),
+            'all_val_recall': recalls.mean(axis=0),
+            'all_val_f1': val_f1s.mean(axis=0),
+            'all_train_f1': train_f1s.mean(axis=0),
+            'train_losses': train_losses.mean(axis=0),
+            'val_losses': val_losses.mean(axis=0),
+            'mean_val_best_epoch_precision': best_epoch_precisions.mean(),
+            'std_val_best_epoch_precision': best_epoch_precisions.std(),
+            'mean_val_best_epoch_recall': best_epoch_recalls.mean(),
+            'std_val_best_epoch_recall': best_epoch_recalls.std(),
+            'mean_val_best_epoch_f1': best_epoch_f1s.mean(),
+            'std_val_best_epoch_f1': best_epoch_f1s.std(),
         }
 
         logger.info(f'Done train/evaluate for {n_folds} folds')
 
-        logger.info(res)
+        logger.info({
+            'mean_val_best_epoch_precision': res['mean_val_best_epoch_precision'],
+            'std_val_best_epoch_precision': res['std_val_best_epoch_precision'],
+            'mean_val_best_epoch_recall': res['mean_val_best_epoch_recall'],
+            'std_val_best_epoch_recall': res['std_val_best_epoch_recall'],
+            'mean_val_best_epoch_f1': res['mean_val_best_epoch_f1'],
+            'std_val_best_epoch_f1': res['std_val_best_epoch_f1']
+        })
 
         return res
 
     def _train(self, n_epochs, train_loader: DataLoader, valid_loader: DataLoader = None, save_model=False):
-        train_losses = np.zeros(n_epochs)
-        valid_losses = np.zeros(n_epochs)
-        precisions = np.zeros(n_epochs)
-        recalls = np.zeros(n_epochs)
+        all_train_metrics = TrainingMetrics(n_epochs=n_epochs)
+        all_val_metrics = TrainingMetrics(n_epochs=n_epochs)
 
         for epoch in range(n_epochs):
-            train_loss = 0.0
-            valid_loss = 0.0
-
-            TP = 0
-            FP = 0
-            FN = 0
+            epoch_train_metrics = Metrics()
+            epoch_val_metrics = Metrics()
 
             self.model.train()
             for batch_idx, (data, target) in enumerate(train_loader):
@@ -101,13 +127,19 @@ class Classifier:
 
                 self.optimizer.zero_grad()
                 output = self.model(data)
-                loss = self.criterion(output.squeeze(), target.float())
+                output = output.squeeze()
+                loss = self.criterion(output, target.float())
                 loss.backward()
                 self.optimizer.step()
 
-                train_loss += loss.item() / len(train_loader)
+                epoch_train_metrics.update_loss(loss=loss.item(), num_batches=len(train_loader))
+                epoch_train_metrics.update_accuracies(y_true=target, y_out=output)
 
-            train_losses[epoch] = train_loss
+            all_train_metrics.update(epoch=epoch,
+                                     loss=epoch_train_metrics.loss,
+                                     precision=epoch_train_metrics.precision,
+                                     recall=epoch_train_metrics.recall,
+                                     f1=epoch_train_metrics.F1)
 
             if valid_loader:
                 self.model.eval()
@@ -121,36 +153,24 @@ class Classifier:
                         output = self.model(data)
                         output = output.squeeze()
                         loss = self.criterion(output, target.float())
-                        valid_loss += loss.item() / len(valid_loader)   # Loss*bs/N = (Sum of all l)/N
 
-                        y_score = torch.sigmoid(output)
-                        y_pred = y_score > .5
-                        TP += ((target == 1) & (y_pred == 1)).sum().item()
-                        FN += ((target == 1) & (y_pred == 0)).sum().item()
-                        FP += ((target == 0) & (y_pred == 1)).sum().item()
-                valid_losses[epoch] = valid_loss
+                        epoch_val_metrics.update_loss(loss=loss.item(), num_batches=len(valid_loader))
+                        epoch_val_metrics.update_accuracies(y_true=target, y_out=output)
 
-                try:
-                    precision = TP / (TP + FP)
-                except ZeroDivisionError:
-                    logger.warning('Precision undefined')
-                    precision = 0.0
+                all_val_metrics.update(epoch=epoch,
+                                       loss=epoch_val_metrics.loss,
+                                       precision=epoch_val_metrics.precision,
+                                       recall=epoch_val_metrics.recall,
+                                       f1=epoch_val_metrics.F1)
 
-                try:
-                    recall = TP / (TP + FN)
-                except ZeroDivisionError:
-                    logger.warning('Recall undefined')
-                    recall = 0.0
-
-                precisions[epoch] = precision
-                recalls[epoch] = recall
-
-            logger.info(f'Epoch: {epoch+1} \tTraining Loss: {train_loss:.6f} \tValidation Loss: {valid_loss:.6f}')
+            logger.info(f'Epoch: {epoch + 1} \tTrain Loss: {epoch_train_metrics.loss:.6f} '
+                        f'\tTrain F1: {epoch_train_metrics.F1:.6f}'
+                        f'\tVal F1: {epoch_val_metrics.F1}')
 
         if save_model:
             torch.save(self.model.state_dict(), f'{self.save_path}/model.pt')
 
-        return train_losses, valid_losses, precisions, recalls
+        return all_train_metrics, all_val_metrics
 
     def evaluate(self):
         state_dict = torch.load(f'{self.save_path}/model.pt')
@@ -179,4 +199,3 @@ class Classifier:
 
         print(f'Precision: {precision:.3f}')
         print(f'Recall: {recall:.3f}')
-

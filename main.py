@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 
 from CNN import CNN
 from Classifier import Classifier
+from Plotting import Plotting
 from SlcDataset import SlcDataset
 from KfoldDataLoader import KfoldDataLoader
 from Subset import Subset
@@ -15,8 +16,10 @@ parser = argparse.ArgumentParser(description='CNN model for classifying segmenta
 parser.add_argument('manifest_path', help='Path to manifest file')
 parser.add_argument('project_name', help='Project name')
 parser.add_argument('model_config_path', help='Path to pickled model config')
+parser.add_argument('experiment_name', help='Experiment name')
 parser.add_argument('-additional_train_transform_path', help='Data augmentation for train set', required=False)
 parser.add_argument('-n_epochs', help='Number of training epochs', default=20, type=int)
+parser.add_argument('-learning_rate', help='Learning rate', default=1e-3, type=float)
 parser.add_argument('--debug', default=False, required=False, action='store_true',
                     help='Whether to debug on a tiny sample')
 args = parser.parse_args()
@@ -59,7 +62,7 @@ def main():
                                           additional_train_transform=additional_train_transform)
 
     model = CNN(cfg=model_config)
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
     criterion = torch.nn.BCEWithLogitsLoss()
     classifier = Classifier(
         model=model,
@@ -72,7 +75,10 @@ def main():
         save_path='./saved_models',
         debug=args.debug
     )
-    classifier.fit()
+    cv_res = classifier.cross_validate()
+    plotting = Plotting(experiment_name=args.experiment_name)
+    plotting.plot_train_loss(train_loss=cv_res['train_losses'])
+    plotting.plot_train_val_F1(train_f1=cv_res['all_train_f1'], val_f1=cv_res['all_val_f1'])
     # classifier.evaluate()
 
 
