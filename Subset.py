@@ -19,6 +19,7 @@ class Subset(Dataset):
         self.apply_transform = apply_transform
 
         default_transforms = [
+            transforms.CenterCrop(60),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
         ]
