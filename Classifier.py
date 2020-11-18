@@ -12,13 +12,14 @@ logger = logging.getLogger(__name__)
 
 
 class Classifier:
-    def __init__(self, model: torch.nn.Module, n_epochs: int, test_loader: DataLoader, optimizer, criterion, save_path,
-                 train_loader: DataLoader = None, kfoldDataLoader: KfoldDataLoader = None, debug=False):
+    def __init__(self, model: torch.nn.Module, n_epochs: int, test_loader: DataLoader, optimizer, scheduler, criterion,
+                 save_path, train_loader: DataLoader = None, kfoldDataLoader: KfoldDataLoader = None, debug=False):
         self.n_epochs = n_epochs
         self.train_loader = train_loader
         self.test_loader = test_loader
         self.model = model
         self.optimizer = optimizer
+        self.scheduler = scheduler
         self.criterion = criterion
         self.use_cuda = torch.cuda.is_available()
         self.save_path = save_path
@@ -153,6 +154,7 @@ class Classifier:
                         output = self.model(data)
                         output = output.squeeze()
                         loss = self.criterion(output, target.float())
+                        self.scheduler.step(loss)
 
                         epoch_val_metrics.update_loss(loss=loss.item(), num_batches=len(valid_loader))
                         epoch_val_metrics.update_accuracies(y_true=target, y_out=output)

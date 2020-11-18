@@ -68,6 +68,7 @@ def main():
 
     model = CNN(cfg=model_config, dropout_prob=args.dropout_prob)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min')
     criterion = torch.nn.BCEWithLogitsLoss()
     classifier = Classifier(
         model=model,
@@ -76,6 +77,7 @@ def main():
         kfoldDataLoader=kfoldDataLoader,
         test_loader=test_loader,
         optimizer=optimizer,
+        scheduler=scheduler,
         criterion=criterion,
         save_path='./saved_models',
         debug=args.debug
