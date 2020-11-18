@@ -22,13 +22,13 @@ class Subset(Dataset):
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
         ]
+        if center_crop:
+            default_transforms.insert(0, transforms.CenterCrop(60))
+            
         if additional_transform:
             transform = additional_transform + default_transforms
         else:
             transform = default_transforms
-
-        if center_crop:
-            default_transforms.insert(0, transforms.CenterCrop(60))
 
         transform = transforms.Compose(transform)
 
