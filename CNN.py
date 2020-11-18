@@ -1,6 +1,4 @@
-import torch
 from torch import nn
-import torch.nn.functional as F
 
 
 class CNN(nn.Module):
@@ -10,8 +8,10 @@ class CNN(nn.Module):
         self.features = self._make_layers(cfg=cfg, batch_norm=batch_norm,
                                           batch_norm_before_nonlin=batch_norm_before_nonlin)
         self.avgpool = nn.AdaptiveAvgPool2d((7, 7))
+
+        last_conv_filter_num = cfg[-2]
         self.classifier = nn.Sequential(
-            nn.Linear(64 * 7 * 7, 512),
+            nn.Linear(last_conv_filter_num * 7 * 7, 512),
             nn.ReLU(inplace=True),
             nn.Dropout(p=dropout_prob),
             nn.Linear(512, num_classes),
