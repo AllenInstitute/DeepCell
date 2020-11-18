@@ -65,8 +65,8 @@ class Classifier:
 
             train_f1s[i] = train_metrics.f1s
 
-            train_losses += train_metrics.losses
-            val_losses += val_metrics.losses
+            train_losses[i] = train_metrics.losses
+            val_losses[i] = val_metrics.losses
 
             # Reset model weights
             logger.info('Resetting model weights')
