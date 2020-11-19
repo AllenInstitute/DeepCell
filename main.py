@@ -25,8 +25,6 @@ parser.add_argument('-dropout_prob', help='Dropout prob', default=0.5, type=floa
 parser.add_argument('-weight_decay', help='Weight decay (L2 regularizaion)', default=0.0, type=float)
 parser.add_argument('--crop_to_center', help='Whether to crop the input to the area surrounding the mask',
                     default=False, action='store_true')
-parser.add_argument('--random_erasing', help='Whether to apply random erasing',
-                    default=False, action='store_true')
 parser.add_argument('--use_learning_rate_scheduler', help='Use learning rate scheduler', default=False,
                     action='store_true')
 parser.add_argument('--debug', default=False, required=False, action='store_true',
@@ -58,7 +56,7 @@ def main():
     if args.debug:
         train_loader = DataLoader(
             Subset(dataset=slcDataset, indices=range(len(slcDataset)), apply_transform=True,
-                   center_crop=args.crop_to_center, apply_random_erasing=args.random_erasing),
+                   center_crop=args.crop_to_center),
             batch_size=64,
             shuffle=True)
         kfoldDataLoader = None

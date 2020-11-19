@@ -29,7 +29,6 @@ class SlcDataset(Dataset):
 
         input = self._extract_channels(obs=obs)
         input = Image.fromarray(input)
-        input = input.convert(mode='L')
 
         target = self.y[index]
 
