@@ -20,7 +20,7 @@ class Subset(Dataset):
 
         default_transforms = [
             transforms.ToTensor(),
-            transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+            transforms.Normalize(mean=[0.5], std=[0.5])
         ]
         if center_crop:
             default_transforms.insert(0, transforms.CenterCrop(60))
