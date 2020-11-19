@@ -56,7 +56,7 @@ def main():
     if args.debug:
         train_loader = DataLoader(
             Subset(dataset=slcDataset, indices=range(len(slcDataset)), apply_transform=True,
-                   center_crop=args.crop_to_center),
+                   center_crop=args.crop_to_center, additional_transform=additional_train_transform),
             batch_size=64,
             shuffle=True)
         kfoldDataLoader = None
