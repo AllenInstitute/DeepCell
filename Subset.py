@@ -20,6 +20,7 @@ class Subset(Dataset):
 
         default_transforms = [
             transforms.ToTensor(),
+            transforms.RandomErasing(scale=(.02, .1)),
             transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
         ]
         if center_crop:
