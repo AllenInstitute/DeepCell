@@ -69,7 +69,8 @@ def main():
         test_loader = DataLoader(dataset=test_dataset, batch_size=64)
         kfoldDataLoader = KfoldDataLoader(train_dataset=train_dataset, y=train_y, n_splits=5, batch_size=64,
                                           shuffle=True, random_state=1234,
-                                          additional_train_transform=additional_train_transform)
+                                          additional_train_transform=additional_train_transform,
+                                          crop_to_center=args.crop_to_center, random_erasing=args.random_erasing)
 
     model = CNN(cfg=model_config, dropout_prob=args.dropout_prob)
     optimizer = lambda: torch.optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
