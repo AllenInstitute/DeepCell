@@ -13,7 +13,7 @@ class Subset(Dataset):
         indices (sequence): Indices in the whole set selected for subset
     """
     def __init__(self, dataset: Dataset, indices: Sequence[int], additional_transform=None,
-                 apply_transform=False, center_crop=True, apply_random_erasing=False) -> None:
+                 apply_transform=False, center_crop=False, apply_random_erasing=False) -> None:
         self.dataset = dataset
         self.indices = indices
         self.apply_transform = apply_transform

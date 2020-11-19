@@ -6,7 +6,7 @@ from Subset import Subset
 
 class KfoldDataLoader:
     def __init__(self, train_dataset, y, n_splits, batch_size, shuffle=True, additional_train_transform=None,
-                 random_state=None, crop_to_center=True, random_erasing=False):
+                 random_state=None, crop_to_center=False, random_erasing=False):
         self.train_dataset = train_dataset
         self.y = y
         self.n_splits = n_splits
