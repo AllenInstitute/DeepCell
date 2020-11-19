@@ -13,7 +13,7 @@ class Subset(Dataset):
         indices (sequence): Indices in the whole set selected for subset
     """
     def __init__(self, dataset: Dataset, indices: Sequence[int], additional_transform=None,
-                 apply_transform=False, center_crop=True) -> None:
+                 apply_transform=False, center_crop=True, apply_random_erasing=False) -> None:
         self.dataset = dataset
         self.indices = indices
         self.apply_transform = apply_transform
@@ -29,6 +29,10 @@ class Subset(Dataset):
             transform = additional_transform + default_transforms
         else:
             transform = default_transforms
+
+        if apply_random_erasing:
+            # needs to come after ToTensor()
+            transform.append(transforms.RandomErasing(scale=(.02, .1)))
 
         transform = transforms.Compose(transform)
 
