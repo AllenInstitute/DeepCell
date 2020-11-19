@@ -28,7 +28,7 @@ class SlcDataset(Dataset):
         obs = self.manifest[index]
 
         input = self._extract_channels(obs=obs)
-        input = Image.fromarray(input)
+        input = Image.fromarray(input, mode='L')
 
         target = self.y[index]
 
