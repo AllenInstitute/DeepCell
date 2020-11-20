@@ -14,6 +14,9 @@ class CNN(nn.Module):
             nn.Linear(last_conv_filter_num * 7 * 7, 1024),
             nn.ReLU(inplace=True),
             nn.Dropout(p=dropout_prob),
+            nn.Linear(1024, 1024),
+            nn.ReLU(inplace=True),
+            nn.Dropout(p=dropout_prob),
             nn.Linear(1024, num_classes),
         )
 
