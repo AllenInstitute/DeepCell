@@ -14,10 +14,10 @@ class CNN(nn.Module):
             nn.Linear(last_conv_filter_num * 7 * 7, 64),
             nn.ReLU(inplace=True),
             nn.Dropout(p=dropout_prob),
-            nn.Linear(64, 32),
+            nn.Linear(64, 64),
             nn.ReLU(inplace=True),
             nn.Dropout(p=dropout_prob),
-            nn.Linear(32, num_classes),
+            nn.Linear(64, num_classes),
         )
 
     def forward(self, x):
@@ -45,4 +45,6 @@ class CNN(nn.Module):
                     layers += [conv2d, nn.ReLU(inplace=True)]
                 in_channels = v
         return nn.Sequential(*layers)
+
+
 
