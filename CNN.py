@@ -11,10 +11,10 @@ class CNN(nn.Module):
 
         last_conv_filter_num = cfg[-2]
         self.classifier = nn.Sequential(
-            nn.Linear(last_conv_filter_num * 7 * 7, 64),
+            nn.Linear(last_conv_filter_num * 7 * 7, 1024),
             nn.ReLU(inplace=True),
             nn.Dropout(p=dropout_prob),
-            nn.Linear(64, num_classes),
+            nn.Linear(1024, num_classes),
         )
 
     def forward(self, x):
