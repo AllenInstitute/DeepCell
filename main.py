@@ -72,7 +72,7 @@ def main():
 
     model = CNN(cfg=model_config, dropout_prob=args.dropout_prob)
     optimizer = lambda: torch.optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
-    scheduler = lambda optimizer: torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=.95)
+    scheduler = lambda optimizer: torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=.99)
     criterion = torch.nn.BCEWithLogitsLoss()
     classifier = Classifier(
         model=model,
