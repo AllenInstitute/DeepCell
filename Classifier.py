@@ -160,7 +160,7 @@ class Classifier:
                         loss = self.criterion(output, target.float())
 
                         if self.use_learning_rate_scheduler:
-                            self.scheduler.step(loss)
+                            self.scheduler.step()
 
                         epoch_val_metrics.update_loss(loss=loss.item(), num_batches=len(valid_loader))
                         epoch_val_metrics.update_accuracies(y_true=target, y_out=output)
