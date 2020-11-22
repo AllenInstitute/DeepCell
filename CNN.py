@@ -2,23 +2,17 @@ from torch import nn
 
 
 class CNN(nn.Module):
-    def __init__(self, cfg, batch_norm=True, batch_norm_before_nonlin=True, num_classes=1,
+    def __init__(self, conv_cfg, classifier_cfg, batch_norm=True, batch_norm_before_nonlin=True, num_classes=1,
                  dropout_prob=0.5):
         super().__init__()
-        self.features = self._make_layers(cfg=cfg, batch_norm=batch_norm,
-                                          batch_norm_before_nonlin=batch_norm_before_nonlin)
+        self.features = self._make_conv_layers(cfg=conv_cfg, batch_norm=batch_norm,
+                                               batch_norm_before_nonlin=batch_norm_before_nonlin)
         self.avgpool = nn.AdaptiveAvgPool2d((7, 7))
 
-        last_conv_filter_num = cfg[-2]
-        self.classifier = nn.Sequential(
-            nn.Linear(last_conv_filter_num * 7 * 7, 1024),
-            nn.ReLU(inplace=True),
-            nn.Dropout(p=dropout_prob),
-            nn.Linear(1024, 1024),
-            nn.ReLU(inplace=True),
-            nn.Dropout(p=dropout_prob),
-            nn.Linear(1024, num_classes),
-        )
+        last_conv_filter_num = conv_cfg[-2]
+        in_features = last_conv_filter_num * 7 * 7
+        self.classifier = self._make_classifier_layers(cfg=classifier_cfg, in_features=in_features,
+                                                       dropout_prob=dropout_prob, num_classes=num_classes)
 
     def forward(self, x):
         x = self.features(x)
@@ -28,7 +22,7 @@ class CNN(nn.Module):
         return x
 
     @staticmethod
-    def _make_layers(cfg, batch_norm=True, batch_norm_before_nonlin=True):
+    def _make_conv_layers(cfg, batch_norm=True, batch_norm_before_nonlin=True):
         layers = []
         in_channels = 3
         for v in cfg:
@@ -44,6 +38,17 @@ class CNN(nn.Module):
                 else:
                     layers += [conv2d, nn.ReLU(inplace=True)]
                 in_channels = v
+        return nn.Sequential(*layers)
+
+    @staticmethod
+    def _make_classifier_layers(cfg, in_features, dropout_prob, num_classes=1):
+        layers = [
+            nn.Linear(in_features=in_features, out_features=cfg[0])
+        ]
+        for i, v in enumerate(cfg[1:-1], start=1):
+            layers += [nn.Linear(cfg[i-1], cfg[i]), nn.ReLU(inplace=True), nn.Dropout(p=dropout_prob)]
+
+        layers.append(nn.Linear(cfg[-1], num_classes))
         return nn.Sequential(*layers)
 
 

@@ -14,14 +14,16 @@ class Plotting:
         self.save_path = f'{self.results_dir}/{self.experiment_name}'
         os.makedirs(self.save_path, exist_ok=True)
 
-    def plot_train_loss(self, train_loss):
-        data = pd.DataFrame({'train loss': train_loss, 'epoch': range(len(train_loss))})
-        fig = px.line(data, x='epoch', y='train loss', title='Train loss')
-        fig.write_image(f'{self.save_path}/train_loss_{self.file_suffix}.png')
+    def plot_loss(self, train_loss, val_loss):
+        train = pd.DataFrame({'loss': train_loss, 'train or val': 'train', 'epoch': range(len(train_loss))})
+        val = pd.DataFrame({'loss': val_loss, 'train or val': 'val', 'epoch': range(len(val_loss))})
+        data = pd.concat([train, val])
+        fig = px.line(data, x='epoch', y='loss', color='train or val', title='Loss')
+        return fig
 
     def plot_train_val_F1(self, train_f1, val_f1):
         train = pd.DataFrame({'f1': train_f1, 'train or val': 'train', 'epoch': range(len(train_f1))})
         val = pd.DataFrame({'f1': val_f1, 'train or val': 'val', 'epoch': range(len(val_f1))})
         data = pd.concat([train, val])
         fig = px.line(data, x='epoch', y='f1', color='train or val', title='Train vs Val F1')
-        fig.write_image(f'{self.save_path}/f1_{self.file_suffix}.png')
+        return fig
