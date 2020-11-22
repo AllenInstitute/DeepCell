@@ -1,21 +1,23 @@
 from PIL import Image
 from croissant.utils import read_jsonlines
 import numpy as np
-from sklearn.model_selection import StratifiedShuffleSplit
 from torch.utils.data import Dataset
-from Subset import Subset
 
 
 class SlcDataset(Dataset):
-    def __init__(self, manifest_path, project_name, image_dim, debug=False):
+    def __init__(self, manifest_path, project_name, image_dim=(128, 128), roi_ids=None, transform=None, debug=False):
         super().__init__()
 
         self.manifest_path = manifest_path
         self.project_name = project_name
         self.image_dim = image_dim
+        self.transform = transform
 
-        self.manifest = read_jsonlines(uri=self.manifest_path)
-        self.manifest = [x for x in self.manifest]
+        manifest = read_jsonlines(uri=self.manifest_path)
+        self.manifest = [x for x in manifest]
+        self.roi_ids = roi_ids if roi_ids is not None else [x['roi-id'] for x in self.manifest]
+        self.manifest = [x for x in self.manifest if x['roi-id'] in set(self.roi_ids)]
+
         self.y = self._get_labels()
 
         if debug:
@@ -23,6 +25,7 @@ class SlcDataset(Dataset):
             cell_idx = np.argwhere(self.y == 1)[0][0]
             self.manifest = [self.manifest[not_cell_idx], self.manifest[cell_idx]]
             self.y = np.array([0, 1])
+            self.roi_ids = [x['roi-id'] for x in self.manifest]
 
     def __getitem__(self, index):
         obs = self.manifest[index]
@@ -30,23 +33,15 @@ class SlcDataset(Dataset):
         input = self._extract_channels(obs=obs)
         input = Image.fromarray(input)
 
+        if self.transform:
+            input = self.transform(input)
+
         target = self.y[index]
 
         return input, target
 
     def __len__(self):
         return len(self.manifest)
-
-    def get_train_test_datasets(self, test_size, seed=None, apply_transform=False):
-        sss = StratifiedShuffleSplit(n_splits=2, test_size=test_size, random_state=seed)
-        train_index, test_index = next(sss.split(np.zeros(len(self.y)), self.y))
-
-        train_subset = Subset(dataset=self, indices=train_index, apply_transform=apply_transform)
-        test_subset = Subset(dataset=self, indices=test_index, apply_transform=apply_transform)
-
-        train_y = self.y[train_index]
-
-        return train_subset, train_y, test_subset
 
     def _get_labels(self):
         labels = [x[self.project_name]['majorityLabel'] for x in self.manifest]

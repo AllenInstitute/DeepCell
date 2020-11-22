@@ -1,34 +1,37 @@
 import logging
 import numpy as np
 import os
+import sys
 import torch
 from torch.utils.data import DataLoader
 
-from KfoldDataLoader import KfoldDataLoader
-from Metrics import Metrics
-from TrainingMetrics import TrainingMetrics
+from Metrics import Metrics, TrainingMetrics
+from SlcDataset import SlcDataset
+
+logging.basicConfig(
+    stream=sys.stdout,
+    level=logging.INFO,
+    format='%(levelname)s:\t%(asctime)s\t%(message)s',
+    datefmt='%m/%d/%Y %I:%M:%S %p'
+)
 
 logger = logging.getLogger(__name__)
 
 
 class Classifier:
-    def __init__(self, model: torch.nn.Module, n_epochs: int, test_loader: DataLoader, optimizer, scheduler, criterion,
-                 save_path, train_loader: DataLoader = None, kfoldDataLoader: KfoldDataLoader = None, debug=False,
-                 use_learning_rate_scheduler=False):
+    def __init__(self, model: torch.nn.Module, train: SlcDataset, n_epochs: int, optimizer,
+                 criterion, save_path, scheduler=None, debug=False):
         self.n_epochs = n_epochs
-        self.train_loader = train_loader
-        self.test_loader = test_loader
         self.model = model
+        self.train = train
         self.optimizer_constructor = optimizer
         self.scheduler_contructor = scheduler
         self.optimizer = optimizer()
-        self.scheduler = scheduler(self.optimizer)
+        self.scheduler = scheduler(self.optimizer) if scheduler is not None else None
         self.criterion = criterion
         self.use_cuda = torch.cuda.is_available()
         self.save_path = save_path
-        self.kfoldDataLoader = kfoldDataLoader
         self.debug = debug
-        self.use_learning_rate_scheduler = use_learning_rate_scheduler
 
         if not os.path.exists(f'{self.save_path}'):
             os.makedirs(f'{self.save_path}')
@@ -38,30 +41,31 @@ class Classifier:
 
         torch.save(self.model.state_dict(), f'{self.save_path}/model_init.pt')
 
-    def cross_validate(self):
+    def cross_validate(self, data_splitter, n_splits=5, shuffle=True, batch_size=64):
         if self.debug:
-            data_loaders = [(self.train_loader, None)]
-            n_folds = 1
+            datasets = [(self.train, None)]
+            n_splits = 1
         else:
-            data_loaders = self.kfoldDataLoader.run()
-            n_folds = self.kfoldDataLoader.n_splits
+            datasets = data_splitter.get_cross_val_split(train_dataset=self.train, n_splits=n_splits,
+                                                                  shuffle=shuffle)
+        train_losses = np.zeros((n_splits, self.n_epochs))
+        val_losses = np.zeros((n_splits, self.n_epochs))
+        precisions = np.zeros((n_splits, self.n_epochs))
+        recalls = np.zeros((n_splits, self.n_epochs))
+        train_f1s = np.zeros((n_splits, self.n_epochs))
+        val_f1s = np.zeros((n_splits, self.n_epochs))
+        best_epochs = np.zeros(n_splits, dtype=np.int)
 
-        train_losses = np.zeros((n_folds, self.n_epochs))
-        val_losses = np.zeros((n_folds, self.n_epochs))
-        precisions = np.zeros((n_folds, self.n_epochs))
-        recalls = np.zeros((n_folds, self.n_epochs))
-        train_f1s = np.zeros((n_folds, self.n_epochs))
-        val_f1s = np.zeros((n_folds, self.n_epochs))
-        best_epochs = np.zeros(n_folds, dtype=np.int)
+        logger.info(f'Train evaluate on {n_splits} folds')
 
-        logger.info(f'Train evaluate on {n_folds} folds')
+        for i, (train, valid) in enumerate(datasets):
+            train_loader = DataLoader(dataset=train, shuffle=True, batch_size=batch_size)
+            valid_loader = DataLoader(dataset=valid, shuffle=False, batch_size=batch_size)
 
-        for i, (train_loader, valid_loader) in enumerate(data_loaders):
             logger.info(f'Train/evaluate on fold {i}')
 
-            train_metrics, val_metrics = self._train(
-                n_epochs=self.n_epochs, train_loader=train_loader, valid_loader=valid_loader,
-                save_model=False
+            train_metrics, val_metrics = self.fit(
+                train_loader=train_loader, valid_loader=valid_loader, save_model=False
             )
             best_epochs[i] = val_metrics.losses.argmin()
             precisions[i] = val_metrics.precisions
@@ -103,7 +107,7 @@ class Classifier:
             'std_val_best_epoch_f1': best_epoch_f1s.std(),
         }
 
-        logger.info(f'Done train/evaluate for {n_folds} folds')
+        logger.info(f'Done train/evaluate for {n_splits} folds')
 
         logger.info({
             'mean_val_best_epoch_precision': res['mean_val_best_epoch_precision'],
@@ -116,11 +120,11 @@ class Classifier:
 
         return res
 
-    def _train(self, n_epochs, train_loader: DataLoader, valid_loader: DataLoader = None, save_model=False):
-        all_train_metrics = TrainingMetrics(n_epochs=n_epochs)
-        all_val_metrics = TrainingMetrics(n_epochs=n_epochs)
+    def fit(self, train_loader: DataLoader, valid_loader: DataLoader = None, save_model=False):
+        all_train_metrics = TrainingMetrics(n_epochs=self.n_epochs)
+        all_val_metrics = TrainingMetrics(n_epochs=self.n_epochs)
 
-        for epoch in range(n_epochs):
+        for epoch in range(self.n_epochs):
             epoch_train_metrics = Metrics()
             epoch_val_metrics = Metrics()
 
@@ -159,7 +163,7 @@ class Classifier:
                         output = output.squeeze()
                         loss = self.criterion(output, target.float())
 
-                        if self.use_learning_rate_scheduler:
+                        if self.scheduler is not None:
                             self.scheduler.step()
 
                         epoch_val_metrics.update_loss(loss=loss.item(), num_batches=len(valid_loader))
@@ -217,5 +221,6 @@ class Classifier:
         self.optimizer = self.optimizer_constructor()
 
         # reset scheduler
-        self.scheduler = self.scheduler_contructor(self.optimizer)
+        if self.scheduler is not None:
+            self.scheduler = self.scheduler_contructor(self.optimizer)
 
