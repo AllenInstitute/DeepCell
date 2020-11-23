@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 class Classifier:
     def __init__(self, model: torch.nn.Module, train: SlcDataset, n_epochs: int, optimizer,
-                 criterion, save_path, scheduler=None, debug=False):
+                 criterion, save_path, scheduler=None, scheduler_step_after_batch=False, debug=False):
         self.n_epochs = n_epochs
         self.model = model
         self.train = train
@@ -28,6 +28,7 @@ class Classifier:
         self.scheduler_contructor = scheduler
         self.optimizer = optimizer()
         self.scheduler = scheduler(self.optimizer) if scheduler is not None else None
+        self.scheduler_step_after_batch = scheduler_step_after_batch
         self.criterion = criterion
         self.use_cuda = torch.cuda.is_available()
         self.save_path = save_path
@@ -140,9 +141,16 @@ class Classifier:
                 loss = self.criterion(output, target.float())
                 loss.backward()
                 self.optimizer.step()
+                if self.scheduler_step_after_batch:
+                    if self.scheduler is not None:
+                        self.scheduler.step()
 
                 epoch_train_metrics.update_loss(loss=loss.item(), num_batches=len(train_loader))
                 epoch_train_metrics.update_accuracies(y_true=target, y_out=output)
+
+            if not self.scheduler_step_after_batch:
+                if self.scheduler is not None:
+                    self.scheduler.step()
 
             all_train_metrics.update(epoch=epoch,
                                      loss=epoch_train_metrics.loss,
@@ -162,9 +170,6 @@ class Classifier:
                         output = self.model(data)
                         output = output.squeeze()
                         loss = self.criterion(output, target.float())
-
-                        if self.scheduler is not None:
-                            self.scheduler.step()
 
                         epoch_val_metrics.update_loss(loss=loss.item(), num_batches=len(valid_loader))
                         epoch_val_metrics.update_accuracies(y_true=target, y_out=output)
