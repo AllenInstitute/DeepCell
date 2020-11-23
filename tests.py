@@ -7,6 +7,7 @@ from torchvision import transforms
 from CNN import CNN
 from Classifier import Classifier
 from DataSplitter import DataSplitter
+from HyperparamTuning import HyperparamTuner, ParamDistribution
 from SlcDataset import SlcDataset
 
 
@@ -47,6 +48,26 @@ class Tests(unittest.TestCase):
                                      train_transform=transform, test_transform=transform)
         classifier.cross_validate(data_splitter=data_splitter, n_splits=5)
 
+    def test_hyperparam_tuner(self):
+        param_distributions = {
+            'optimizer': {
+                'optimizer': torch.optim.Adam,
+                'params': {
+                    'lr': {
+                        'distr': (-4, -2),
+                        'distr_type': 'LOG_SCALE'
+                    }
+                }
+            }
+        }
+        param_distributions = ParamDistribution(param_distribution=param_distributions)
+        transform = transforms.ToTensor()
+        train = SlcDataset(manifest_path=self.manifest_path, project_name=self.project_name, transform=transform)
+        data_splitter = DataSplitter(manifest_path=self.manifest_path, project_name=self.project_name,
+                                     train_transform=transform, test_transform=transform)
+        hp = HyperparamTuner(param_distributions=param_distributions, data_splitter=data_splitter, iters=1)
+        res = hp.search(train_dataset=train, n_epochs=1)
+        print(res)
 
 
 if __name__ == '__main__':

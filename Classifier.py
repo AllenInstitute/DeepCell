@@ -81,18 +81,6 @@ class Classifier:
             # Reset
             logger.info('Resetting model')
             self._reset()
-
-
-        best_epoch_precisions = np.array(
-            [precisions[row][col] for row, col in zip(range(precisions.shape[0]), best_epochs)]
-        )
-        best_epoch_recalls = np.array(
-            [recalls[row][col] for row, col in zip(range(recalls.shape[0]), best_epochs)]
-        )
-        best_epoch_f1s = np.array(
-            [val_f1s[row][col] for row, col in zip(range(val_f1s.shape[0]), best_epochs)]
-        )
-
         res = {
             'all_val_precision': precisions.mean(axis=0),
             'all_val_recall': recalls.mean(axis=0),
@@ -100,23 +88,23 @@ class Classifier:
             'all_train_f1': train_f1s.mean(axis=0),
             'train_losses': train_losses.mean(axis=0),
             'val_losses': val_losses.mean(axis=0),
-            'mean_val_best_epoch_precision': best_epoch_precisions.mean(),
-            'std_val_best_epoch_precision': best_epoch_precisions.std(),
-            'mean_val_best_epoch_recall': best_epoch_recalls.mean(),
-            'std_val_best_epoch_recall': best_epoch_recalls.std(),
-            'mean_val_best_epoch_f1': best_epoch_f1s.mean(),
-            'std_val_best_epoch_f1': best_epoch_f1s.std(),
+            'precision_mean': precisions[:, -1].mean(),
+            'precision_std': precisions[:, -1].std(),
+            'recall_mean': recalls[:, -1].mean(),
+            'recall_std': recalls[:, -1].std(),
+            'f1_mean': val_f1s[:, -1].mean(),
+            'f1_std': val_f1s[:, -1].std(),
         }
 
         logger.info(f'Done train/evaluate for {n_splits} folds')
 
         logger.info({
-            'mean_val_best_epoch_precision': res['mean_val_best_epoch_precision'],
-            'std_val_best_epoch_precision': res['std_val_best_epoch_precision'],
-            'mean_val_best_epoch_recall': res['mean_val_best_epoch_recall'],
-            'std_val_best_epoch_recall': res['std_val_best_epoch_recall'],
-            'mean_val_best_epoch_f1': res['mean_val_best_epoch_f1'],
-            'std_val_best_epoch_f1': res['std_val_best_epoch_f1']
+            'precision_mean': res['precision_mean'],
+            'precision_std': res['precision_std'],
+            'recall_mean': res['recall_mean'],
+            'recall_std': res['recall_std'],
+            'f1_mean': res['f1_mean'],
+            'f1_std': res['f1_std']
         })
 
         return res
