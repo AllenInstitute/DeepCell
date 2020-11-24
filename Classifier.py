@@ -42,7 +42,7 @@ class Classifier:
 
         torch.save(self.model.state_dict(), f'{self.save_path}/model_init.pt')
 
-    def cross_validate(self, data_splitter, n_splits=5, shuffle=True, batch_size=64):
+    def cross_validate(self, data_splitter, n_splits=5, shuffle=True, batch_size=64, log_after_each_epoch=True):
         if self.debug:
             datasets = [(self.train, None)]
             n_splits = 1
@@ -66,7 +66,8 @@ class Classifier:
             logger.info(f'Train/evaluate on fold {i}')
 
             train_metrics, val_metrics = self.fit(
-                train_loader=train_loader, valid_loader=valid_loader, save_model=False
+                train_loader=train_loader, valid_loader=valid_loader, save_model=False,
+                log_after_each_epoch=log_after_each_epoch
             )
             best_epochs[i] = val_metrics.losses.argmin()
             precisions[i] = val_metrics.precisions
@@ -109,7 +110,8 @@ class Classifier:
 
         return res
 
-    def fit(self, train_loader: DataLoader, valid_loader: DataLoader = None, save_model=False):
+    def fit(self, train_loader: DataLoader, valid_loader: DataLoader = None, save_model=False,
+            log_after_each_epoch=True):
         all_train_metrics = TrainingMetrics(n_epochs=self.n_epochs)
         all_val_metrics = TrainingMetrics(n_epochs=self.n_epochs)
 
@@ -136,10 +138,6 @@ class Classifier:
                 epoch_train_metrics.update_loss(loss=loss.item(), num_batches=len(train_loader))
                 epoch_train_metrics.update_accuracies(y_true=target, y_out=output)
 
-            if not self.scheduler_step_after_batch:
-                if self.scheduler is not None:
-                    self.scheduler.step()
-
             all_train_metrics.update(epoch=epoch,
                                      loss=epoch_train_metrics.loss,
                                      precision=epoch_train_metrics.precision,
@@ -162,15 +160,20 @@ class Classifier:
                         epoch_val_metrics.update_loss(loss=loss.item(), num_batches=len(valid_loader))
                         epoch_val_metrics.update_accuracies(y_true=target, y_out=output)
 
+            if not self.scheduler_step_after_batch:
+                if self.scheduler is not None:
+                    self.scheduler.step()
+
                 all_val_metrics.update(epoch=epoch,
                                        loss=epoch_val_metrics.loss,
                                        precision=epoch_val_metrics.precision,
                                        recall=epoch_val_metrics.recall,
                                        f1=epoch_val_metrics.F1)
 
-            logger.info(f'Epoch: {epoch + 1} \tTrain Loss: {epoch_train_metrics.loss:.6f} '
-                        f'\tTrain F1: {epoch_train_metrics.F1:.6f}'
-                        f'\tVal F1: {epoch_val_metrics.F1:.6f}')
+            if log_after_each_epoch:
+                logger.info(f'Epoch: {epoch + 1} \tTrain Loss: {epoch_train_metrics.loss:.6f} '
+                            f'\tTrain F1: {epoch_train_metrics.F1:.6f}'
+                            f'\tVal F1: {epoch_val_metrics.F1:.6f}')
 
         if save_model:
             torch.save(self.model.state_dict(), f'{self.save_path}/model.pt')

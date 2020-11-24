@@ -1,3 +1,6 @@
+import logging
+import sys
+
 import numpy as np
 import torch
 
@@ -6,6 +9,15 @@ from Classifier import Classifier
 from DataSplitter import DataSplitter
 from Plotting import Plotting
 from SlcDataset import SlcDataset
+
+logging.basicConfig(
+    stream=sys.stdout,
+    level=logging.INFO,
+    format='%(levelname)s:\t%(asctime)s\t%(message)s',
+    datefmt='%m/%d/%Y %I:%M:%S %p'
+)
+
+logger = logging.getLogger(__name__)
 
 
 class ParamDistribution:
@@ -95,7 +107,14 @@ class HyperparamTuner:
                 save_path='./saved_models'
             )
 
-            cv_res = classifier.cross_validate(data_splitter=self.data_splitter, n_splits=self.n_splits)
+            logger.info('==========')
+            logger.info(f'ITER {iter}')
+            logger.info('==========')
+            logger.info(params)
+            logger.info('Cross validating')
+
+            cv_res = classifier.cross_validate(data_splitter=self.data_splitter, n_splits=self.n_splits,
+                                               log_after_each_epoch=False)
             d = {}
             for category, category_params in params.items():
                 params = category_params['params']
