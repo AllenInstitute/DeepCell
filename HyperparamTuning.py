@@ -80,7 +80,7 @@ class HyperparamTuner:
             optimizer_params = params['optimizer'] if 'optimizer' in params else {}
             scheduler_params = params['scheduler'] if 'scheduler' in params else {}
 
-            if 'conv_config' not in model_params['params']:
+            if 'conv_cfg' not in model_params['params']:
                 model_params['params']['conv_cfg'] = CONV_CONFIG
             if 'classifier_cfg' not in model_params['params']:
                 model_params['classifier_cfg'] = CLASSIFIER_CONFIG
