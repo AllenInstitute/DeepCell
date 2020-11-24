@@ -162,7 +162,7 @@ class Classifier:
 
             if not self.scheduler_step_after_batch:
                 if self.scheduler is not None:
-                    self.scheduler.step()
+                    self.scheduler.step(loss)
 
                 all_val_metrics.update(epoch=epoch,
                                        loss=epoch_val_metrics.loss,
