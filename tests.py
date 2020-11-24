@@ -27,7 +27,7 @@ class Tests(unittest.TestCase):
         train_transform = transforms.ToTensor()
         train = SlcDataset(manifest_path=self.manifest_path, project_name=self.project_name, transform=train_transform,
                            debug=True)
-        cnn = CNN(conv_cfg=[32, 'M', 64, 'M', 128, 'M'], classifier_cfg=[512], dropout_prob=0.0)
+        cnn = CNN(conv_cfg=[32, 'M', 64, 'M', 128, 'M'], classifier_cfg=[512, 16], dropout_prob=0.0)
         optimizer = lambda: torch.optim.Adam(cnn.parameters(), lr=1e-3)
         criterion = torch.nn.BCEWithLogitsLoss()
         classifier = Classifier(model=cnn, train=train, n_epochs=5, optimizer=optimizer,

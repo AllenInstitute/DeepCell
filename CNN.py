@@ -43,10 +43,16 @@ class CNN(nn.Module):
     @staticmethod
     def _make_classifier_layers(cfg, in_features, dropout_prob, num_classes=1):
         layers = [
-            nn.Linear(in_features=in_features, out_features=cfg[0])
+            nn.Linear(in_features=in_features, out_features=cfg[0]),
+            nn.ReLU(inplace=True),
+            nn.Dropout(p=dropout_prob)
         ]
-        for i, v in enumerate(cfg[1:-1], start=1):
-            layers += [nn.Linear(cfg[i-1], cfg[i]), nn.ReLU(inplace=True), nn.Dropout(p=dropout_prob)]
+        for i, v in enumerate(cfg[1:], start=1):
+            layers += [
+                nn.Linear(cfg[i-1], cfg[i]),
+                nn.ReLU(inplace=True),
+                nn.Dropout(p=dropout_prob)
+            ]
 
         layers.append(nn.Linear(cfg[-1], num_classes))
         return nn.Sequential(*layers)
