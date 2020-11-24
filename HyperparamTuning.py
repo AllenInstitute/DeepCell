@@ -45,7 +45,7 @@ class ParamDistribution:
         distr = param['distr']
 
         if param['distr_type'] == 'DISCRETE':
-            return np.choice(distr)
+            return np.random.choice(distr)
         elif param['distr_type'] == 'LOG_SCALE':
             low, high = distr
             return 10 ** np.random.uniform(low=low, high=high)
