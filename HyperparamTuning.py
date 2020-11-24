@@ -61,6 +61,7 @@ OPTIMIZER = torch.optim.Adam
 LR = 1e-3
 CONV_CONFIG = [32, 32, 'M', 64, 64, 'M']
 CLASSIFIER_CONFIG = [512]
+CRITERION = torch.nn.BCEWithLogitsLoss
 
 
 class HyperparamTuner:
@@ -79,6 +80,7 @@ class HyperparamTuner:
                 {'params': {'conv_cfg': CONV_CONFIG, 'classifier_cfg': CLASSIFIER_CONFIG}}
             optimizer_params = params['optimizer'] if 'optimizer' in params else {}
             scheduler_params = params['scheduler'] if 'scheduler' in params else {}
+            criterion_params = params['criterion'] if 'criterion' in params else {}
 
             if 'conv_cfg' not in model_params['params']:
                 model_params['params']['conv_cfg'] = CONV_CONFIG
@@ -97,7 +99,7 @@ class HyperparamTuner:
             else:
                 scheduler = None
 
-            criterion = torch.nn.BCEWithLogitsLoss()
+            criterion = CRITERION(**criterion_params['params']) if criterion_params else CRITERION()
             classifier = Classifier(
                 model=model,
                 n_epochs=n_epochs,
