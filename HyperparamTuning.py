@@ -1,4 +1,5 @@
 import logging
+import random
 import sys
 
 import numpy as np
@@ -45,7 +46,7 @@ class ParamDistribution:
         distr = param['distr']
 
         if param['distr_type'] == 'DISCRETE':
-            return np.random.choice(distr)
+            return random.choice(distr)
         elif param['distr_type'] == 'LOG_SCALE':
             low, high = distr
             return 10 ** np.random.uniform(low=low, high=high)
