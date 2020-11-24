@@ -27,10 +27,10 @@ class Tests(unittest.TestCase):
         train_transform = transforms.ToTensor()
         train = SlcDataset(manifest_path=self.manifest_path, project_name=self.project_name, transform=train_transform,
                            debug=True)
-        cnn = CNN(conv_cfg=[32, 'M', 64, 'M', 128, 'M'], dropout_prob=0.0)
+        cnn = CNN(conv_cfg=[32, 'M', 64, 'M', 128, 'M'], classifier_cfg=[512], dropout_prob=0.0)
         optimizer = lambda: torch.optim.Adam(cnn.parameters(), lr=1e-3)
         criterion = torch.nn.BCEWithLogitsLoss()
-        classifier = Classifier(model=cnn, train=train, n_epochs=10, optimizer=optimizer,
+        classifier = Classifier(model=cnn, train=train, n_epochs=20, optimizer=optimizer,
                                 criterion=criterion, save_path='./saved_models')
         train_loader = DataLoader(dataset=train, batch_size=2)
         train_metrics, _ = classifier.fit(train_loader=train_loader)
@@ -39,7 +39,7 @@ class Tests(unittest.TestCase):
     def test_cross_validate(self):
         transform = transforms.ToTensor()
         train = SlcDataset(manifest_path=self.manifest_path, project_name=self.project_name, transform=transform)
-        cnn = CNN(conv_cfg=[32, 'M', 64, 'M', 128, 'M'], dropout_prob=0.0)
+        cnn = CNN(conv_cfg=[32, 'M', 64, 'M', 128, 'M'], classifier_cfg=[512])
         optimizer = lambda: torch.optim.Adam(cnn.parameters(), lr=1e-3)
         criterion = torch.nn.BCEWithLogitsLoss()
         classifier = Classifier(model=cnn, train=train, n_epochs=1, optimizer=optimizer,

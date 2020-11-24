@@ -62,16 +62,20 @@ class HyperparamTuner:
         for iter in range(self.iters):
             params = self.param_distributions.sample()
 
-            model_params = params['model'] if 'model' in params else {'conv_cfg': CONV_CONFIG, 'classifier_cfg':
-                CLASSIFIER_CONFIG}
+            model_params = params['model'] if 'model' in params else \
+                {'params': {'conv_cfg': CONV_CONFIG, 'classifier_cfg': CLASSIFIER_CONFIG}}
             optimizer_params = params['optimizer'] if 'optimizer' in params else {}
             scheduler_params = params['scheduler'] if 'scheduler' in params else {}
 
-            model = CNN(**model_params)
+            if 'conv_config' not in model_params['params']:
+                model_params['params']['conv_cfg'] = CONV_CONFIG
+            if 'classifier_cfg' not in model_params['params']:
+                model_params['classifier_cfg'] = CLASSIFIER_CONFIG
+            model = CNN(**model_params['params'])
 
             if optimizer_params:
                 optimizer = lambda: optimizer_params['optimizer'](model.parameters(),
-                                                                     **optimizer_params['params'])
+                                                                  **optimizer_params['params'])
             else:
                 optimizer = lambda: OPTIMIZER(model.parameters(), lr=LR)
 
