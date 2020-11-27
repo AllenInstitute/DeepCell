@@ -4,12 +4,15 @@ from SlcDataset import SlcDataset
 from util import get_random_roi
 
 
-def display_roi(mask, max_, avg_, roi_id, columns, rows):
+def display_roi(mask, max_, avg_, roi_id, columns, rows, label, y_pred=None):
     imgs = [mask, max_, avg_]
     type_ = ['mask', 'max', 'avg']
     fig = plt.figure(figsize=(20, 20))
     for i in range(1, columns * rows + 1):
-        fig.add_subplot(rows, columns, i, title=f'Cell {roi_id} {type_[i - 1]}')
+        title = f'{label} {roi_id} {type_[i - 1]}'
+        if y_pred:
+            title += f' {y_pred}'
+        fig.add_subplot(rows, columns, i, title=title)
         plt.imshow(imgs[i - 1], cmap='gray', vmin=0, vmax=255)
     plt.show()
 

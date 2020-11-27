@@ -19,11 +19,10 @@ logger = logging.getLogger(__name__)
 
 
 class Classifier:
-    def __init__(self, model: torch.nn.Module, train: SlcDataset, n_epochs: int, optimizer,
+    def __init__(self, model: torch.nn.Module, n_epochs: int, optimizer,
                  criterion, save_path, scheduler=None, scheduler_step_after_batch=False, debug=False):
         self.n_epochs = n_epochs
         self.model = model
-        self.train_dataset = train
         self.optimizer_constructor = optimizer
         self.scheduler_contructor = scheduler
         self.optimizer = optimizer()
@@ -42,12 +41,13 @@ class Classifier:
 
         torch.save(self.model.state_dict(), f'{self.save_path}/model_init.pt')
 
-    def cross_validate(self, data_splitter, n_splits=5, shuffle=True, batch_size=64, log_after_each_epoch=True):
+    def cross_validate(self, train_dataset: SlcDataset, data_splitter, n_splits=5, shuffle=True, batch_size=64,
+                       log_after_each_epoch=True):
         if self.debug:
-            datasets = [(self.train_dataset, None)]
+            datasets = [(train_dataset, None)]
             n_splits = 1
         else:
-            datasets = data_splitter.get_cross_val_split(train_dataset=self.train_dataset, n_splits=n_splits,
+            datasets = data_splitter.get_cross_val_split(train_dataset=train_dataset, n_splits=n_splits,
                                                          shuffle=shuffle)
         train_losses = np.zeros((n_splits, self.n_epochs))
         val_losses = np.zeros((n_splits, self.n_epochs))
