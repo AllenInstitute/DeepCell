@@ -33,7 +33,7 @@ class Tests(unittest.TestCase):
         classifier = Classifier(model=cnn, train=train, n_epochs=5, optimizer=optimizer,
                                 criterion=criterion, save_path='./saved_models')
         train_loader = DataLoader(dataset=train, batch_size=2)
-        train_metrics, _ = classifier.fit(train_loader=train_loader)
+        train_metrics, _ = classifier.train(train_loader=train_loader)
         self.assertLess(train_metrics.losses[-1], 1e-5)
 
     def test_cross_validate(self):

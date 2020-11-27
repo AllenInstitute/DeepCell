@@ -65,7 +65,7 @@ class Classifier:
 
             logger.info(f'Train/evaluate on fold {i}')
 
-            train_metrics, val_metrics = self.fit(
+            train_metrics, val_metrics = self.train(
                 train_loader=train_loader, valid_loader=valid_loader, save_model=False,
                 log_after_each_epoch=log_after_each_epoch
             )
@@ -110,8 +110,8 @@ class Classifier:
 
         return res
 
-    def fit(self, train_loader: DataLoader, valid_loader: DataLoader = None, save_model=False,
-            log_after_each_epoch=True):
+    def train(self, train_loader: DataLoader, valid_loader: DataLoader = None, save_model=False,
+              log_after_each_epoch=True):
         all_train_metrics = TrainingMetrics(n_epochs=self.n_epochs)
         all_val_metrics = TrainingMetrics(n_epochs=self.n_epochs)
 
@@ -162,7 +162,10 @@ class Classifier:
 
             if not self.scheduler_step_after_batch:
                 if self.scheduler is not None:
-                    self.scheduler.step(loss)
+                    if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+                        self.scheduler.step(epoch_val_metrics.F1)
+                    else:
+                        self.scheduler.step()
 
                 all_val_metrics.update(epoch=epoch,
                                        loss=epoch_val_metrics.loss,
@@ -180,33 +183,23 @@ class Classifier:
 
         return all_train_metrics, all_val_metrics
 
-    def evaluate(self):
+    def test(self, test_loader: DataLoader):
         state_dict = torch.load(f'{self.save_path}/model.pt')
         self.model.load_state_dict(state_dict)
 
-        TP = 0
-        FP = 0
-        FN = 0
+        metrics = Metrics()
 
         self.model.eval()
-        for data, target in self.test_loader:
+        for data, target in test_loader:
             if self.use_cuda:
                 data, target = data.cuda(), target.cuda()
 
             with torch.no_grad():
                 output = self.model(data)
                 output = output.squeeze()
-                y_score = torch.sigmoid(output)
-                y_pred = y_score > .5
-                TP += ((target == 1) & (y_pred == 1)).sum().item()
-                FN += ((target == 1) & (y_pred == 0)).sum().item()
-                FP += ((target == 0) & (y_pred == 1)).sum().item()
+                metrics.update_accuracies(y_true=target, y_out=output)
 
-        precision = TP / (TP + FP)
-        recall = TP / (TP + FN)
-
-        print(f'Precision: {precision:.3f}')
-        print(f'Recall: {recall:.3f}')
+        return metrics
 
     def _reset(self):
         # reset model weights
