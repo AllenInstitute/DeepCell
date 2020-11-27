@@ -10,7 +10,7 @@ def display_roi(mask, max_, avg_, roi_id, columns, rows, label, y_pred=None):
     fig = plt.figure(figsize=(20, 20))
     for i in range(1, columns * rows + 1):
         title = f'{label} {roi_id} {type_[i - 1]}'
-        if y_pred:
+        if y_pred is not None:
             title += f' {y_pred}'
         fig.add_subplot(rows, columns, i, title=title)
         plt.imshow(imgs[i - 1], cmap='gray', vmin=0, vmax=255)
