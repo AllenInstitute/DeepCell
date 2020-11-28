@@ -4,7 +4,9 @@ from SlcDataset import SlcDataset
 from util import get_random_roi
 
 
-def display_roi(mask, max_, avg_, roi_id, columns, rows, label, y_pred=None):
+def display_roi(data: SlcDataset, roi_id, columns, rows, label, y_pred=None):
+    data, target = data[data.roi_ids.index(roi_id)]
+    avg_, max_, mask = data[:, :, 0], data[:, :, 1], data[:, :, 2]
     imgs = [mask, max_, avg_]
     type_ = ['mask', 'max', 'avg']
     fig = plt.figure(figsize=(20, 20))
@@ -18,9 +20,9 @@ def display_roi(mask, max_, avg_, roi_id, columns, rows, label, y_pred=None):
 
 
 def display_differently_labeled_rois(data: SlcDataset):
-    cell_mask, cell_max, cell_avg, cell_roi_id = get_random_roi(data=data, label=1)
-    display_roi(mask=cell_mask, max_=cell_max, avg_=cell_avg, roi_id=cell_roi_id, rows=1, columns=3)
+    cell_roi_id = get_random_roi(data=data, label=1)
+    display_roi(data=data, roi_id=cell_roi_id, rows=1, columns=3, label='Cell')
 
-    not_cell_mask, not_cell_max, not_cell_avg, not_cell_roi_id = get_random_roi(data=data, label=0)
-    display_roi(mask=not_cell_mask, max_=not_cell_max, avg_=not_cell_avg, roi_id=not_cell_roi_id, rows=1, columns=3)
+    not_cell_roi_id = get_random_roi(data=data, label=0)
+    display_roi(data=data, roi_id=not_cell_roi_id, rows=1, columns=3, label='Not Cell')
 

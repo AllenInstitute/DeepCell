@@ -1,11 +1,15 @@
 from PIL import Image
 from croissant.utils import read_jsonlines
 import numpy as np
+import os
 from torch.utils.data import Dataset
+
+from Transform import Transform
 
 
 class SlcDataset(Dataset):
-    def __init__(self, manifest_path, project_name, image_dim=(128, 128), roi_ids=None, transform=None, debug=False):
+    def __init__(self, manifest_path, project_name, image_dim=(128, 128), roi_ids=None, transform: Transform = None,
+                 debug=False):
         super().__init__()
 
         self.manifest_path = manifest_path
@@ -33,7 +37,19 @@ class SlcDataset(Dataset):
         input = self._extract_channels(obs=obs)
 
         if self.transform:
-            input = self.transform(input)
+            avg, max_, mask = input[:, :, 0], input[:, :, 1], input[:, :, 2]
+            if self.transform.avg_transform:
+                avg = self.transform.avg_transform(avg)
+                input[:, :, 0] = avg
+            if self.transform.max_transform:
+                max_ = self.transform.max_transform(max_)
+                input[:, :, 1] = max_
+            if self.transform.mask_transform:
+                mask = self.transform.mask_transform(mask)
+                input[:, :, 2] = mask
+
+            if self.transform.all_transform:
+                input = self.transform.all_transform(input)
 
         target = self.y[index]
 
@@ -51,15 +67,16 @@ class SlcDataset(Dataset):
     def _extract_channels(self, obs):
         roi_id = obs['roi-id']
 
-        with open(f'data/avg_{roi_id}.png', 'rb') as f:
+        data_dir = os.path.abspath('../data')
+        with open(f'{data_dir}/avg_{roi_id}.png', 'rb') as f:
             avg = Image.open(f)
             avg = np.array(avg)
 
-        with open(f'data/max_{roi_id}.png', 'rb') as f:
+        with open(f'{data_dir}/max_{roi_id}.png', 'rb') as f:
             max = Image.open(f)
             max = np.array(max)
 
-        with open(f'data/mask_{roi_id}.png', 'rb') as f:
+        with open(f'{data_dir}/mask_{roi_id}.png', 'rb') as f:
             mask = Image.open(f)
             mask = np.array(mask)
 
