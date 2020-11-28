@@ -67,7 +67,7 @@ class SlcDataset(Dataset):
     def _extract_channels(self, obs):
         roi_id = obs['roi-id']
 
-        data_dir = os.path.abspath('../data')
+        data_dir = self._get_data_dir()
         with open(f'{data_dir}/avg_{roi_id}.png', 'rb') as f:
             avg = Image.open(f)
             avg = np.array(avg)
@@ -86,4 +86,8 @@ class SlcDataset(Dataset):
         res[:, :, 2] = mask
 
         return res
+
+    @staticmethod
+    def _get_data_dir():
+        return os.path.abspath('data')
 
