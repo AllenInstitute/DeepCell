@@ -103,7 +103,6 @@ class HyperparamTuner:
             classifier = Classifier(
                 model=model,
                 n_epochs=n_epochs,
-                train=train_dataset,
                 optimizer=optimizer,
                 scheduler=scheduler,
                 criterion=criterion,
@@ -116,8 +115,8 @@ class HyperparamTuner:
             logger.info(params)
             logger.info('Cross validating')
 
-            cv_res = classifier.cross_validate(data_splitter=self.data_splitter, n_splits=self.n_splits,
-                                               log_after_each_epoch=False)
+            cv_res = classifier.cross_validate(train_dataset=train_dataset, data_splitter=self.data_splitter,
+                                               n_splits=self.n_splits, log_after_each_epoch=False)
             d = {}
             for category, category_params in params.items():
                 params = category_params['params']
