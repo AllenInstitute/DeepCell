@@ -4,9 +4,11 @@ from SlcDataset import SlcDataset
 from util import get_random_roi
 
 
-def display_roi(data: SlcDataset, roi_id, columns, rows, label, y_pred=None):
-    data, target = data[data.roi_ids.index(roi_id)]
-    avg_, max_, mask = data[:, :, 0], data[:, :, 1], data[:, :, 2]
+def display_roi(data: SlcDataset, roi_id, columns, rows, label, y_pred=None, channels=None):
+    if channels is None:
+        data, _ = data[data.roi_ids.index(roi_id)]
+        channels = data
+    avg_, max_, mask = channels[:, :, 0], channels[:, :, 1], channels[:, :, 2]
     imgs = [mask, max_, avg_]
     type_ = ['mask', 'max', 'avg']
     fig = plt.figure(figsize=(20, 20))
