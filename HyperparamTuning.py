@@ -4,10 +4,10 @@ import sys
 
 import numpy as np
 import torch
+from torch.utils.data import DataLoader
 
 from CNN import CNN
 from Classifier import Classifier
-from DataSplitter import DataSplitter
 from Plotting import Plotting
 from SlcDataset import SlcDataset
 
@@ -65,10 +65,11 @@ CRITERION = torch.nn.BCEWithLogitsLoss
 
 
 class HyperparamTuner:
-    def __init__(self, param_distributions: ParamDistribution, data_splitter: DataSplitter, n_splits=5, iters=10):
+    def __init__(self, param_distributions: ParamDistribution, train_loader: DataLoader, valid_loader: DataLoader,
+                 iters=10):
         self.param_distributions = param_distributions
-        self.data_splitter = data_splitter
-        self.n_splits = n_splits
+        self.train_loader = train_loader
+        self.valid_loader = valid_loader
         self.iters = iters
 
     def search(self, train_dataset: SlcDataset, n_epochs=100):
@@ -115,26 +116,23 @@ class HyperparamTuner:
             logger.info(params)
             logger.info('Cross validating')
 
-            cv_res = classifier.cross_validate(train_dataset=train_dataset, data_splitter=self.data_splitter,
-                                               n_splits=self.n_splits, log_after_each_epoch=False)
+            train_metrics, val_metrics = classifier.train(train_loader=self.train_loader,
+                                                          valid_loader=self.valid_loader)
             d = {}
             for category, category_params in params.items():
                 params = category_params['params']
                 for param, val in params.items():
                     d[param] = val
-            d['precision_mean'] = cv_res['precision_mean']
-            d['precision_std'] = cv_res['precision_std']
-            d['recall_mean'] = cv_res['recall_mean']
-            d['recall_std'] = cv_res['recall_std']
-            d['f1_mean'] = cv_res['f1_mean']
-            d['f1_std'] = cv_res['f1_std']
+            d['precision'] = val_metrics.precisions[-1]
+            d['recall'] = val_metrics.recalls[-1]
+            d['f1'] = val_metrics.f1s[-1]
 
             plotting = Plotting(experiment_name=iter)
-            fig = plotting.plot_loss(train_loss=cv_res['train_losses'], val_loss=cv_res['val_losses'])
+            fig = plotting.plot_loss(train_loss=train_metrics.losses, val_loss=val_metrics.losses)
             d['loss_plot'] = f'results/loss_{iter}_{plotting.file_suffix}.png'
             fig.write_image(d['loss_plot'])
 
-            fig = plotting.plot_train_val_F1(train_f1=cv_res['all_train_f1'], val_f1=cv_res['all_val_f1'])
+            fig = plotting.plot_train_val_F1(train_f1=train_metrics.f1s, val_f1=val_metrics.f1s)
             d['f1_plot'] = f'results/f1_{iter}_{plotting.file_suffix}.png'
             fig.write_image(d['f1_plot'])
 

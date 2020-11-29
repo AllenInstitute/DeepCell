@@ -41,79 +41,14 @@ class Classifier:
 
         torch.save(self.model.state_dict(), f'{self.save_path}/model_init.pt')
 
-    def cross_validate(self, train_dataset: SlcDataset, data_splitter, n_splits=5, shuffle=True, batch_size=64,
-                       log_after_each_epoch=True):
-        if self.debug:
-            datasets = [(train_dataset, None)]
-            n_splits = 1
-        else:
-            datasets = data_splitter.get_cross_val_split(train_dataset=train_dataset, n_splits=n_splits,
-                                                         shuffle=shuffle)
-        train_losses = np.zeros((n_splits, self.n_epochs))
-        val_losses = np.zeros((n_splits, self.n_epochs))
-        precisions = np.zeros((n_splits, self.n_epochs))
-        recalls = np.zeros((n_splits, self.n_epochs))
-        train_f1s = np.zeros((n_splits, self.n_epochs))
-        val_f1s = np.zeros((n_splits, self.n_epochs))
-        best_epochs = np.zeros(n_splits, dtype=np.int)
-
-        logger.info(f'Train evaluate on {n_splits} folds')
-
-        for i, (train, valid) in enumerate(datasets):
-            train_loader = DataLoader(dataset=train, shuffle=True, batch_size=batch_size)
-            valid_loader = DataLoader(dataset=valid, shuffle=False, batch_size=batch_size)
-
-            logger.info(f'Train/evaluate on fold {i}')
-
-            train_metrics, val_metrics = self.train(
-                train_loader=train_loader, valid_loader=valid_loader, save_model=False,
-                log_after_each_epoch=log_after_each_epoch
-            )
-            best_epochs[i] = val_metrics.losses.argmin()
-            precisions[i] = val_metrics.precisions
-            recalls[i] = val_metrics.recalls
-            val_f1s[i] = val_metrics.f1s
-
-            train_f1s[i] = train_metrics.f1s
-
-            train_losses[i] = train_metrics.losses
-            val_losses[i] = val_metrics.losses
-
-            # Reset
-            logger.info('Resetting model')
-            self._reset()
-        res = {
-            'all_val_precision': precisions.mean(axis=0),
-            'all_val_recall': recalls.mean(axis=0),
-            'all_val_f1': val_f1s.mean(axis=0),
-            'all_train_f1': train_f1s.mean(axis=0),
-            'train_losses': train_losses.mean(axis=0),
-            'val_losses': val_losses.mean(axis=0),
-            'precision_mean': precisions[:, -1].mean(),
-            'precision_std': precisions[:, -1].std(),
-            'recall_mean': recalls[:, -1].mean(),
-            'recall_std': recalls[:, -1].std(),
-            'f1_mean': val_f1s[:, -1].mean(),
-            'f1_std': val_f1s[:, -1].std(),
-        }
-
-        logger.info(f'Done train/evaluate for {n_splits} folds')
-
-        logger.info({
-            'precision_mean': res['precision_mean'],
-            'precision_std': res['precision_std'],
-            'recall_mean': res['recall_mean'],
-            'recall_std': res['recall_std'],
-            'f1_mean': res['f1_mean'],
-            'f1_std': res['f1_std']
-        })
-
-        return res
-
     def train(self, train_loader: DataLoader, valid_loader: DataLoader = None, save_model=False,
-              log_after_each_epoch=True):
+              log_after_each_epoch=True, early_stopping_count=30):
         all_train_metrics = TrainingMetrics(n_epochs=self.n_epochs)
         all_val_metrics = TrainingMetrics(n_epochs=self.n_epochs)
+
+        best_epoch_F1 = -float('inf')
+        best_epoch = 0
+        time_since_best_epoch = 0
 
         for epoch in range(self.n_epochs):
             epoch_train_metrics = Metrics()
@@ -160,6 +95,25 @@ class Classifier:
                         epoch_val_metrics.update_loss(loss=loss.item(), num_batches=len(valid_loader))
                         epoch_val_metrics.update_accuracies(y_true=target, y_out=output)
 
+                all_val_metrics.update(epoch=epoch,
+                                       loss=epoch_val_metrics.loss,
+                                       precision=epoch_val_metrics.precision,
+                                       recall=epoch_val_metrics.recall,
+                                       f1=epoch_val_metrics.F1)
+
+                if epoch_val_metrics.F1 > best_epoch_F1:
+                    torch.save(self.model.state_dict(), f'{self.save_path}/model.pt')
+                    best_epoch = epoch
+                    best_epoch_F1 = epoch_val_metrics.F1
+                    time_since_best_epoch = 0
+                else:
+                    time_since_best_epoch += 1
+                    if time_since_best_epoch > early_stopping_count:
+                        logger.info('Stopping due to early stopping')
+                        all_train_metrics.truncate_to_epoch(epoch=best_epoch)
+                        all_val_metrics.truncate_to_epoch(epoch=best_epoch)
+                        return all_train_metrics, all_val_metrics
+
             if not self.scheduler_step_after_batch:
                 if self.scheduler is not None:
                     if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
@@ -167,19 +121,10 @@ class Classifier:
                     else:
                         self.scheduler.step()
 
-                all_val_metrics.update(epoch=epoch,
-                                       loss=epoch_val_metrics.loss,
-                                       precision=epoch_val_metrics.precision,
-                                       recall=epoch_val_metrics.recall,
-                                       f1=epoch_val_metrics.F1)
-
             if log_after_each_epoch:
                 logger.info(f'Epoch: {epoch + 1} \tTrain Loss: {epoch_train_metrics.loss:.6f} '
                             f'\tTrain F1: {epoch_train_metrics.F1:.6f}'
                             f'\tVal F1: {epoch_val_metrics.F1:.6f}')
-
-        if save_model:
-            torch.save(self.model.state_dict(), f'{self.save_path}/model.pt')
 
         return all_train_metrics, all_val_metrics
 
