@@ -4,7 +4,10 @@ from SlcDataset import SlcDataset
 from util import get_random_roi
 
 
-def display_roi(data: SlcDataset, roi_id, columns, rows, label, y_pred=None, channels=None):
+def display_roi(roi_id, columns, rows, label, y_pred=None, channels=None, data: SlcDataset = None):
+    if channels is None and data is None:
+        raise ValueError('Need to supply either dataset or numpy array')
+    
     if channels is None:
         data, _ = data[data.roi_ids.index(roi_id)]
         channels = data
