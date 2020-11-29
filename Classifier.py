@@ -41,12 +41,12 @@ class Classifier:
 
         torch.save(self.model.state_dict(), f'{self.save_path}/model_init.pt')
 
-    def train(self, train_loader: DataLoader, valid_loader: DataLoader = None, save_model=False,
+    def train(self, train_loader: DataLoader, valid_loader: DataLoader = None,
               log_after_each_epoch=True, early_stopping_count=30):
         all_train_metrics = TrainingMetrics(n_epochs=self.n_epochs)
         all_val_metrics = TrainingMetrics(n_epochs=self.n_epochs)
 
-        best_epoch_F1 = -float('inf')
+        best_epoch_loss = float('inf')
         best_epoch = 0
         time_since_best_epoch = 0
 
@@ -101,10 +101,10 @@ class Classifier:
                                        recall=epoch_val_metrics.recall,
                                        f1=epoch_val_metrics.F1)
 
-                if epoch_val_metrics.F1 > best_epoch_F1:
+                if epoch_val_metrics.loss < best_epoch_loss:
                     torch.save(self.model.state_dict(), f'{self.save_path}/model.pt')
                     best_epoch = epoch
-                    best_epoch_F1 = epoch_val_metrics.F1
+                    best_epoch_loss = epoch_val_metrics.loss
                     time_since_best_epoch = 0
                 else:
                     time_since_best_epoch += 1
