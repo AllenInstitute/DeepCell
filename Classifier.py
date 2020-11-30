@@ -5,6 +5,7 @@ import sys
 import torch
 from torch.utils.data import DataLoader
 
+from DataSplitter import DataSplitter
 from Metrics import Metrics, TrainingMetrics
 from SlcDataset import SlcDataset
 
@@ -20,7 +21,8 @@ logger = logging.getLogger(__name__)
 
 class Classifier:
     def __init__(self, model: torch.nn.Module, n_epochs: int, optimizer,
-                 criterion, save_path, scheduler=None, scheduler_step_after_batch=False, debug=False):
+                 criterion, save_path, scheduler=None, scheduler_step_after_batch=False, debug=False,
+                 early_stopping=30):
         self.n_epochs = n_epochs
         self.model = model
         self.optimizer_constructor = optimizer
@@ -32,6 +34,7 @@ class Classifier:
         self.use_cuda = torch.cuda.is_available()
         self.save_path = save_path
         self.debug = debug
+        self.early_stopping = early_stopping
 
         if not os.path.exists(f'{self.save_path}'):
             os.makedirs(f'{self.save_path}')
@@ -41,8 +44,56 @@ class Classifier:
 
         torch.save(self.model.state_dict(), f'{self.save_path}/model_init.pt')
 
+    def cross_validate(self, train_dataset: SlcDataset, data_splitter: DataSplitter, batch_size=64, sampler=None,
+                       n_splits=5):
+        min_n_epoch = float('inf')
+        precisions = np.zeros(n_splits)
+        recalls = np.zeros(n_splits)
+        f1s = np.zeros(n_splits)
+
+        train_loss = np.zeros(self.n_epochs)
+        valid_loss = np.zeros(self.n_epochs)
+
+        train_f1 = np.zeros(self.n_epochs)
+        valid_f1 = np.zeros(self.n_epochs)
+
+        for i, (train, valid) in enumerate(data_splitter.get_cross_val_split(train_dataset=train_dataset,
+                                                                           n_splits=n_splits)):
+            train_loader = DataLoader(dataset=train, shuffle=True, batch_size=batch_size, sampler=sampler)
+            valid_loader = DataLoader(dataset=valid, shuffle=False, batch_size=batch_size)
+            train_metrics, valid_metrics = self.train(train_loader=train_loader, valid_loader=valid_loader,
+                                                      log_after_each_epoch=False)
+            precisions[i] = (valid_metrics.precisions[-1])
+            recalls[i] = (valid_metrics.recalls[-1])
+            f1s[i] = (valid_metrics.f1s[-1])
+
+            train_loss += train_metrics.losses
+            valid_loss += valid_metrics.losses
+
+            train_f1 += train_metrics.f1s
+            valid_f1 += valid_metrics.f1s
+
+            min_n_epoch = min(len(train_metrics.losses), min_n_epoch)
+
+        train_loss = train_loss[:min_n_epoch] / n_splits
+        valid_loss = valid_loss[:min_n_epoch] / n_splits
+
+        train_f1 = train_f1[:min_n_epoch] / n_splits
+        valid_f1 = valid_f1[:min_n_epoch] / n_splits
+
+        metrics = {
+            'precision_mean': precisions.mean(),
+            'precision_std': precisions.std(),
+            'recall_mean': recalls.mean(),
+            'recall_std': recalls.std(),
+            'f1_mean': f1s.mean(),
+            'f1_std': f1s.std()
+        }
+
+        return metrics, (train_loss, valid_loss), (train_f1, valid_f1)
+
     def train(self, train_loader: DataLoader, valid_loader: DataLoader = None,
-              log_after_each_epoch=True, early_stopping_count=30):
+              log_after_each_epoch=True):
         all_train_metrics = TrainingMetrics(n_epochs=self.n_epochs)
         all_val_metrics = TrainingMetrics(n_epochs=self.n_epochs)
 
@@ -108,7 +159,7 @@ class Classifier:
                     time_since_best_epoch = 0
                 else:
                     time_since_best_epoch += 1
-                    if time_since_best_epoch > early_stopping_count:
+                    if time_since_best_epoch > self.early_stopping:
                         logger.info('Stopping due to early stopping')
                         all_train_metrics.truncate_to_epoch(epoch=best_epoch)
                         all_val_metrics.truncate_to_epoch(epoch=best_epoch)

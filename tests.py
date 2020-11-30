@@ -25,12 +25,12 @@ class Tests(unittest.TestCase):
 
     def test_train_loss_0_sanity(self):
         train_transform = transforms.ToTensor()
-        train = SlcDataset(manifest_path=self.manifest_path, project_name=self.project_name, transform=train_transform,
+        train = SlcDataset(manifest_path=self.manifest_path, project_name=self.project_name,
                            debug=True)
         cnn = CNN(conv_cfg=[32, 'M', 64, 'M', 128, 'M'], classifier_cfg=[512, 16], dropout_prob=0.0)
         optimizer = lambda: torch.optim.Adam(cnn.parameters(), lr=1e-3)
         criterion = torch.nn.BCEWithLogitsLoss()
-        classifier = Classifier(model=cnn, train=train, n_epochs=5, optimizer=optimizer,
+        classifier = Classifier(model=cnn, n_epochs=5, optimizer=optimizer,
                                 criterion=criterion, save_path='./saved_models')
         train_loader = DataLoader(dataset=train, batch_size=2)
         train_metrics, _ = classifier.train(train_loader=train_loader)
