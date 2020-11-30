@@ -3,6 +3,7 @@ from croissant.utils import read_jsonlines
 import numpy as np
 import os
 from torch.utils.data import Dataset
+from torch.utils.data.sampler import Sampler
 
 from Transform import Transform
 
@@ -90,4 +91,23 @@ class SlcDataset(Dataset):
     @staticmethod
     def _get_data_dir():
         return os.path.abspath('data')
+
+
+class SlcSampler:
+    def __init__(self, y, cell_prob=0.2):
+        self.positive_proba = cell_prob
+
+        self.positive_idxs = np.where(y == 1)[0]
+        self.negative_idxs = np.where(y == 0)[0]
+
+        self.n_positive = self.positive_idxs.shape[0]
+        self.n_negative = int(self.n_positive * (1 - self.positive_proba) / self.positive_proba)
+
+    def __iter__(self):
+        negative_sample = np.random.choice(self.negative_idxs, size=self.n_negative)
+        shuffled = np.random.permutation(np.hstack((negative_sample, self.positive_idxs)))
+        return iter(shuffled.tolist())
+
+    def __len__(self):
+        return self.n_positive + self.n_negative
 
