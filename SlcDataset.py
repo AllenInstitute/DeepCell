@@ -90,7 +90,8 @@ class SlcDataset(Dataset):
 
     @staticmethod
     def _get_data_dir():
-        return os.path.abspath('data')
+        dir = os.path.dirname(os.path.abspath(__file__))
+        return os.path.abspath(f'{dir}/data')
 
 
 class SlcSampler(Sampler):
