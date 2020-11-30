@@ -93,7 +93,7 @@ class SlcDataset(Dataset):
         return os.path.abspath('data')
 
 
-class SlcSampler:
+class SlcSampler(Sampler):
     def __init__(self, y, cell_prob=0.2):
         self.positive_proba = cell_prob
 
