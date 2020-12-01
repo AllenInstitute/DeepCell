@@ -70,7 +70,7 @@ class Classifier:
         all_train_metrics = TrainingMetrics(n_epochs=self.n_epochs)
         all_val_metrics = TrainingMetrics(n_epochs=self.n_epochs)
 
-        best_epoch_f1 = float('inf')
+        best_epoch_f1 = -float('inf')
         best_epoch = 0
         time_since_best_epoch = 0
 
