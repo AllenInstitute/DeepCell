@@ -16,10 +16,10 @@ class TrainingMetrics:
         self.f1s[epoch] = f1
 
     def truncate_to_epoch(self, epoch):
-        self.losses = self.losses[:epoch]
-        self.precisions = self.precisions[:epoch]
-        self.recalls = self.recalls[:epoch]
-        self.f1s = self.f1s[:epoch]
+        self.losses = self.losses[:epoch+1]
+        self.precisions = self.precisions[:epoch+1]
+        self.recalls = self.recalls[:epoch+1]
+        self.f1s = self.f1s[:epoch+1]
 
 
 class Metrics:
