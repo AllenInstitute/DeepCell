@@ -50,10 +50,14 @@ class Classifier:
 
         for i, (train, valid) in enumerate(data_splitter.get_cross_val_split(train_dataset=train_dataset,
                                                                              n_splits=n_splits)):
+            logger.info(f'=========')
+            logger.info(f'Fold {i}')
+            logger.info(f'=========')
+
             train_loader = DataLoader(dataset=train, shuffle=True, batch_size=batch_size, sampler=sampler)
             valid_loader = DataLoader(dataset=valid, shuffle=False, batch_size=batch_size)
             train_metrics, valid_metrics = self.train(train_loader=train_loader, valid_loader=valid_loader,
-                                                      log_after_each_epoch=False, save_model=save_model, eval_fold=i)
+                                                      save_model=save_model, eval_fold=i)
 
             cv_metrics.update(train_metrics=train_metrics, valid_metrics=valid_metrics)
 
