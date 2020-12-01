@@ -56,8 +56,14 @@ class Metrics:
             res = 0.0
         return res
 
-    def update_accuracies(self, y_true, y_out):
-        y_score = torch.sigmoid(y_out)
+    def update_accuracies(self, y_true, y_out=None, y_score=None):
+        if y_out is not None and y_score is not None:
+            raise ValueError('Supply either logits or score')
+        if y_out is None and y_score is None:
+            raise ValueError('Supply either logits or score')
+
+        if y_score is None:
+            y_score = torch.sigmoid(y_out)
         y_pred = y_score > .5
 
         self._increment_TP(y_pred=y_pred, y_true=y_true)

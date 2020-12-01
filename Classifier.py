@@ -57,7 +57,9 @@ class Classifier:
 
             cv_metrics.update(train_metrics=train_metrics, valid_metrics=valid_metrics)
 
-        return cv_metrics
+            self._reset()
+
+        return cv_metrics.metrics
 
     def train(self, train_loader: DataLoader, eval_fold=None, valid_loader: DataLoader = None,
               log_after_each_epoch=True, save_model=False):
@@ -148,20 +150,26 @@ class Classifier:
         return all_train_metrics, all_val_metrics
 
     def test(self, test_loader: DataLoader):
-        state_dict = torch.load(f'{self.save_path}/model.pt')
-        self.model.load_state_dict(state_dict)
-
+        dataset: SlcDataset = test_loader.dataset
         metrics = Metrics()
+        y_scores = np.zeros(len(dataset))
 
-        self.model.eval()
-        for data, target in test_loader:
-            if self.use_cuda:
-                data, target = data.cuda(), target.cuda()
+        models = os.listdir(f'{self.save_path}')
+        for model in models:
+            state_dict = torch.load(f'{self.save_path}/{model}')
+            self.model.load_state_dict(state_dict)
 
-            with torch.no_grad():
-                output = self.model(data)
-                output = output.squeeze()
-                metrics.update_accuracies(y_true=target, y_out=output)
+            self.model.eval()
+            for data, target in test_loader:
+                if self.use_cuda:
+                    data, target = data.cuda(), target.cuda()
+
+                with torch.no_grad():
+                    output = self.model(data)
+                    output = output.squeeze()
+                    y_scores += torch.sigmoid(output)
+        y_scores /= len(models)
+        metrics.update_accuracies(y_true=dataset.y, y_score=y_scores)
 
         return metrics
 
