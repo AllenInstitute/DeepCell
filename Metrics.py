@@ -103,19 +103,18 @@ class CVMetrics:
         train_f1 = sum([x.f1s[-1] for x in self.train_metrics]) / self.n_splits
         valid_f1 = sum([x.f1s[-1] for x in self.valid_metrics]) / self.n_splits
 
-        history = self._get_running_metrics()
-
         return {
             'valid_precision': valid_precision,
             'valid_recall': valid_recall,
             'train_f1': train_f1,
             'valid_f1': valid_f1,
-            'history': history
         }
 
     def _get_running_metrics(self):
-        truncated_train_metrics = [x.truncate_to_epoch(epoch=self.min_n_epoch) for x in self.train_metrics]
-        truncated_valid_metrics = [x.truncate_to_epoch(epoch=self.min_n_epoch) for x in self.valid_metrics]
+        for x in self.train_metrics:
+            x.truncate_to_epoch(epoch=self.min_n_epoch)
+        for x in self.valid_metrics:
+            x.truncate_to_epoch(epoch=self.min_n_epoch)
 
         train_loss = np.zeros(int(self.min_n_epoch))
         valid_loss = np.zeros(int(self.min_n_epoch))
@@ -123,13 +122,13 @@ class CVMetrics:
         train_f1 = np.zeros(int(self.min_n_epoch))
         valid_f1 = np.zeros(int(self.min_n_epoch))
 
-        for m in truncated_train_metrics:
+        for m in self.train_metrics:
             train_loss += m.losses
             train_f1 += m.f1s
         train_loss /= self.n_splits
         train_f1 /= self.n_splits
 
-        for m in truncated_valid_metrics:
+        for m in self.valid_metrics:
             valid_loss += m.losses
             valid_f1 += m.f1s
         valid_loss /= self.n_splits
