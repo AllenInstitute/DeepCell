@@ -97,7 +97,7 @@ class CVMetrics:
 
     @property
     def metrics(self):
-        valid_precision = sum([x.recalls[-1] for x in self.valid_metrics]) / self.n_splits
+        valid_precision = sum([x.precisions[-1] for x in self.valid_metrics]) / self.n_splits
         valid_recall = sum([x.recalls[-1] for x in self.valid_metrics]) / self.n_splits
 
         train_f1 = sum([x.f1s[-1] for x in self.train_metrics]) / self.n_splits

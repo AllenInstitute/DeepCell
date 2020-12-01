@@ -63,7 +63,7 @@ class Classifier:
 
             self._reset()
 
-        return cv_metrics.metrics
+        return cv_metrics
 
     def train(self, train_loader: DataLoader, eval_fold=None, valid_loader: DataLoader = None,
               log_after_each_epoch=True, save_model=False):
