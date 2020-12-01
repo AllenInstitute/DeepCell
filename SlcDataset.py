@@ -1,7 +1,6 @@
 from PIL import Image
 from croissant.utils import read_jsonlines
 import numpy as np
-import os
 from torch.utils.data import Dataset
 from torch.utils.data.sampler import Sampler
 
@@ -69,7 +68,7 @@ class SlcDataset(Dataset):
     def _extract_channels(self, obs):
         roi_id = obs['roi-id']
 
-        data_dir = self._get_data_dir()
+        data_dir = self.data_dir
         with open(f'{data_dir}/avg_{roi_id}.png', 'rb') as f:
             avg = Image.open(f)
             avg = np.array(avg)
@@ -88,11 +87,6 @@ class SlcDataset(Dataset):
         res[:, :, 2] = mask
 
         return res
-
-    @staticmethod
-    def _get_data_dir():
-        dir = os.path.dirname(os.path.abspath(__file__))
-        return os.path.abspath(f'{dir}/../data')
 
 
 class SlcSampler(Sampler):
