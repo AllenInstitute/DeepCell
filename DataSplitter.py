@@ -5,15 +5,17 @@ from SlcDataset import SlcDataset
 
 
 class DataSplitter:
-    def __init__(self, manifest_path, project_name, train_transform=None, test_transform=None, seed=None):
+    def __init__(self, manifest_path, project_name, data_dir, train_transform=None, test_transform=None, seed=None):
         self.manifest_path = manifest_path
         self.project_name = project_name
+        self.data_dir = data_dir
         self.train_transform = train_transform
         self.test_transform = test_transform
         self.seed = seed
 
     def get_train_test_split(self, test_size):
-        full_dataset = SlcDataset(manifest_path=self.manifest_path, project_name=self.project_name)
+        full_dataset = SlcDataset(manifest_path=self.manifest_path, project_name=self.project_name,
+                                  data_dir=self.data_dir)
         sss = StratifiedShuffleSplit(n_splits=2, test_size=test_size, random_state=self.seed)
         train_index, test_index = next(sss.split(np.zeros(len(full_dataset)), full_dataset.y))
 
@@ -22,9 +24,10 @@ class DataSplitter:
         test_roi_ids = roi_ids[test_index]
 
         train_dataset = SlcDataset(roi_ids=train_roi_ids, manifest_path=self.manifest_path,
-                                   project_name=self.project_name, transform=self.train_transform)
+                                   project_name=self.project_name, transform=self.train_transform,
+                                   data_dir=self.data_dir)
         test_dataset = SlcDataset(roi_ids=test_roi_ids, manifest_path=self.manifest_path,
-                                  project_name=self.project_name, transform=self.test_transform)
+                                  project_name=self.project_name, transform=self.test_transform, data_dir=self.data_dir)
 
         return train_dataset, test_dataset
 
@@ -36,7 +39,7 @@ class DataSplitter:
             valid_roi_ids = roi_ids[test_index]
 
             train = SlcDataset(roi_ids=train_roi_ids, manifest_path=self.manifest_path,
-                               project_name=self.project_name, transform=self.train_transform)
+                               project_name=self.project_name, transform=self.train_transform, data_dir=self.data_dir)
             valid = SlcDataset(roi_ids=valid_roi_ids, manifest_path=self.manifest_path,
-                               project_name=self.project_name, transform=self.test_transform)
+                               project_name=self.project_name, transform=self.test_transform, data_dir=self.data_dir)
             yield train, valid

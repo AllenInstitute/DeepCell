@@ -9,12 +9,13 @@ from Transform import Transform
 
 
 class SlcDataset(Dataset):
-    def __init__(self, manifest_path, project_name, image_dim=(128, 128), roi_ids=None, transform: Transform = None,
-                 debug=False):
+    def __init__(self, manifest_path, project_name, data_dir, image_dim=(128, 128), roi_ids=None,
+                 transform: Transform = None, debug=False):
         super().__init__()
 
         self.manifest_path = manifest_path
         self.project_name = project_name
+        self.data_dir = data_dir
         self.image_dim = image_dim
         self.transform = transform
 
@@ -91,7 +92,7 @@ class SlcDataset(Dataset):
     @staticmethod
     def _get_data_dir():
         dir = os.path.dirname(os.path.abspath(__file__))
-        return os.path.abspath(f'{dir}/data')
+        return os.path.abspath(f'{dir}/../data')
 
 
 class SlcSampler(Sampler):
