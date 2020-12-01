@@ -6,7 +6,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from DataSplitter import DataSplitter
-from Metrics import Metrics, TrainingMetrics
+from Metrics import Metrics, TrainingMetrics, CVMetrics
 from SlcDataset import SlcDataset
 
 logging.basicConfig(
@@ -45,59 +45,26 @@ class Classifier:
         torch.save(self.model.state_dict(), f'{self.save_path}/model_init.pt')
 
     def cross_validate(self, train_dataset: SlcDataset, data_splitter: DataSplitter, batch_size=64, sampler=None,
-                       n_splits=5):
-        min_n_epoch = float('inf')
-        precisions = np.zeros(n_splits)
-        recalls = np.zeros(n_splits)
-        f1s = np.zeros(n_splits)
-
-        train_loss = np.zeros(self.n_epochs)
-        valid_loss = np.zeros(self.n_epochs)
-
-        train_f1 = np.zeros(self.n_epochs)
-        valid_f1 = np.zeros(self.n_epochs)
+                       n_splits=5, save_model=False):
+        cv_metrics = CVMetrics(n_splits=n_splits, n_epochs=self.n_epochs)
 
         for i, (train, valid) in enumerate(data_splitter.get_cross_val_split(train_dataset=train_dataset,
-                                                                           n_splits=n_splits)):
+                                                                             n_splits=n_splits)):
             train_loader = DataLoader(dataset=train, shuffle=True, batch_size=batch_size, sampler=sampler)
             valid_loader = DataLoader(dataset=valid, shuffle=False, batch_size=batch_size)
             train_metrics, valid_metrics = self.train(train_loader=train_loader, valid_loader=valid_loader,
-                                                      log_after_each_epoch=False)
-            precisions[i] = (valid_metrics.precisions[-1])
-            recalls[i] = (valid_metrics.recalls[-1])
-            f1s[i] = (valid_metrics.f1s[-1])
+                                                      log_after_each_epoch=False, save_model=save_model, eval_fold=i)
 
-            train_loss += train_metrics.losses
-            valid_loss += valid_metrics.losses
+            cv_metrics.update(train_metrics=train_metrics, valid_metrics=valid_metrics)
 
-            train_f1 += train_metrics.f1s
-            valid_f1 += valid_metrics.f1s
+        return cv_metrics
 
-            min_n_epoch = min(len(train_metrics.losses), min_n_epoch)
-
-        train_loss = train_loss[:min_n_epoch] / n_splits
-        valid_loss = valid_loss[:min_n_epoch] / n_splits
-
-        train_f1 = train_f1[:min_n_epoch] / n_splits
-        valid_f1 = valid_f1[:min_n_epoch] / n_splits
-
-        metrics = {
-            'precision_mean': precisions.mean(),
-            'precision_std': precisions.std(),
-            'recall_mean': recalls.mean(),
-            'recall_std': recalls.std(),
-            'f1_mean': f1s.mean(),
-            'f1_std': f1s.std()
-        }
-
-        return metrics, (train_loss, valid_loss), (train_f1, valid_f1)
-
-    def train(self, train_loader: DataLoader, valid_loader: DataLoader = None,
-              log_after_each_epoch=True):
+    def train(self, train_loader: DataLoader, eval_fold=None, valid_loader: DataLoader = None,
+              log_after_each_epoch=True, save_model=False):
         all_train_metrics = TrainingMetrics(n_epochs=self.n_epochs)
         all_val_metrics = TrainingMetrics(n_epochs=self.n_epochs)
 
-        best_epoch_loss = float('inf')
+        best_epoch_f1 = float('inf')
         best_epoch = 0
         time_since_best_epoch = 0
 
@@ -152,10 +119,11 @@ class Classifier:
                                        recall=epoch_val_metrics.recall,
                                        f1=epoch_val_metrics.F1)
 
-                if epoch_val_metrics.loss < best_epoch_loss:
-                    torch.save(self.model.state_dict(), f'{self.save_path}/model.pt')
+                if epoch_val_metrics.loss < best_epoch_f1:
+                    if save_model:
+                        torch.save(self.model.state_dict(), f'{self.save_path}/{eval_fold}_model.pt')
                     best_epoch = epoch
-                    best_epoch_loss = epoch_val_metrics.loss
+                    best_epoch_f1 = epoch_val_metrics.F1
                     time_since_best_epoch = 0
                 else:
                     time_since_best_epoch += 1
@@ -208,4 +176,3 @@ class Classifier:
         # reset scheduler
         if self.scheduler is not None:
             self.scheduler = self.scheduler_contructor(self.optimizer)
-
