@@ -125,7 +125,7 @@ class Classifier:
                                        recall=epoch_val_metrics.recall,
                                        f1=epoch_val_metrics.F1)
 
-                if epoch_val_metrics.F1 < best_epoch_f1:
+                if epoch_val_metrics.F1 > best_epoch_f1:
                     if save_model:
                         torch.save(self.model.state_dict(), f'{self.save_path}/{eval_fold}_model.pt')
                     best_epoch = epoch
