@@ -63,7 +63,9 @@ class SlcDataset(Dataset):
             if self.transform.all_transform:
                 input = self.transform.all_transform(input)
 
-        target = self.y[index] if self.has_labels else None
+        # Note if no labels, 0.0 is given as the target
+        # TODO collate_fn should be used instead
+        target = self.y[index] if self.has_labels else 0
 
         return input, target
 
