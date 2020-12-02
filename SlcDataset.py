@@ -9,21 +9,32 @@ from Transform import Transform
 
 class SlcDataset(Dataset):
     def __init__(self, manifest_path, project_name, data_dir, image_dim=(128, 128), roi_ids=None,
-                 transform: Transform = None, debug=False):
+                 transform: Transform = None, debug=False, has_labels=True, parse_from_manifest=True):
         super().__init__()
+
+        if not parse_from_manifest and roi_ids is None:
+            raise ValueError('need to provide roi ids if not parsing from manifest')
 
         self.manifest_path = manifest_path
         self.project_name = project_name
         self.data_dir = data_dir
         self.image_dim = image_dim
         self.transform = transform
+        self.has_labels = has_labels
 
-        manifest = read_jsonlines(uri=self.manifest_path)
-        self.manifest = [x for x in manifest]
-        self.roi_ids = roi_ids if roi_ids is not None else [x['roi-id'] for x in self.manifest]
-        self.manifest = [x for x in self.manifest if x['roi-id'] in set(self.roi_ids)]
+        if parse_from_manifest:
+            manifest = read_jsonlines(uri=self.manifest_path)
+            self.manifest = [x for x in manifest]
+        else:
+            self.manifest = None
 
-        self.y = self._get_labels()
+        if roi_ids is not None:
+            self.roi_ids = roi_ids
+            self.manifest = [x for x in self.manifest if x['roi-id'] in set(self.roi_ids)]
+        else:
+            self.roi_ids = [x['roi-id'] for x in self.manifest]
+        
+        self.y = self._get_labels() if self.has_labels else None
 
         if debug:
             not_cell_idx = np.argwhere(self.y == 0)[0][0]
@@ -52,7 +63,7 @@ class SlcDataset(Dataset):
             if self.transform.all_transform:
                 input = self.transform.all_transform(input)
 
-        target = self.y[index]
+        target = self.y[index] if self.has_labels else None
 
         return input, target
 

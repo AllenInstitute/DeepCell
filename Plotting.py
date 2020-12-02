@@ -6,7 +6,7 @@ import os
 
 
 class Plotting:
-    def __init__(self, experiment_name):
+    def __init__(self, experiment_name=''):
         self.results_dir = 'results'
         self.experiment_name = experiment_name
         self.file_suffix = datetime.datetime.now().strftime('%m-%d-%Y-%H%M%S')
