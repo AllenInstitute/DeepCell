@@ -26,14 +26,14 @@ class SlcDataset(Dataset):
             manifest = read_jsonlines(uri=self.manifest_path)
             self.manifest = [x for x in manifest]
         else:
-            self.manifest = None
+            self.manifest = [{'roi-id': roi_id} for roi_id in roi_ids]
 
         if roi_ids is not None:
             self.roi_ids = roi_ids
             self.manifest = [x for x in self.manifest if x['roi-id'] in set(self.roi_ids)]
         else:
             self.roi_ids = [x['roi-id'] for x in self.manifest]
-        
+
         self.y = self._get_labels() if self.has_labels else None
 
         if debug:
