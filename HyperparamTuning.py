@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from CNN import CNN
+from models.CNN import CNN
 from Classifier import Classifier
 from Plotting import Plotting
 from SlcDataset import SlcDataset

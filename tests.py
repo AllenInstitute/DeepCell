@@ -4,7 +4,7 @@ import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
-from CNN import CNN
+from models.CNN import CNN
 from Classifier import Classifier
 from DataSplitter import DataSplitter
 from HyperparamTuning import HyperparamTuner, ParamDistribution
