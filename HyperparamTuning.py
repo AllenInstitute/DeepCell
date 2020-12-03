@@ -6,6 +6,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
+from DataSplitter import DataSplitter
 from models.CNN import CNN
 from Classifier import Classifier
 from Plotting import Plotting
@@ -65,14 +66,18 @@ CRITERION = torch.nn.BCEWithLogitsLoss
 
 
 class HyperparamTuner:
-    def __init__(self, param_distributions: ParamDistribution, train_loader: DataLoader, valid_loader: DataLoader,
-                 iters=10):
+    def __init__(self, model: torch.nn.Module, param_distributions: ParamDistribution, train_dataset: SlcDataset,
+                 data_splitter: DataSplitter, batch_size=64, sampler=None, iters=10, n_cv_splits=5):
+        self.model = model
         self.param_distributions = param_distributions
-        self.train_loader = train_loader
-        self.valid_loader = valid_loader
+        self.train_dataset = train_dataset
+        self.data_splitter = data_splitter
+        self.batch_size = batch_size
+        self.sampler = sampler
         self.iters = iters
+        self.n_cv_splits = n_cv_splits
 
-    def search(self, train_dataset: SlcDataset, n_epochs=100):
+    def search(self, n_epochs=1000):
         res = []
         for iter in range(self.iters):
             params = self.param_distributions.sample()
@@ -87,7 +92,7 @@ class HyperparamTuner:
                 model_params['params']['conv_cfg'] = CONV_CONFIG
             if 'classifier_cfg' not in model_params['params']:
                 model_params['classifier_cfg'] = CLASSIFIER_CONFIG
-            model = CNN(**model_params['params'])
+            model = self.model(**model_params['params'])
 
             if optimizer_params:
                 optimizer = lambda: optimizer_params['optimizer'](model.parameters(),
@@ -116,25 +121,19 @@ class HyperparamTuner:
             logger.info(params)
             logger.info('Cross validating')
 
-            train_metrics, val_metrics = classifier.train(train_loader=self.train_loader,
-                                                          valid_loader=self.valid_loader)
+            cv_metrics = classifier.cross_validate(train_dataset=self.train_dataset,
+                                                   data_splitter=self.data_splitter,
+                                                   batch_size=self.batch_size,
+                                                   sampler=self.sampler, n_splits=self.n_cv_splits,
+                                                   save_model=False)
             d = {}
             for category, category_params in params.items():
                 params = category_params['params']
                 for param, val in params.items():
                     d[param] = val
-            d['precision'] = val_metrics.precisions[-1]
-            d['recall'] = val_metrics.recalls[-1]
-            d['f1'] = val_metrics.f1s[-1]
 
-            plotting = Plotting(experiment_name=iter)
-            fig = plotting.plot_loss(train_loss=train_metrics.losses, val_loss=val_metrics.losses)
-            d['loss_plot'] = f'results/loss_{iter}_{plotting.file_suffix}.png'
-            fig.write_image(d['loss_plot'])
-
-            fig = plotting.plot_train_val_F1(train_f1=train_metrics.f1s, val_f1=val_metrics.f1s)
-            d['f1_plot'] = f'results/f1_{iter}_{plotting.file_suffix}.png'
-            fig.write_image(d['f1_plot'])
-
+            metrics = cv_metrics.metrics
+            for k, v in metrics.items():
+                d[k] = v
             res.append(d)
         return res
