@@ -67,7 +67,8 @@ CRITERION = torch.nn.BCEWithLogitsLoss
 
 class HyperparamTuner:
     def __init__(self, model: torch.nn.Module, param_distributions: ParamDistribution, train_dataset: SlcDataset,
-                 data_splitter: DataSplitter, batch_size=64, sampler=None, iters=10, n_cv_splits=5):
+                 data_splitter: DataSplitter, batch_size=64, sampler=None, iters=10, n_cv_splits=5,
+                 early_stopping=10):
         self.model = model
         self.param_distributions = param_distributions
         self.train_dataset = train_dataset
@@ -76,6 +77,7 @@ class HyperparamTuner:
         self.sampler = sampler
         self.iters = iters
         self.n_cv_splits = n_cv_splits
+        self.early_stopping = early_stopping
 
     def search(self, n_epochs=1000):
         res = []
@@ -112,7 +114,8 @@ class HyperparamTuner:
                 optimizer=optimizer,
                 scheduler=scheduler,
                 criterion=criterion,
-                save_path='./saved_models'
+                save_path='./saved_models',
+                early_stopping=self.early_stopping
             )
 
             logger.info('==========')
