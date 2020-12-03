@@ -4,12 +4,9 @@ import sys
 
 import numpy as np
 import torch
-from torch.utils.data import DataLoader
 
 from DataSplitter import DataSplitter
-from models.CNN import CNN
 from Classifier import Classifier
-from Plotting import Plotting
 from SlcDataset import SlcDataset
 
 logging.basicConfig(
@@ -60,7 +57,6 @@ class ParamDistribution:
 
 OPTIMIZER = torch.optim.Adam
 LR = 1e-3
-CONV_CONFIG = [32, 32, 'M', 64, 64, 'M']
 CLASSIFIER_CONFIG = [512]
 CRITERION = torch.nn.BCEWithLogitsLoss
 
@@ -85,13 +81,11 @@ class HyperparamTuner:
             params = self.param_distributions.sample()
 
             model_params = params['model'] if 'model' in params else \
-                {'params': {'conv_cfg': CONV_CONFIG, 'classifier_cfg': CLASSIFIER_CONFIG}}
+                {'params': {'classifier_cfg': CLASSIFIER_CONFIG}}
             optimizer_params = params['optimizer'] if 'optimizer' in params else {}
             scheduler_params = params['scheduler'] if 'scheduler' in params else {}
             criterion_params = params['criterion'] if 'criterion' in params else {}
 
-            if 'conv_cfg' not in model_params['params']:
-                model_params['params']['conv_cfg'] = CONV_CONFIG
             if 'classifier_cfg' not in model_params['params']:
                 model_params['classifier_cfg'] = CLASSIFIER_CONFIG
             model = self.model(**model_params['params'])
