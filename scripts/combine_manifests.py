@@ -22,13 +22,10 @@ def combine_and_save_manifests(manifests_metas, out='merged.manifest', roi_id_le
         noncells = 0.0
 
         invalid = 0.0
-        nonslc = 0.0
 
-        for obs in manifest:
-            if int(obs['roi-id']) >= roi_id_less_than:
-                nonslc += 1
-                continue
+        slc = [x for x in manifest if int(x['roi-id']) < roi_id_less_than]
 
+        for obs in slc:
             if project_name in obs:
                 if 'majorityLabel' in obs[project_name]:
                     if obs[project_name]['majorityLabel'] == 'cell':
@@ -44,7 +41,6 @@ def combine_and_save_manifests(manifests_metas, out='merged.manifest', roi_id_le
         print(project_name)
         print(f'cells: {cells}')
         print(f'noncells: {noncells}')
-        print(f'nonslc: {nonslc}')
         print(f'invalid: {invalid}')
 
     with open(out, 'w') as f:
@@ -58,7 +54,7 @@ if __name__ == '__main__':
             'project_name': 'ophys-experts-slc-oct-2020'
             },
         {
-            'manifest_url': 's3://prod.slapp.alleninstitute.org/behavior_3cre_1600roi/20201119175205/expert-output/ophys-experts-go-big-or-go-home/manifests/output/output.manifest',
+            'manifest_url': 's3://prod.slapp.alleninstitute.org/behavior_3cre_1600roi/20201119175205/expert-output/ophys-experts-go-big-or-go-home-chain/manifests/output/output.manifest',
             'project_name': 'ophys-experts-go-big-or-go-home'
         }
     ]

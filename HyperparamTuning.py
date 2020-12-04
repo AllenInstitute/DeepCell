@@ -80,8 +80,7 @@ class HyperparamTuner:
         for iter in range(self.iters):
             params = self.param_distributions.sample()
 
-            model_params = params['model'] if 'model' in params else \
-                {'params': {'classifier_cfg': CLASSIFIER_CONFIG}}
+            model_params = params['model'] if 'model' in params else {}
             optimizer_params = params['optimizer'] if 'optimizer' in params else {}
             scheduler_params = params['scheduler'] if 'scheduler' in params else {}
             criterion_params = params['criterion'] if 'criterion' in params else {}
