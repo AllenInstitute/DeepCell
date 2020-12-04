@@ -85,8 +85,6 @@ class HyperparamTuner:
             scheduler_params = params['scheduler'] if 'scheduler' in params else {}
             criterion_params = params['criterion'] if 'criterion' in params else {}
 
-            if 'classifier_cfg' not in model_params['params']:
-                model_params['classifier_cfg'] = CLASSIFIER_CONFIG
             model = self.model(**model_params['params'])
 
             if optimizer_params:
