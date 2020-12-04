@@ -16,17 +16,36 @@ def combine_and_save_manifests(manifests_metas, out='merged.manifest', roi_id_le
 
     for manifest_meta in manifests_metas:
         manifest = read_jsonlines(manifest_meta['manifest_url'])
+        project_name = manifest_meta['project_name']
+
+        cells = 0.0
+        noncells = 0.0
+
+        invalid = 0.0
+        nonslc = 0.0
 
         for obs in manifest:
-            if obs['roi-id'] > roi_id_less_than:
+            if int(obs['roi-id']) >= roi_id_less_than:
+                nonslc += 1
                 continue
-            project_name = manifest_meta['project_name']
+
             if project_name in obs:
                 if 'majorityLabel' in obs[project_name]:
+                    if obs[project_name]['majorityLabel'] == 'cell':
+                        cells += 1
+                    else:
+                        noncells += 1
                     obs[new_project_name] = obs[project_name]
                     del obs[project_name]
                     obs = json.dumps(obs)
                     combined.append(obs + '\n')
+            else:
+                invalid += 1
+        print(project_name)
+        print(f'cells: {cells}')
+        print(f'noncells: {noncells}')
+        print(f'nonslc: {nonslc}')
+        print(f'invalid: {invalid}')
 
     with open(out, 'w') as f:
         f.writelines(combined)

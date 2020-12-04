@@ -91,7 +91,7 @@ class HyperparamTuner:
             model = self.model(**model_params['params'])
 
             if optimizer_params:
-                optimizer = lambda: optimizer_params['optimizer'](model.parameters(),
+                optimizer = lambda: optimizer_params['optimizer'](optimizer_params['optimizer_params'](model),
                                                                   **optimizer_params['params'])
             else:
                 optimizer = lambda: OPTIMIZER(model.parameters(), lr=LR)
