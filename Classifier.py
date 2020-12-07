@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 import torch
 from torch.utils.data import DataLoader
 
@@ -8,8 +9,8 @@ from Metrics import Metrics, TrainingMetrics, CVMetrics
 from SlcDataset import SlcDataset
 
 logging.basicConfig(
-    filename='classifier.log',
-    level=logging.DEBUG,
+    stream=sys.stdout,
+    level=logging.INFO,
     format='%(levelname)s:\t%(asctime)s\t%(message)s',
     datefmt='%m/%d/%Y %I:%M:%S %p'
 )
