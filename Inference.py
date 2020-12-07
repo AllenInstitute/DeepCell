@@ -53,7 +53,7 @@ def inference(model: torch.nn.Module, test_loader: DataLoader, has_labels=True, 
     y_scores = y_scores.mean(axis=0)
     y_preds = y_scores > threshold
     if has_labels:
-        metrics.update_accuracies(y_true=dataset.y, y_score=y_scores)
+        metrics.update_accuracies(y_true=dataset.y, y_score=y_scores, threshold=threshold)
 
     df = pd.DataFrame({'roi-id': dataset.roi_ids, 'y_score': y_scores, 'y_pred': y_preds})
 
