@@ -9,7 +9,7 @@ from Metrics import Metrics
 from SlcDataset import SlcDataset
 
 
-def inference(model: torch.nn.Module, test_loader: DataLoader, has_labels=True):
+def inference(model: torch.nn.Module, test_loader: DataLoader, has_labels=True, threshold=0.5):
     dataset: SlcDataset = test_loader.dataset
     metrics = Metrics()
 
@@ -36,7 +36,7 @@ def inference(model: torch.nn.Module, test_loader: DataLoader, has_labels=True):
                 start = prev_start
                 end = start + data.shape[0]
                 y_scores[i][start:end] = y_score
-                y_preds[i][start:end] = y_score > .5
+                y_preds[i][start:end] = y_score > threshold
                 prev_start = end
 
         if has_labels:
