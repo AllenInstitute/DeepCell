@@ -51,7 +51,7 @@ def inference(model: torch.nn.Module, test_loader: DataLoader, has_labels=True, 
             print(f'{model_checkpoint} f1: {f1}')
 
     y_scores = y_scores.mean(axis=0)
-    y_preds = y_scores > .5
+    y_preds = y_scores > threshold
     if has_labels:
         metrics.update_accuracies(y_true=dataset.y, y_score=y_scores)
 
