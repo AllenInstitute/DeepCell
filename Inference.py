@@ -9,12 +9,19 @@ from Metrics import Metrics
 from SlcDataset import SlcDataset
 
 
-def inference(model: torch.nn.Module, test_loader: DataLoader, has_labels=True, threshold=0.5):
+def inference(model: torch.nn.Module, test_loader: DataLoader, has_labels=True, threshold=0.5, ensemble=True,
+              cv_fold=None):
+    if not ensemble and cv_fold is None:
+        raise ValueError('If not using ensemble, need to give cv_fold')
+
     dataset: SlcDataset = test_loader.dataset
     metrics = Metrics()
 
-    models = os.listdir(f'./saved_models/checkpoints')
-    models = [model for model in models if model != 'model_init.pt']
+    if ensemble:
+        models = os.listdir(f'./saved_models/checkpoints')
+        models = [model for model in models if model != 'model_init.pt']
+    else:
+        models = [f'{cv_fold}_model.pt']
 
     y_scores = np.zeros((len(models), len(dataset)))
     y_preds = np.zeros((len(models), len(dataset)))
