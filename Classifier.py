@@ -9,7 +9,7 @@ from SlcDataset import SlcDataset
 
 logging.basicConfig(
     filename='classifier.log',
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='%(levelname)s:\t%(asctime)s\t%(message)s',
     datefmt='%m/%d/%Y %I:%M:%S %p'
 )
