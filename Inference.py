@@ -13,6 +13,8 @@ def inference(model: torch.nn.Module, test_loader: DataLoader, has_labels=True, 
               cv_fold=None):
     if not ensemble and cv_fold is None:
         raise ValueError('If not using ensemble, need to give cv_fold')
+    if cv_fold is not None and ensemble:
+        raise ValueError('Ensemble should be false if passing in cv_fold')
 
     dataset: SlcDataset = test_loader.dataset
     metrics = Metrics()
