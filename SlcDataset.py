@@ -29,7 +29,7 @@ class SlcDataset(Dataset):
             self.manifest = [{'roi-id': roi_id} for roi_id in roi_ids]
 
         if roi_ids is not None:
-            self.manifest = [x for x in self.manifest if x['roi-id'] in set(self.roi_ids)]
+            self.manifest = [x for x in self.manifest if x['roi-id'] in set(roi_ids)]
             self.roi_ids = [x['roi-id'] for x in self.manifest]
         else:
             self.roi_ids = [x['roi-id'] for x in self.manifest]
