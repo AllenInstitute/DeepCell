@@ -44,7 +44,7 @@ class RoiDataset(Dataset):
             self.roi_ids = [x['roi-id'] for x in self.manifest]
 
         self.y = self._get_labels() if self.has_labels else None
-        
+
         self.genotypes = self._get_genotype(experiment_genotype_map=experiment_genotype_map)
 
         if debug:

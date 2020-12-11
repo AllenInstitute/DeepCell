@@ -9,7 +9,7 @@ from Metrics import Metrics
 from RoiDataset import RoiDataset
 
 
-def inference(model: torch.nn.Module, test_loader: DataLoader, has_labels=True, threshold=0.5, ensemble=True,
+def inference(model: torch.nn.Module, test_loader: DataLoader, checkpoint_path, has_labels=True, threshold=0.5, ensemble=True,
               cv_fold=None):
     if not ensemble and cv_fold is None:
         raise ValueError('If not using ensemble, need to give cv_fold')
@@ -20,7 +20,7 @@ def inference(model: torch.nn.Module, test_loader: DataLoader, has_labels=True, 
     metrics = Metrics()
 
     if ensemble:
-        models = os.listdir(f'./saved_models/checkpoints')
+        models = os.listdir(checkpoint_path)
         models = [model for model in models if model != 'model_init.pt']
     else:
         models = [f'{cv_fold}_model.pt']
@@ -29,7 +29,7 @@ def inference(model: torch.nn.Module, test_loader: DataLoader, has_labels=True, 
     y_preds = np.zeros((len(models), len(dataset)))
 
     for i, model_checkpoint in enumerate(models):
-        state_dict = torch.load(f'./saved_models/checkpoints/{model_checkpoint}')
+        state_dict = torch.load(f'{checkpoint_path}/{model_checkpoint}')
         model.load_state_dict(state_dict)
 
         model.eval()
