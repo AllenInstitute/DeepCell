@@ -115,7 +115,7 @@ class RoiDataset(Dataset):
         return res
 
     def _filter_by_cre_line(self, experiment_genotype_map, cre_line):
-        filtered = [x for x in self.manifest if experiment_genotype_map[x['experiment-id']].startswith(self.cre_line)]
+        filtered = [x for x in self.manifest if experiment_genotype_map[x['experiment-id']].startswith(cre_line)]
         return filtered
 
 
