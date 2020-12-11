@@ -24,7 +24,6 @@ class RoiDataset(Dataset):
         self.image_dim = image_dim
         self.transform = transform
         self.has_labels = has_labels
-        self.cre_line = cre_line
 
         experiment_genotype_map = get_experiment_genotype_map()
 
@@ -35,7 +34,7 @@ class RoiDataset(Dataset):
             self.manifest = [{'roi-id': roi_id} for roi_id in roi_ids]
 
         if cre_line:
-            self.manifest = self._filter_by_cre_line(experiment_genotype_map=experiment_genotype_map)
+            self.manifest = self._filter_by_cre_line(experiment_genotype_map=experiment_genotype_map, cre_line=cre_line)
 
         if roi_ids is not None:
             self.manifest = [x for x in self.manifest if x['roi-id'] in set(roi_ids)]
@@ -45,7 +44,7 @@ class RoiDataset(Dataset):
 
         self.y = self._get_labels() if self.has_labels else None
 
-        self.genotypes = self._get_genotype(experiment_genotype_map=experiment_genotype_map)
+        self.cre_line = self._get_creline(experiment_genotype_map=experiment_genotype_map)
 
         if debug:
             not_cell_idx = np.argwhere(self.y == 0)[0][0]
@@ -89,8 +88,8 @@ class RoiDataset(Dataset):
         labels = np.array(labels)
         return labels
 
-    def _get_genotype(self, experiment_genotype_map):
-        return [experiment_genotype_map[x['experiment-id']] for x in self.manifest]
+    def _get_creline(self, experiment_genotype_map):
+        return [experiment_genotype_map[x['experiment-id']][:3] for x in self.manifest]
 
     def _extract_channels(self, obs):
         roi_id = obs['roi-id']
@@ -115,7 +114,7 @@ class RoiDataset(Dataset):
 
         return res
 
-    def _filter_by_cre_line(self, experiment_genotype_map):
+    def _filter_by_cre_line(self, experiment_genotype_map, cre_line):
         filtered = [x for x in self.manifest if experiment_genotype_map[x['experiment-id']].startswith(self.cre_line)]
         return filtered
 
