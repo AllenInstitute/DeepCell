@@ -1,15 +1,4 @@
-import numpy as np
 import pandas as pd
-
-from RoiDataset import RoiDataset
-
-
-def get_random_roi(data: RoiDataset, label):
-    idxs = np.where(data.y == label)[0]
-    idx = np.random.choice(idxs)
-    roi_id = data.roi_ids[idx]
-
-    return roi_id
 
 
 def get_experiment_genotype_map():
