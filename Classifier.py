@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 
 from DataSplitter import DataSplitter
 from Metrics import Metrics, TrainingMetrics, CVMetrics
-from SlcDataset import SlcDataset
+from RoiDataset import RoiDataset
 
 logging.basicConfig(
     stream=sys.stdout,
@@ -43,7 +43,7 @@ class Classifier:
 
         torch.save(self.model.state_dict(), f'{self.save_path}/model_init.pt')
 
-    def cross_validate(self, train_dataset: SlcDataset, data_splitter: DataSplitter, batch_size=64, sampler=None,
+    def cross_validate(self, train_dataset: RoiDataset, data_splitter: DataSplitter, batch_size=64, sampler=None,
                        n_splits=5, save_model=False):
         cv_metrics = CVMetrics(n_splits=n_splits, n_epochs=self.n_epochs)
 

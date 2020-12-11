@@ -7,7 +7,7 @@ import torch
 
 from DataSplitter import DataSplitter
 from Classifier import Classifier
-from SlcDataset import SlcDataset
+from RoiDataset import RoiDataset
 
 logging.basicConfig(
     stream=sys.stdout,
@@ -62,7 +62,7 @@ CRITERION = torch.nn.BCEWithLogitsLoss
 
 
 class HyperparamTuner:
-    def __init__(self, model: torch.nn.Module, param_distributions: ParamDistribution, train_dataset: SlcDataset,
+    def __init__(self, model: torch.nn.Module, param_distributions: ParamDistribution, train_dataset: RoiDataset,
                  data_splitter: DataSplitter, batch_size=64, sampler=None, iters=10, n_cv_splits=5,
                  early_stopping=10):
         self.model = model

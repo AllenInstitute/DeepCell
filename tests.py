@@ -8,7 +8,7 @@ from models.CNN import CNN
 from Classifier import Classifier
 from DataSplitter import DataSplitter
 from HyperparamTuning import HyperparamTuner, ParamDistribution
-from SlcDataset import SlcDataset
+from RoiDataset import RoiDataset
 
 
 class Tests(unittest.TestCase):
@@ -25,7 +25,7 @@ class Tests(unittest.TestCase):
 
     def test_train_loss_0_sanity(self):
         train_transform = transforms.ToTensor()
-        train = SlcDataset(manifest_path=self.manifest_path, project_name=self.project_name,
+        train = RoiDataset(manifest_path=self.manifest_path, project_name=self.project_name,
                            debug=True)
         cnn = CNN(conv_cfg=[32, 'M', 64, 'M', 128, 'M'], classifier_cfg=[512, 16], dropout_prob=0.0)
         optimizer = lambda: torch.optim.Adam(cnn.parameters(), lr=1e-3)
@@ -38,7 +38,7 @@ class Tests(unittest.TestCase):
 
     def test_cross_validate(self):
         transform = transforms.ToTensor()
-        train = SlcDataset(manifest_path=self.manifest_path, project_name=self.project_name, transform=transform)
+        train = RoiDataset(manifest_path=self.manifest_path, project_name=self.project_name, transform=transform)
         cnn = CNN(conv_cfg=[32, 'M', 64, 'M', 128, 'M'], classifier_cfg=[512])
         optimizer = lambda: torch.optim.Adam(cnn.parameters(), lr=1e-3)
         criterion = torch.nn.BCEWithLogitsLoss()
@@ -62,7 +62,7 @@ class Tests(unittest.TestCase):
         }
         param_distributions = ParamDistribution(param_distribution=param_distributions)
         transform = transforms.ToTensor()
-        train = SlcDataset(manifest_path=self.manifest_path, project_name=self.project_name, transform=transform)
+        train = RoiDataset(manifest_path=self.manifest_path, project_name=self.project_name, transform=transform)
         data_splitter = DataSplitter(manifest_path=self.manifest_path, project_name=self.project_name,
                                      train_transform=transform, test_transform=transform)
         hp = HyperparamTuner(param_distributions=param_distributions, data_splitter=data_splitter, iters=1)

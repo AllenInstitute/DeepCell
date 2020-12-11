@@ -1,10 +1,10 @@
 import matplotlib.pyplot as plt
 
-from SlcDataset import SlcDataset
+from RoiDataset import RoiDataset
 from util import get_random_roi
 
 
-def display_roi(roi_id, columns, rows, label, y_pred=None, channels=None, data: SlcDataset = None):
+def display_roi(roi_id, columns, rows, label, y_pred=None, channels=None, data: RoiDataset = None):
     if channels is None and data is None:
         raise ValueError('Need to supply either dataset or numpy array')
 
@@ -24,7 +24,7 @@ def display_roi(roi_id, columns, rows, label, y_pred=None, channels=None, data: 
     plt.show()
 
 
-def display_differently_labeled_rois(data: SlcDataset):
+def display_differently_labeled_rois(data: RoiDataset):
     cell_roi_id = get_random_roi(data=data, label=1)
     display_roi(data=data, roi_id=cell_roi_id, rows=1, columns=3, label='Cell')
 

@@ -3,7 +3,7 @@ import json
 from croissant.utils import read_jsonlines
 
 
-def combine_and_save_manifests(manifests_metas, out='merged.manifest', roi_id_less_than=3e6):
+def combine_and_save_manifests(manifests_metas, out='merged.manifest'):
     """
 
     :param manifests_metas: [{'manifest_url': ..., 'project_name': ...}]
@@ -23,9 +23,7 @@ def combine_and_save_manifests(manifests_metas, out='merged.manifest', roi_id_le
 
         invalid = 0.0
 
-        slc = [x for x in manifest if int(x['roi-id']) < roi_id_less_than]
-
-        for obs in slc:
+        for obs in manifest:
             if project_name in obs:
                 if 'majorityLabel' in obs[project_name]:
                     if obs[project_name]['majorityLabel'] == 'cell':

@@ -6,7 +6,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from Metrics import Metrics
-from SlcDataset import SlcDataset
+from RoiDataset import RoiDataset
 
 
 def inference(model: torch.nn.Module, test_loader: DataLoader, has_labels=True, threshold=0.5, ensemble=True,
@@ -16,7 +16,7 @@ def inference(model: torch.nn.Module, test_loader: DataLoader, has_labels=True, 
     if cv_fold is not None and ensemble:
         raise ValueError('Ensemble should be false if passing in cv_fold')
 
-    dataset: SlcDataset = test_loader.dataset
+    dataset: RoiDataset = test_loader.dataset
     metrics = Metrics()
 
     if ensemble:
