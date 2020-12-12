@@ -9,7 +9,7 @@ class ResnetBackbone(nn.Module):
             raise ValueError('Use either freeze_all_layers or freeze_up_to_layer')
 
         super().__init__()
-        model = torchvision.models.resnet18(pretrained=True, progress=False)
+        model = torchvision.models.resnet34(pretrained=True, progress=False)
         if truncate_to_layer is not None:
             layers = self._truncate_to_layer(model=model, layer=truncate_to_layer)
         else:
@@ -59,3 +59,7 @@ class ResnetBackbone(nn.Module):
 
         layers.append(nn.Linear(cfg[-1], num_classes))
         return nn.Sequential(*layers)
+
+
+if __name__ == '__main__':
+    ResnetBackbone(classifier_cfg=[512], truncate_to_layer=-4, freeze_all_layers=False, freeze_up_to_layer=-1)
