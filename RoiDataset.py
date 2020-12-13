@@ -44,7 +44,10 @@ class RoiDataset(Dataset):
 
         self.y = self._get_labels() if self.has_labels else None
 
-        self.cre_line = self._get_creline(experiment_genotype_map=experiment_genotype_map)
+        if parse_from_manifest:
+            self.cre_line = self._get_creline(experiment_genotype_map=experiment_genotype_map)
+        else:
+            self.cre_line = None
 
         if debug:
             not_cell_idx = np.argwhere(self.y == 0)[0][0]
@@ -89,7 +92,7 @@ class RoiDataset(Dataset):
         return labels
 
     def _get_creline(self, experiment_genotype_map):
-        return [experiment_genotype_map[x['experiment_id']][:3] for x in self.manifest]
+        return [experiment_genotype_map[x['experiment-id']][:3] for x in self.manifest]
 
     def _extract_channels(self, obs):
         roi_id = obs['roi-id']
@@ -142,6 +145,5 @@ if __name__ == '__main__':
     project_name = 'ophys-experts-slc-oct-2020_ophys-experts-go-big-or-go-home'
     manifest_path = 's3://prod.slapp.alleninstitute.org/behavior_slc_oct_2020_behavior_3cre_1600roi_merged/output.manifest'
 
-    dataset = RoiDataset(manifest_path=manifest_path, project_name=project_name, data_dir='./data',
-                         cre_line='Slc')
+    dataset = RoiDataset(manifest_path=manifest_path, project_name=project_name, data_dir='./data')
 
