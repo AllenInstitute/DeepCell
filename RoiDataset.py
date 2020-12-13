@@ -89,7 +89,7 @@ class RoiDataset(Dataset):
         return labels
 
     def _get_creline(self, experiment_genotype_map):
-        return [experiment_genotype_map[x['experiment-id']][:3] for x in self.manifest]
+        return [experiment_genotype_map[x['experiment_id']][:3] for x in self.manifest]
 
     def _extract_channels(self, obs):
         roi_id = obs['roi-id']

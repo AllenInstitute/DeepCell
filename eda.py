@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 
 from RoiDataset import RoiDataset
-from util import get_random_roi
 
 
 def display_roi(roi_id, columns, rows, label, y_pred=None, channels=None, data: RoiDataset = None):
@@ -22,12 +21,4 @@ def display_roi(roi_id, columns, rows, label, y_pred=None, channels=None, data: 
         fig.add_subplot(rows, columns, i, title=title)
         plt.imshow(imgs[i - 1], cmap='gray', vmin=0, vmax=255)
     plt.show()
-
-
-def display_differently_labeled_rois(data: RoiDataset):
-    cell_roi_id = get_random_roi(data=data, label=1)
-    display_roi(data=data, roi_id=cell_roi_id, rows=1, columns=3, label='Cell')
-
-    not_cell_roi_id = get_random_roi(data=data, label=0)
-    display_roi(data=data, roi_id=not_cell_roi_id, rows=1, columns=3, label='Not Cell')
 
