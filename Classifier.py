@@ -44,7 +44,7 @@ class Classifier:
         torch.save(self.model.state_dict(), f'{self.save_path}/model_init.pt')
 
     def cross_validate(self, train_dataset: RoiDataset, data_splitter: DataSplitter, batch_size=64, sampler=None,
-                       n_splits=5, save_model=False):
+                       n_splits=5, save_model=False, log_after_each_epoch=True):
         cv_metrics = CVMetrics(n_splits=n_splits, n_epochs=self.n_epochs)
 
         for i, (train, valid) in enumerate(data_splitter.get_cross_val_split(train_dataset=train_dataset,
@@ -56,7 +56,8 @@ class Classifier:
             train_loader = DataLoader(dataset=train, shuffle=True, batch_size=batch_size, sampler=sampler)
             valid_loader = DataLoader(dataset=valid, shuffle=False, batch_size=batch_size)
             train_metrics, valid_metrics = self.train(train_loader=train_loader, valid_loader=valid_loader,
-                                                      save_model=save_model, eval_fold=i)
+                                                      save_model=save_model, eval_fold=i,
+                                                      log_after_each_epoch=log_after_each_epoch)
 
             cv_metrics.update(train_metrics=train_metrics, valid_metrics=valid_metrics)
 

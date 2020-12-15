@@ -1,3 +1,5 @@
+import os
+
 import matplotlib.pyplot as plt
 import json
 import skimage.color
@@ -6,6 +8,7 @@ import numpy as np
 from pathlib import Path
 import slapp.utils.query_utils as qu
 import visual_behavior.data_access.loading as loading
+from matplotlib.backends.backend_pdf import PdfPages
 
 mapped_drive = '/Users/adam.amster/ibs-adama-ux1'
 
@@ -41,6 +44,14 @@ def rois_on_im(rois, im):
     return im
 
 
+def get_experiment_metadata(experiment_id):
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    path = Path(root) / 'ophys_metadata_lookup.txt'
+    df = pd.read_csv(path)
+    metadata = df[df['experiment_id'] == experiment_id].iloc[0]
+    return metadata.to_dict()
+
+
 def run_for_experiment(experiment_id):
     # get max projection image
     movie_path = loading.get_motion_corrected_movie_h5_location(experiment_id)
@@ -63,7 +74,7 @@ def run_for_experiment(experiment_id):
     labels_path = "/Users/adam.amster/Downloads/inference.csv"
     labels = pd.read_csv(labels_path)
     labels = labels[labels['experiment_id'] == experiment_id]
-    label_map = {i['roi-id']: i['y_pred'] for _, i in labels.iterrows()}
+    label_map = {i['roi-id']: i['y_score'] > .4 for _, i in labels.iterrows()}
 
     cnn_rois = [i for i in cnn_rois if i['id'] in label_map]
     valid_cnn_rois = [r for r in cnn_rois if label_map[r['id']]]
@@ -76,20 +87,39 @@ def run_for_experiment(experiment_id):
 
     f, a = plt.subplots(2, 2, clear=True, sharex=True, sharey=True, num=1)
     a[0, 0].imshow(im_prod_valid)
-    a[0, 0].set_title(f"{len(valid_prod_rois)} Production Cells")
+    a[0, 0].set_title(f"{len(valid_prod_rois)} Production Cells", fontsize=8)
     a[0, 1].imshow(im_prod_invalid)
-    a[0, 1].set_title(f"{len(invalid_prod_rois)} Production NOT Cells")
+    a[0, 1].set_title(f"{len(invalid_prod_rois)} Production NOT Cells", fontsize=8)
     a[1, 0].imshow(im_cnn_valid)
-    a[1, 0].set_title(f"{len(valid_cnn_rois)} Suite2P + CNN Cells")
+    a[1, 0].set_title(f"{len(valid_cnn_rois)} Suite2P + CNN Cells", fontsize=8)
     a[1, 1].imshow(im_cnn_invalid)
-    a[1, 1].set_title(f"{len(invalid_cnn_rois)} Suite2P + CNN NOT Cells")
+    a[1, 1].set_title(f"{len(invalid_cnn_rois)} Suite2P + CNN NOT Cells", fontsize=8)
     _ = [ia.grid(alpha=0.7) for ia in a.flat]
-    f.suptitle(f"experiment {experiment_id}")
-    plt.savefig(f'../inference-output/{experiment_id}.png', dpi=1200)
+
+    # add metadata
+    metadata = get_experiment_metadata(experiment_id=experiment_id)
+    props = dict(boxstyle='round', facecolor='wheat', pad=1)
+    textstr = f'''
+    Experiment: {metadata["experiment_id"]}
+    Depth: {metadata["depth"]}
+    Rig: {metadata["rig"]}
+    Cre Line: {metadata["genotype"][:3]}
+    '''
+    plt.subplots_adjust(right=.7)
+
+    f.text(0.85, .75, textstr, bbox=props, fontsize=6, ha='center')
+    return f
 
 
 if __name__ == '__main__':
     inference_res = pd.read_csv('~/Downloads/inference.csv')
     experiments = inference_res['experiment_id'].unique()
-    for experiment_id in experiments:
-        run_for_experiment(experiment_id=experiment_id)
+    experiments = [904352688]
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    path = Path(root) / 'inference-output' / 'inference_plots.pdf'
+    with PdfPages(f'{path}') as pdf:
+        for i, experiment_id in enumerate(experiments):
+            print(f'experiment {i}')
+            f = run_for_experiment(experiment_id=experiment_id)
+            pdf.savefig(f)
+            plt.close()
