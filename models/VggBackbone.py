@@ -4,9 +4,8 @@ from torch import nn
 
 
 class VggBackbone(torch.nn.Module):
-    def __init__(self, truncate_to_layer, classifier_cfg, dropout_prob=0.5, freeze_layers=True):
+    def __init__(self, model, truncate_to_layer, classifier_cfg, dropout_prob=0.5, freeze_layers=True):
         super().__init__()
-        model = torchvision.models.vgg11_bn(pretrained=True, progress=False)
         conv_layers = self._truncate_to_layer(model=model, layer=truncate_to_layer)
         self.features = torch.nn.Sequential(*conv_layers)
 

@@ -68,11 +68,14 @@ def plot_model_vs_labeler_performance_for_creline(fig, cre_line, row, col, showl
     labeler = calc_labeler_perf_for_cre_line(cre_line=cre_line)
     model = pd.read_csv(f'~/Downloads/cnn_{cre_line.lower()}_pr_curve.csv')
 
+    labeler_marker_sizes = ((labeler['Percent labeled'] - labeler['Percent labeled'].min()) /
+                           (labeler['Percent labeled'].max() - labeler['Percent labeled'].min()) + 1) * 5
     fig.add_trace(go.Scatter(x=labeler['recall'], y=labeler['precision'], showlegend=showlegend,
                              mode='markers',
                              name='Labeler',
                              marker=dict(
-                                 color='blue'
+                                 color='blue',
+                                 size=labeler_marker_sizes
                              )),
                   row=row,
                   col=col)
