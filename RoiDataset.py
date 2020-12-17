@@ -97,7 +97,7 @@ class RoiDataset(Dataset):
             if 'cre_line' in x:
                 cre_lines.append(x['cre_line'])
             else:
-                x.append(experiment_genotype_map[x['experiment-id']][:3])
+                cre_lines.append(experiment_genotype_map[x['experiment-id']][:3])
         return cre_lines
 
     def _extract_channels(self, obs):
