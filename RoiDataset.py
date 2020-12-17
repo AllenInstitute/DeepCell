@@ -37,7 +37,7 @@ class RoiDataset(Dataset):
             self.manifest = self._filter_by_cre_line(experiment_genotype_map=experiment_genotype_map, cre_line=cre_line)
 
         if roi_ids is not None:
-            self.manifest = [x for x in self.manifest if x['roi-id'] in set(roi_ids)]
+            self.manifest = [x for x in self.manifest if str(x['roi-id']) in set([str(x) for x in roi_ids])]
             self.roi_ids = [x['roi-id'] for x in self.manifest]
         else:
             self.roi_ids = [x['roi-id'] for x in self.manifest]

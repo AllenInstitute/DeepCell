@@ -45,3 +45,11 @@ class DataSplitter:
             valid = RoiDataset(roi_ids=valid_roi_ids, manifest_path=self.manifest_path,
                                project_name=self.project_name, transform=self.test_transform, data_dir=self.data_dir)
             yield train, valid
+
+
+if __name__ == '__main__':
+    project_name = 'ophys-experts-slc-oct-2020_ophys-experts-go-big-or-go-home'
+    manifest_path = 's3://prod.slapp.alleninstitute.org/behavior_slc_oct_2020_behavior_3cre_1600roi_merged/output.manifest'
+
+    data_splitter = DataSplitter(manifest_path=manifest_path, project_name=project_name, seed=1234, data_dir='./data')
+    train, test = data_splitter.get_train_test_split(test_size=.3)
