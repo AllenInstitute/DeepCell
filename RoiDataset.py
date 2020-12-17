@@ -1,7 +1,6 @@
 from PIL import Image
 from croissant.utils import read_jsonlines
 import numpy as np
-import pandas as pd
 from torch.utils.data import Dataset
 from torch.utils.data.sampler import Sampler
 
@@ -12,7 +11,7 @@ from util import get_experiment_genotype_map
 class RoiDataset(Dataset):
     def __init__(self, manifest_path, project_name, data_dir, image_dim=(128, 128), roi_ids=None,
                  transform: Transform = None, debug=False, has_labels=True, parse_from_manifest=True,
-                 cre_line=None):
+                 cre_line=None, exclude_mask=False):
         super().__init__()
 
         if not parse_from_manifest and roi_ids is None:
@@ -24,6 +23,7 @@ class RoiDataset(Dataset):
         self.image_dim = image_dim
         self.transform = transform
         self.has_labels = has_labels
+        self.exclude_mask = exclude_mask
 
         experiment_genotype_map = get_experiment_genotype_map()
 
@@ -92,7 +92,13 @@ class RoiDataset(Dataset):
         return labels
 
     def _get_creline(self, experiment_genotype_map):
-        return [experiment_genotype_map[x['experiment-id']][:3] for x in self.manifest]
+        cre_lines = []
+        for x in self.manifest:
+            if x['cre_line']:
+                cre_lines.append(x['cre_line'])
+            else:
+                x.append(experiment_genotype_map[x['experiment-id']][:3])
+        return cre_lines
 
     def _extract_channels(self, obs):
         roi_id = obs['roi-id']
@@ -113,7 +119,11 @@ class RoiDataset(Dataset):
         res = np.zeros((*self.image_dim, 3), dtype=np.uint8)
         res[:, :, 0] = avg
         res[:, :, 1] = max
-        res[:, :, 2] = mask
+        
+        if self.exclude_mask:
+            res[:, :, 2] = max
+        else:
+            res[:, :, 2] = mask
 
         return res
 

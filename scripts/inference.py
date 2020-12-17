@@ -10,7 +10,7 @@ import slapp.utils.query_utils as qu
 import visual_behavior.data_access.loading as loading
 from matplotlib.backends.backend_pdf import PdfPages
 
-mapped_drive = '/Users/adam.amster/ibs-adama-ux1'
+mapped_drive = '/Users/adam.amster/ibs-adama-ux3'
 
 # NOTE requires inference-plots env (dependency conflicts)
 
@@ -33,15 +33,28 @@ def get_LIMS_data(dbconn, exp_id):
 
 
 def rois_on_im(rois, im):
-    im = skimage.color.gray2rgb(im).astype('uint8')
+    im = skimage.color.gray2rgb(im)
     for roi in rois:
-        submask = np.array(roi['mask_matrix']) * 255
+        submask = np.array(roi['mask_matrix']).astype('uint8') * 255
         r0 = roi['y']
         r1 = roi['y'] + roi['height']
         c0 = roi['x']
         c1 = roi['x'] + roi['width']
-        im[:, :, 0][r0:r1, c0:c1][submask != 0] = submask[submask != 0]
+        im[:, :, 0][r0:r1, c0:c1][submask != 0] = submask[submask != 0] * 0.5
     return im
+
+
+def reshape_mask(roi, im):
+    submask = np.array(roi['mask_matrix'])
+    mask = np.zeros(im.shape)
+    r0 = roi['y']
+    r1 = roi['y'] + roi['height']
+    c0 = roi['x']
+    c1 = roi['x'] + roi['width']
+    mask[r0:r1, c0:c1] = submask
+    return mask
+
+
 
 
 def get_experiment_metadata(experiment_id):
