@@ -94,7 +94,7 @@ class RoiDataset(Dataset):
     def _get_creline(self, experiment_genotype_map):
         cre_lines = []
         for x in self.manifest:
-            if x['cre_line']:
+            if 'cre_line' in x:
                 cre_lines.append(x['cre_line'])
             else:
                 x.append(experiment_genotype_map[x['experiment-id']][:3])
@@ -119,7 +119,7 @@ class RoiDataset(Dataset):
         res = np.zeros((*self.image_dim, 3), dtype=np.uint8)
         res[:, :, 0] = avg
         res[:, :, 1] = max
-        
+
         if self.exclude_mask:
             res[:, :, 2] = max
         else:
