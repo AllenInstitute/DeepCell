@@ -45,7 +45,7 @@ class Classifier:
 
     def cross_validate(self, train_dataset: RoiDataset, data_splitter: DataSplitter, batch_size=64, sampler=None,
                        n_splits=5, save_model=False, log_after_each_epoch=True):
-        cv_metrics = CVMetrics(n_splits=n_splits, n_epochs=self.n_epochs)
+        cv_metrics = CVMetrics(n_splits=n_splits)
 
         for i, (train, valid) in enumerate(data_splitter.get_cross_val_split(train_dataset=train_dataset,
                                                                              n_splits=n_splits)):
@@ -70,8 +70,7 @@ class Classifier:
         all_train_metrics = TrainingMetrics(n_epochs=self.n_epochs)
         all_val_metrics = TrainingMetrics(n_epochs=self.n_epochs)
 
-        best_epoch_val_f1 = -float('inf')
-        best_epoch = 0
+        best_epoch_val_loss = float('inf')
         time_since_best_epoch = 0
 
         for epoch in range(self.n_epochs):
@@ -90,12 +89,8 @@ class Classifier:
                 loss = self.criterion(output, target.float())
                 loss.backward()
                 self.optimizer.step()
-                if self.scheduler_step_after_batch:
-                    if self.scheduler is not None:
-                        self.scheduler.step()
 
                 epoch_train_metrics.update_loss(loss=loss.item(), num_batches=len(train_loader))
-                epoch_train_metrics.update_accuracies(y_true=target, y_out=output)
 
             all_train_metrics.update(epoch=epoch,
                                      loss=epoch_train_metrics.loss,
@@ -125,13 +120,12 @@ class Classifier:
                                        recall=epoch_val_metrics.recall,
                                        f1=epoch_val_metrics.F1)
 
-                if epoch_val_metrics.F1 > best_epoch_val_f1:
+                if epoch_val_metrics.loss < best_epoch_val_loss:
                     if save_model:
                         torch.save(self.model.state_dict(), f'{self.save_path}/{eval_fold}_model.pt')
-                    best_epoch = epoch
                     all_train_metrics.best_epoch = epoch
                     all_val_metrics.best_epoch = epoch
-                    best_epoch_val_f1 = epoch_val_metrics.F1
+                    best_epoch_val_loss = epoch_val_metrics.loss
                     time_since_best_epoch = 0
                 else:
                     time_since_best_epoch += 1
@@ -142,14 +136,13 @@ class Classifier:
             if not self.scheduler_step_after_batch:
                 if self.scheduler is not None:
                     if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-                        self.scheduler.step(epoch_val_metrics.F1)
+                        self.scheduler.step(epoch_val_metrics.loss)
                     else:
                         self.scheduler.step()
 
             if log_after_each_epoch:
                 logger.info(f'Epoch: {epoch + 1} \tTrain Loss: {epoch_train_metrics.loss:.6f} '
-                            f'\tTrain F1: {epoch_train_metrics.F1:.6f}'
-                            f'\tVal F1: {epoch_val_metrics.F1:.6f}')
+                            f'\tVal Loss: {epoch_val_metrics.loss:.6f}')
 
         return all_train_metrics, all_val_metrics
 
