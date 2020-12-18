@@ -129,14 +129,14 @@ class Classifier:
                     if save_model:
                         torch.save(self.model.state_dict(), f'{self.save_path}/{eval_fold}_model.pt')
                     best_epoch = epoch
+                    all_train_metrics.best_epoch = epoch
+                    all_val_metrics.best_epoch = epoch
                     best_epoch_val_f1 = epoch_val_metrics.F1
                     time_since_best_epoch = 0
                 else:
                     time_since_best_epoch += 1
                     if time_since_best_epoch > self.early_stopping:
                         logger.info('Stopping due to early stopping')
-                        all_train_metrics.truncate_to_epoch(epoch=best_epoch)
-                        all_val_metrics.truncate_to_epoch(epoch=best_epoch)
                         return all_train_metrics, all_val_metrics
 
             if not self.scheduler_step_after_batch:

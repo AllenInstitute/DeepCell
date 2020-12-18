@@ -8,18 +8,13 @@ class TrainingMetrics:
         self.precisions = np.zeros(n_epochs)
         self.recalls = np.zeros(n_epochs)
         self.f1s = np.zeros(n_epochs)
+        self.best_epoch = None
 
     def update(self, epoch, loss, precision, recall, f1):
         self.losses[epoch] = loss
         self.precisions[epoch] = precision
         self.recalls[epoch] = recall
         self.f1s[epoch] = f1
-
-    def truncate_to_epoch(self, epoch):
-        self.losses = self.losses[:epoch+1]
-        self.precisions = self.precisions[:epoch+1]
-        self.recalls = self.recalls[:epoch+1]
-        self.f1s = self.f1s[:epoch+1]
 
 
 class Metrics:
@@ -84,59 +79,28 @@ class Metrics:
 
 
 class CVMetrics:
-    def __init__(self, n_splits, n_epochs):
+    def __init__(self, n_splits):
         self.n_splits = n_splits
-        self.min_n_epoch = float('inf')
         self.train_metrics = []
         self.valid_metrics = []
 
     def update(self, train_metrics, valid_metrics):
         self.train_metrics.append(train_metrics)
         self.valid_metrics.append(valid_metrics)
-        self.min_n_epoch = min(len(train_metrics.losses), self.min_n_epoch)
 
     @property
     def metrics(self):
-        valid_precision = sum([x.precisions[-1] for x in self.valid_metrics]) / self.n_splits
-        valid_recall = sum([x.recalls[-1] for x in self.valid_metrics]) / self.n_splits
+        valid_precision = sum([x.precisions[x.best_epoch] for x in self.valid_metrics]) / self.n_splits
+        valid_recall = sum([x.recalls[x.best_epoch] for x in self.valid_metrics]) / self.n_splits
 
-        train_f1 = sum([x.f1s[-1] for x in self.train_metrics]) / self.n_splits
-        valid_f1 = sum([x.f1s[-1] for x in self.valid_metrics]) / self.n_splits
+        train_f1 = sum([x.f1s[x.best_epoch] for x in self.train_metrics]) / self.n_splits
+        valid_f1 = sum([x.f1s[x.best_epoch] for x in self.valid_metrics]) / self.n_splits
 
         return {
             'valid_precision': valid_precision,
             'valid_recall': valid_recall,
             'train_f1': train_f1,
             'valid_f1': valid_f1,
-        }
-
-    def _get_running_metrics(self):
-        for x in self.train_metrics:
-            x.truncate_to_epoch(epoch=self.min_n_epoch)
-        for x in self.valid_metrics:
-            x.truncate_to_epoch(epoch=self.min_n_epoch)
-
-        train_loss = np.zeros(int(self.min_n_epoch))
-        valid_loss = np.zeros(int(self.min_n_epoch))
-
-        train_f1 = np.zeros(int(self.min_n_epoch))
-        valid_f1 = np.zeros(int(self.min_n_epoch))
-
-        for m in self.train_metrics:
-            train_loss += m.losses
-            train_f1 += m.f1s
-        train_loss /= self.n_splits
-        train_f1 /= self.n_splits
-
-        for m in self.valid_metrics:
-            valid_loss += m.losses
-            valid_f1 += m.f1s
-        valid_loss /= self.n_splits
-        valid_f1 /= self.n_splits
-
-        return {
-            'loss': (train_loss, valid_loss),
-            'f1': (train_f1, valid_f1)
         }
 
 
