@@ -90,17 +90,12 @@ class CVMetrics:
 
     @property
     def metrics(self):
-        valid_precision = sum([x.precisions[x.best_epoch] for x in self.valid_metrics]) / self.n_splits
-        valid_recall = sum([x.recalls[x.best_epoch] for x in self.valid_metrics]) / self.n_splits
-
-        train_f1 = sum([x.f1s[x.best_epoch] for x in self.train_metrics]) / self.n_splits
-        valid_f1 = sum([x.f1s[x.best_epoch] for x in self.valid_metrics]) / self.n_splits
+        train_loss = sum([x.losses[x.best_epoch] for x in self.train_metrics]) / self.n_splits
+        valid_loss = sum([x.losses[x.best_epoch] for x in self.valid_metrics]) / self.n_splits
 
         return {
-            'valid_precision': valid_precision,
-            'valid_recall': valid_recall,
-            'train_f1': train_f1,
-            'valid_f1': valid_f1,
+            'train_loss': train_loss,
+            'valid_loss': valid_loss
         }
 
 
