@@ -10,7 +10,7 @@ from RoiDataset import RoiDataset
 
 
 def inference(model: torch.nn.Module, test_loader: DataLoader, checkpoint_path, has_labels=True, threshold=0.5, ensemble=True,
-              cv_fold=None):
+              cv_fold=None, use_cuda=True):
     if not ensemble and cv_fold is None:
         raise ValueError('If not using ensemble, need to give cv_fold')
     if cv_fold is not None and ensemble:
@@ -36,7 +36,8 @@ def inference(model: torch.nn.Module, test_loader: DataLoader, checkpoint_path, 
         prev_start = 0
 
         for data, _ in test_loader:
-            data = data.cuda()
+            if use_cuda:
+                data = data.cuda()
 
             with torch.no_grad():
                 output = model(data)
