@@ -111,7 +111,7 @@ class Classifier:
                         loss = self.criterion(output, target.float())
 
                         epoch_val_metrics.update_loss(loss=loss.item(), num_batches=len(valid_loader))
-                        epoch_train_metrics.update_outputs(y_true=target, y_out=output)
+                        epoch_val_metrics.update_outputs(y_true=target, y_out=output)
 
                 all_val_metrics.update(epoch=epoch,
                                          loss=epoch_val_metrics.loss,
