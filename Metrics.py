@@ -1,20 +1,17 @@
 import numpy as np
 import torch
+from sklearn.metrics import average_precision_score
 
 
 class TrainingMetrics:
     def __init__(self, n_epochs):
         self.losses = np.zeros(n_epochs)
-        self.precisions = np.zeros(n_epochs)
-        self.recalls = np.zeros(n_epochs)
-        self.f1s = np.zeros(n_epochs)
+        self.auprs = np.zeros(n_epochs)
         self.best_epoch = None
 
-    def update(self, epoch, loss, precision, recall, f1):
+    def update(self, epoch, loss, aupr):
         self.losses[epoch] = loss
-        self.precisions[epoch] = precision
-        self.recalls[epoch] = recall
-        self.f1s[epoch] = f1
+        self.auprs[epoch] = aupr
 
 
 class Metrics:
@@ -23,6 +20,8 @@ class Metrics:
         self.FP = 0
         self.FN = 0
         self.loss = 0.0
+        self.y_scores = []
+        self.y_trues = []
 
     @property
     def precision(self):
@@ -51,6 +50,10 @@ class Metrics:
             res = 0.0
         return res
 
+    @property
+    def AUPR(self):
+        return average_precision_score(y_true=self.y_trues, y_score=self.y_scores)
+
     def update_accuracies(self, y_true, y_out=None, y_score=None, threshold=0.5):
         if y_out is not None and y_score is not None:
             raise ValueError('Supply either logits or score')
@@ -64,6 +67,12 @@ class Metrics:
         self._increment_TP(y_pred=y_pred, y_true=y_true)
         self._increment_FP(y_pred=y_pred, y_true=y_true)
         self._increment_FN(y_pred=y_pred, y_true=y_true)
+
+    def update_outputs(self, y_out, y_true):
+        preds = torch.sigmoid(y_out).cpu().numpy().tolist()
+        y_true = y_true.cpu().numpy().tolist()
+        self.y_scores += preds
+        self.y_trues += y_true
 
     def update_loss(self, loss, num_batches):
         self.loss += loss / num_batches  # loss*num_batches/N = (Sum of all l)/N
