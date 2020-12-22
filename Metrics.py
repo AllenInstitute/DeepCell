@@ -70,7 +70,7 @@ class Metrics:
 
     def update_outputs(self, y_out, y_true):
         preds = torch.sigmoid(y_out).detach().cpu().numpy().tolist()
-        y_true = y_true.detatch().cpu().numpy().tolist()
+        y_true = y_true.detach().cpu().numpy().tolist()
         self.y_scores += preds
         self.y_trues += y_true
 
