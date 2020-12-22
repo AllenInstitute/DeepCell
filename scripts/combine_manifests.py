@@ -54,6 +54,10 @@ if __name__ == '__main__':
         {
             'manifest_url': 's3://prod.slapp.alleninstitute.org/behavior_3cre_1600roi/20201119175205/expert-output/ophys-experts-go-big-or-go-home-chain/manifests/output/output.manifest',
             'project_name': 'ophys-experts-go-big-or-go-home'
+        },
+        {
+            'manifest_url': 's3://prod.slapp.alleninstitute.org/last-ditch-labeling-effort-20201222/output.manifest',
+            'project_name': 'ophys-experts'
         }
     ]
     combine_and_save_manifests(manifests_metas=manifest_metas, out='/tmp/output.manifest')
