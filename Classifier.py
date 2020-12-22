@@ -133,7 +133,7 @@ class Classifier:
             if not self.scheduler_step_after_batch:
                 if self.scheduler is not None:
                     if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-                        self.scheduler.step(epoch_val_metrics.loss)
+                        self.scheduler.step(epoch_val_metrics.AUPR)
                     else:
                         self.scheduler.step()
 
