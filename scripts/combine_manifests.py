@@ -12,7 +12,7 @@ def combine_and_save_manifests(manifests_metas, out='merged.manifest'):
     """
     combined = []
 
-    new_project_name = '_'.join([m['project_name'] for m in manifests_metas])
+    new_project_name = 'ophys_experts'
 
     for manifest_meta in manifests_metas:
         manifest = read_jsonlines(manifest_meta['manifest_url'])
@@ -56,8 +56,8 @@ if __name__ == '__main__':
             'project_name': 'ophys-experts-go-big-or-go-home'
         },
         {
-            'manifest_url': 's3://prod.slapp.alleninstitute.org/last-ditch-labeling-effort-20201222/output.manifest',
-            'project_name': 'ophys-experts'
+            'manifest_url': 's3://prod.slapp.alleninstitute.org/last-ditch-labeling-effort-20201222/combined_output.manifest',
+            'project_name': 'ophys-expert-danielsf-additions'
         }
     ]
     combine_and_save_manifests(manifests_metas=manifest_metas, out='/tmp/output.manifest')

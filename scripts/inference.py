@@ -127,7 +127,7 @@ def run_for_experiment(experiment_id):
 if __name__ == '__main__':
     inference_res = pd.read_csv('~/Downloads/inference.csv')
     experiments = inference_res['experiment_id'].unique()
-    experiments = [904352688]
+    experiments = [974994099]
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     path = Path(root) / 'inference-output' / 'inference_plots.pdf'
     with PdfPages(f'{path}') as pdf:
