@@ -5,14 +5,11 @@ class RNNDecoder(nn.Module):
     def __init__(self, classifier_cfg, input_dim=300, num_layers=3, hidden_size=256, dropout_prob=0.5):
         super().__init__()
 
-        self.RNN_input_size = input_dim
-        self.num_layers = num_layers
-        self.hidden_size = hidden_size
         self.dropout_prob = dropout_prob
 
         self.LSTM = nn.LSTM(
-            input_size=self.RNN_input_size,
-            hidden_size=self.hidden_size,
+            input_size=input_dim,
+            hidden_size=hidden_size,
             num_layers=num_layers,
             batch_first=True
         )
