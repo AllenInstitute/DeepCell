@@ -39,13 +39,22 @@ def main():
     with open(f'{home_dir}/master_global_to_local_mapping.json') as f:
         global_to_local_mapping = json.loads(f.read())
 
+    with open(f'{home_dir}/new') as f:
+        new = json.loads(f.read())
+
+    num_rois = 0
+
     with jsonlines.open(f'{home_dir}/output.manifest') as reader:
         for roi in reader:
             exp_id = roi['experiment-id']
             global_roi_id = int(roi['roi-id'])
+            if global_roi_id not in new:
+                continue
             local_roi_id = int(global_to_local_mapping['global_to_local'][str(global_roi_id)]['roi_id'])
             exp_to_local_to_global_map[exp_id][local_roi_id] = global_roi_id
+            num_rois += 1
     num_exps = len(exp_to_local_to_global_map)
+    print(f'num rois: {num_rois}')
     exp_meta = get_experiment_meta()
 
     for i, exp_id in enumerate(exp_to_local_to_global_map):

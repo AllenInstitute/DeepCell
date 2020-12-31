@@ -126,7 +126,7 @@ class RoiDataset(Dataset):
             try:
                 res[:, :, 2] = mask
             except:
-                print(roi_id)
+                print(roi_id, mask.shape)
 
         return res
 
