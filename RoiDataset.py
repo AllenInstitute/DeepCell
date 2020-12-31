@@ -123,7 +123,10 @@ class RoiDataset(Dataset):
         if self.exclude_mask:
             res[:, :, 2] = max
         else:
-            res[:, :, 2] = mask
+            try:
+                res[:, :, 2] = mask
+            except:
+                print(roi_id)
 
         return res
 
