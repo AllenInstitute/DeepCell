@@ -68,7 +68,7 @@ def compare_preds():
 
     for row in differ[:10].itertuples():
         roi_id = row.roi_id
-        channels = train._extract_channels(obs={'roi-id': roi_id})
+        channels = train._get_video(obs={'roi-id': roi_id})
         label = 'Cell' if row.y_true == 1 else 'Not Cell'
         fig = display_roi(channels=channels, roi_id=roi_id,
                     columns=3, rows=1, label=label)

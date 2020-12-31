@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 from DataSplitter import DataSplitter
 from Metrics import Metrics, TrainingMetrics, CVMetrics
 from RoiDataset import RoiDataset
+from models.video.VideoNet import VideoNet
 
 logging.basicConfig(
     stream=sys.stdout,
@@ -19,9 +20,9 @@ logger = logging.getLogger(__name__)
 
 
 class Classifier:
-    def __init__(self, model: torch.nn.Module, n_epochs: int, optimizer,
+    def __init__(self, model: VideoNet, n_epochs: int, optimizer,
                  criterion, save_path, scheduler=None, scheduler_step_after_batch=False, debug=False,
-                 early_stopping=30, use_cuda=True):
+                 early_stopping=30, use_cuda=True, seq_len=200):
         self.n_epochs = n_epochs
         self.model = model
         self.optimizer_constructor = optimizer
@@ -34,6 +35,7 @@ class Classifier:
         self.save_path = save_path
         self.debug = debug
         self.early_stopping = early_stopping
+        self.seq_len = seq_len
 
         if not os.path.exists(f'{self.save_path}'):
             os.makedirs(f'{self.save_path}')
@@ -79,19 +81,30 @@ class Classifier:
 
             self.model.train()
             for batch_idx, (data, target) in enumerate(train_loader):
+                data: torch.Tensor
+
                 # move to GPU
                 if self.use_cuda:
                     data, target = data.cuda(), target.cuda()
 
-                self.optimizer.zero_grad()
-                output = self.model(data)
-                output = output.squeeze()
-                loss = self.criterion(output, target.float())
-                loss.backward()
-                self.optimizer.step()
+                # reset RNN hidden state before each batch
+                self.model.rnn.hidden_state = None
 
-                epoch_train_metrics.update_loss(loss=loss.item(), num_batches=len(train_loader))
-                epoch_train_metrics.update_outputs(y_true=target, y_out=output)
+                # split movie into seq_len sized chunks (truncated backprop through time)
+                chunks = data.split(split_size=self.seq_len, dim=0)
+
+                for c in chunks:
+                    self.optimizer.zero_grad()
+                    output = self.model(c)
+                    output = output.squeeze()
+                    loss = self.criterion(output, target.float())
+                    loss.backward()
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=5)
+                    self.optimizer.step()
+                    self.model.rnn.detach_hidden_state()
+
+                    epoch_train_metrics.update_loss(loss=loss.item(), num_batches=len(train_loader))
+                    epoch_train_metrics.update_outputs(y_true=target, y_out=output)
 
             all_train_metrics.update(epoch=epoch,
                                      loss=epoch_train_metrics.loss,

@@ -59,28 +59,16 @@ class RoiDataset(Dataset):
     def __getitem__(self, index):
         obs = self.manifest[index]
 
-        input = self._extract_channels(obs=obs)
+        video = self._get_video(obs=obs)
 
         if self.transform:
-            avg, max_, mask = input[:, :, 0], input[:, :, 1], input[:, :, 2]
-            if self.transform.avg_transform:
-                avg = self.transform.avg_transform(avg)
-                input[:, :, 0] = avg
-            if self.transform.max_transform:
-                max_ = self.transform.max_transform(max_)
-                input[:, :, 1] = max_
-            if self.transform.mask_transform:
-                mask = self.transform.mask_transform(mask)
-                input[:, :, 2] = mask
-
-            if self.transform.all_transform:
-                input = self.transform.all_transform(input)
+            video = self.transform.all_transform(video)
 
         # Note if no labels, 0.0 is given as the target
         # TODO collate_fn should be used instead
         target = self.y[index] if self.has_labels else 0
 
-        return input, target
+        return video, target
 
     def __len__(self):
         return len(self.manifest)
@@ -100,32 +88,13 @@ class RoiDataset(Dataset):
                 cre_lines.append(experiment_genotype_map[x['experiment-id']][:3])
         return cre_lines
 
-    def _extract_channels(self, obs):
+    def _get_video(self, obs):
         roi_id = obs['roi-id']
 
         data_dir = self.data_dir
-        with open(f'{data_dir}/avg_{roi_id}.png', 'rb') as f:
-            avg = Image.open(f)
-            avg = np.array(avg)
-
-        with open(f'{data_dir}/max_{roi_id}.png', 'rb') as f:
-            max = Image.open(f)
-            max = np.array(max)
-
-        with open(f'{data_dir}/mask_{roi_id}.png', 'rb') as f:
-            mask = Image.open(f)
-            mask = np.array(mask)
-
-        res = np.zeros((*self.image_dim, 3), dtype=np.uint8)
-        res[:, :, 0] = avg
-        res[:, :, 1] = max
-
-        if self.exclude_mask:
-            res[:, :, 2] = max
-        else:
-            res[:, :, 2] = mask
-
-        return res
+        with np.load(f'{data_dir}/video_{roi_id}.npz') as data:
+            v = data['arr_0']
+        return v
 
     def _filter_by_cre_line(self, experiment_genotype_map, cre_line):
         filtered = [x for x in self.manifest if experiment_genotype_map[x['experiment-id']].startswith(cre_line)]
