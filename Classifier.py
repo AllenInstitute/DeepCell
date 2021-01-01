@@ -138,8 +138,11 @@ class Classifier:
                         self.scheduler.step()
 
             if log_after_each_epoch:
-                logger.info(f'Epoch: {epoch + 1} \tTrain AUPR: {epoch_train_metrics.AUPR:.6f} '
-                            f'\tVal AUPR: {epoch_val_metrics.AUPR:.6f}')
+                logger.info(f'Epoch: {epoch + 1} \t'
+                            f'Train AUPR: {epoch_train_metrics.AUPR:.6f} \t'
+                            f'Val AUPR: {epoch_val_metrics.AUPR:.6f}\t'
+                            f'Val Loss: {epoch_val_metrics.loss}'
+                            )
 
         return all_train_metrics, all_val_metrics
 

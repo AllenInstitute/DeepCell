@@ -126,6 +126,7 @@ class RoiDataset(Dataset):
             try:
                 res[:, :, 2] = mask
             except:
+                # TODO this should be fixed in SLAPP (issue: ROI larger than cropped area)
                 pass
 
         return res
