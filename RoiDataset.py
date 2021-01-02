@@ -11,7 +11,7 @@ from util import get_experiment_genotype_map
 class RoiDataset(Dataset):
     def __init__(self, manifest_path, project_name, data_dir, image_dim=(128, 128), roi_ids=None,
                  transform: Transform = None, debug=False, has_labels=True, parse_from_manifest=True,
-                 cre_line=None, exclude_mask=False):
+                 cre_line=None, include_mask=False, video_max_frames=None):
         super().__init__()
 
         if not parse_from_manifest and roi_ids is None:
@@ -23,7 +23,8 @@ class RoiDataset(Dataset):
         self.image_dim = image_dim
         self.transform = transform
         self.has_labels = has_labels
-        self.exclude_mask = exclude_mask
+        self.include_mask = include_mask
+        self.video_max_frames = video_max_frames
 
         experiment_genotype_map = get_experiment_genotype_map()
 
@@ -94,7 +95,31 @@ class RoiDataset(Dataset):
         data_dir = self.data_dir
         with np.load(f'{data_dir}/video_{roi_id}.npz') as data:
             v = data['arr_0']
+
+        if self.video_max_frames:
+            v = v[:self.video_max_frames]
+
+        if self.include_mask:
+            v = self._add_mask(video=v, roi_id=roi_id)
         return v
+
+    def _add_mask(self, video, roi_id):
+        data_dir = self.data_dir
+        outline = Image.open(f'{data_dir}/outline_{roi_id}.png')
+        outline = np.array(outline)
+        outline_copy = outline.copy()
+        outline_copy[outline == 0] = 255
+        outline_copy[outline == 255] = 0
+        outline = Image.fromarray(outline_copy)
+
+        for i in range(video.shape[0]):
+            frame = Image.fromarray(video[i])
+
+            frame.paste(outline, box=(0, 0), mask=outline)
+            frame = np.array(frame)
+            video[i] = frame
+
+        return video
 
     def _filter_by_cre_line(self, experiment_genotype_map, cre_line):
         filtered = [x for x in self.manifest if experiment_genotype_map[x['experiment-id']].startswith(cre_line)]
