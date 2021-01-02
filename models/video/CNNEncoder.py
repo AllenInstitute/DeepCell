@@ -43,10 +43,11 @@ class CNNEncoder(torch.nn.Module):
         return conv_layers[:layer]
 
     def _get_last_filter_num(self):
+        features = self.features[0]
         idx = -1
-        while idx > -1 * len(self.features):
-            if hasattr(self.features[idx], 'out_channels'):
-                return self.features[idx].out_channels
+        while idx > -1 * len(features):
+            if hasattr(features[idx], 'out_channels'):
+                return features[idx].out_channels
             idx -= 1
 
         raise Exception('Could not find number of filters in last conv layer')
