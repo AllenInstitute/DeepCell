@@ -102,9 +102,14 @@ class CVMetrics:
         train_loss = sum([x.losses[x.best_epoch] for x in self.train_metrics]) / self.n_splits
         valid_loss = sum([x.losses[x.best_epoch] for x in self.valid_metrics]) / self.n_splits
 
+        train_aupr = sum([x.auprs[x.best_epoch] for x in self.train_metrics]) / self.n_splits
+        valid_aupr = sum([x.auprs[x.best_epoch] for x in self.valid_metrics]) / self.n_splits
+
         return {
             'train_loss': train_loss,
-            'valid_loss': valid_loss
+            'valid_loss': valid_loss,
+            'train_aupr': train_aupr,
+            'valid_aupr': valid_aupr
         }
 
 
