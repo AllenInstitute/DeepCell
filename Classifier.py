@@ -72,7 +72,7 @@ class Classifier:
         all_train_metrics = TrainingMetrics(n_epochs=self.n_epochs)
         all_val_metrics = TrainingMetrics(n_epochs=self.n_epochs)
 
-        best_epoch_metric = -float('inf')
+        best_epoch_metric = float('inf')
         time_since_best_epoch = 0
 
         for epoch in range(self.n_epochs):
@@ -104,11 +104,11 @@ class Classifier:
                     self.model.rnn.detach_hidden_state()
 
                     epoch_train_metrics.update_loss(loss=loss.item(), num_batches=len(train_loader))
-                    epoch_train_metrics.update_outputs(y_true=target, y_out=output)
+                    epoch_train_metrics.update_accuracies(y_true=target, y_out=output)
 
             all_train_metrics.update(epoch=epoch,
                                      loss=epoch_train_metrics.loss,
-                                     aupr=epoch_train_metrics.AUPR)
+                                     f1=epoch_train_metrics.F1)
 
             if valid_loader:
                 self.model.eval()
@@ -124,18 +124,18 @@ class Classifier:
                         loss = self.criterion(output, target.float())
 
                         epoch_val_metrics.update_loss(loss=loss.item(), num_batches=len(valid_loader))
-                        epoch_val_metrics.update_outputs(y_true=target, y_out=output)
+                        epoch_val_metrics.update_accuracies(y_true=target, y_out=output)
 
                 all_val_metrics.update(epoch=epoch,
-                                         loss=epoch_val_metrics.loss,
-                                         aupr=epoch_val_metrics.AUPR)
+                                       loss=epoch_val_metrics.loss,
+                                       f1=epoch_val_metrics.F1)
 
-                if epoch_val_metrics.AUPR > best_epoch_metric:
+                if epoch_val_metrics.loss < best_epoch_metric:
                     if save_model:
                         torch.save(self.model.state_dict(), f'{self.save_path}/{eval_fold}_model.pt')
                     all_train_metrics.best_epoch = epoch
                     all_val_metrics.best_epoch = epoch
-                    best_epoch_metric = epoch_val_metrics.AUPR
+                    best_epoch_metric = epoch_val_metrics.loss
                     time_since_best_epoch = 0
                 else:
                     time_since_best_epoch += 1
@@ -146,13 +146,14 @@ class Classifier:
             if not self.scheduler_step_after_batch:
                 if self.scheduler is not None:
                     if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-                        self.scheduler.step(epoch_val_metrics.AUPR)
+                        self.scheduler.step(epoch_val_metrics.loss)
                     else:
                         self.scheduler.step()
 
             if log_after_each_epoch:
-                logger.info(f'Epoch: {epoch + 1} \tTrain AUPR: {epoch_train_metrics.AUPR:.6f} '
-                            f'\tVal AUPR: {epoch_val_metrics.AUPR:.6f}')
+                logger.info(f'Epoch: {epoch + 1} \tTrain Loss: {epoch_train_metrics.loss:.6f} '
+                            f'\tVal loss: {epoch_val_metrics.loss:.6f}'
+                            f'\tVal F1: {epoch_val_metrics.F1:.6f}')
 
         return all_train_metrics, all_val_metrics
 

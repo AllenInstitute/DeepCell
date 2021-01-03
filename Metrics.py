@@ -6,12 +6,12 @@ from sklearn.metrics import average_precision_score
 class TrainingMetrics:
     def __init__(self, n_epochs):
         self.losses = np.zeros(n_epochs)
-        self.auprs = np.zeros(n_epochs)
         self.best_epoch = None
+        self.f1s = np.zeros(n_epochs)
 
-    def update(self, epoch, loss, aupr):
+    def update(self, epoch, loss, f1):
         self.losses[epoch] = loss
-        self.auprs[epoch] = aupr
+        self.f1s[epoch] = f1
 
 
 class Metrics:

@@ -103,12 +103,12 @@ class RoiDataset(Dataset):
             v = np.load(f'{data_dir}/video_{roi_id}.npy')
 
         if self.video_max_frames:
-            v = v[:self.video_max_frames]
-
-        if v.shape[0] < self.video_max_frames:
-            diff = self.video_max_frames - v.shape[0]
-            pad = np.zeros((diff, *self.image_dim))
-            v = np.concatenate([v, pad])
+            if v.shape[0] < self.video_max_frames:
+                diff = self.video_max_frames - v.shape[0]
+                pad = np.zeros((diff, *self.image_dim))
+                v = np.concatenate([v, pad])
+            else:
+                v = v[:self.video_max_frames]
 
         if self.include_mask:
             v = self._add_mask(video=v, roi_id=roi_id)
