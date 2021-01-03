@@ -114,7 +114,7 @@ class RoiDataset(Dataset):
             v = self._add_mask(video=v, roi_id=roi_id)
 
         # Convert frames to 3 channels
-        v = np.repeat(v[:, None, :], 3, axis=1)
+        v = np.repeat(v[:, :, :, np.newaxis], 3, axis=3)
 
         return v
 

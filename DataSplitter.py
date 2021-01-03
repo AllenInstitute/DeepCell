@@ -6,7 +6,7 @@ from RoiDataset import RoiDataset
 
 class DataSplitter:
     def __init__(self, manifest_path, project_name, data_dir, train_transform=None, test_transform=None, seed=None,
-                 cre_line=None, include_mask=False):
+                 cre_line=None, include_mask=False, video_max_frames=None):
         self.manifest_path = manifest_path
         self.project_name = project_name
         self.data_dir = data_dir
@@ -15,6 +15,7 @@ class DataSplitter:
         self.seed = seed
         self.cre_line = cre_line
         self.include_mask = include_mask
+        self.video_max_frames = video_max_frames
 
     def get_train_test_split(self, test_size):
         full_dataset = RoiDataset(manifest_path=self.manifest_path, project_name=self.project_name,
@@ -28,10 +29,11 @@ class DataSplitter:
 
         train_dataset = RoiDataset(roi_ids=train_roi_ids, manifest_path=self.manifest_path,
                                    project_name=self.project_name, transform=self.train_transform,
-                                   data_dir=self.data_dir, include_mask=self.include_mask)
+                                   data_dir=self.data_dir, include_mask=self.include_mask,
+                                   video_max_frames=self.video_max_frames)
         test_dataset = RoiDataset(roi_ids=test_roi_ids, manifest_path=self.manifest_path,
                                   project_name=self.project_name, transform=self.test_transform, data_dir=self.data_dir,
-                                  include_mask=self.include_mask)
+                                  include_mask=self.include_mask, video_max_frames=self.video_max_frames)
 
         return train_dataset, test_dataset
 
@@ -44,10 +46,10 @@ class DataSplitter:
 
             train = RoiDataset(roi_ids=train_roi_ids, manifest_path=self.manifest_path,
                                project_name=self.project_name, transform=self.train_transform, data_dir=self.data_dir,
-                               include_mask=self.include_mask)
+                               include_mask=self.include_mask, video_max_frames=self.video_max_frames)
             valid = RoiDataset(roi_ids=valid_roi_ids, manifest_path=self.manifest_path,
                                project_name=self.project_name, transform=self.test_transform, data_dir=self.data_dir,
-                               include_mask=self.include_mask)
+                               include_mask=self.include_mask, video_max_frames=self.video_max_frames)
             yield train, valid
 
 
