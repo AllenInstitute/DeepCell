@@ -93,10 +93,9 @@ class Classifier:
                 # split movie into seq_len sized chunks (truncated backprop through time)
                 chunks = data.split(split_size=self.seq_len, dim=2)
 
-                logger.info(f'BATCH {batch_idx}')
+                logger.info(f'BATCH {batch_idx}/{len(train_loader)}')
 
                 for i, c in enumerate(chunks):
-                    logger.info(f'CHUNK {i}')
                     self.optimizer.zero_grad()
                     output = self.model(c)
                     output = output.squeeze()
