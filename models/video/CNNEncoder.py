@@ -25,6 +25,8 @@ class CNNEncoder(torch.nn.Module):
         cnn_embed_seq = []
 
         num_frames = x.size(2)
+        print(f'tensor shape: {x.shape}')
+
         for f in range(num_frames):
             x = self.features(x[:, :, f])
             x = x.reshape(x.size(0), -1)    # flatten
