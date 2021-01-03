@@ -92,6 +92,7 @@ class Classifier:
 
                 # split movie into seq_len sized chunks (truncated backprop through time)
                 chunks = data.split(split_size=self.seq_len, dim=0)
+                print(f'chunks shape: {chunks.shape}')
 
                 for c in chunks:
                     self.optimizer.zero_grad()
