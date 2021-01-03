@@ -25,19 +25,21 @@ class CNNEncoder(torch.nn.Module):
         cnn_embed_seq = []
 
         num_frames = x.size(2)
-        print(f'tensor shape: {x.shape}')
 
         for f in range(num_frames):
-            x = self.features(x[:, :, f])
-            x = x.reshape(x.size(0), -1)    # flatten
-            x = self.embedding(x)
-
-            cnn_embed_seq.append(x)
+            out = self._forward_frame(x=x, frame_idx=f)
+            cnn_embed_seq.append(out)
 
         # (time dim, sample dim, latent dim) -> (sample dim, time dim, latent dim)
         cnn_embed_seq = torch.stack(cnn_embed_seq, dim=0).transpose_(0, 1)
 
         return cnn_embed_seq
+
+    def _forward_frame(self, x, frame_idx):
+        x = self.features(x[:, :, frame_idx])
+        x = x.reshape(x.size(0), -1)  # flatten
+        x = self.embedding(x)
+        return x
 
     @staticmethod
     def _truncate_to_layer(model, layer):
