@@ -1,3 +1,5 @@
+import os
+
 from PIL import Image
 from croissant.utils import read_jsonlines
 import numpy as np
@@ -93,14 +95,27 @@ class RoiDataset(Dataset):
         roi_id = obs['roi-id']
 
         data_dir = self.data_dir
-        with np.load(f'{data_dir}/video_{roi_id}.npz') as data:
-            v = data['arr_0']
+
+        if os.path.exists(f'{data_dir}/video_{roi_id}.npz'):
+            with np.load(f'{data_dir}/video_{roi_id}.npz') as data:
+                v = data['arr_0']
+        else:
+            v = np.load(f'{data_dir}/video_{roi_id}.npy')
 
         if self.video_max_frames:
             v = v[:self.video_max_frames]
 
+        if v.shape[0] < self.video_max_frames:
+            diff = self.video_max_frames - v.shape[0]
+            pad = np.zeros((diff, *self.image_dim))
+            v = np.concatenate([v, pad])
+
         if self.include_mask:
             v = self._add_mask(video=v, roi_id=roi_id)
+
+        # Convert frames to 3 channels
+        v = np.repeat(v[:, :, np.newaxis], 3, axis=2)
+
         return v
 
     def _add_mask(self, video, roi_id):
