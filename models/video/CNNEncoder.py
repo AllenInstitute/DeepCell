@@ -24,9 +24,9 @@ class CNNEncoder(torch.nn.Module):
     def forward(self, x):
         cnn_embed_seq = []
 
-        num_frames = x.size(1)
+        num_frames = x.size(2)
         for f in range(num_frames):
-            x = self.features(x[:, f])
+            x = self.features(x[:, :, f])
             x = x.reshape(x.size(0), -1)    # flatten
             x = self.embedding(x)
 
