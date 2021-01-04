@@ -84,9 +84,8 @@ class Classifier:
             for batch_idx, (data, target) in enumerate(tqdm(train_loader, desc='Train')):
                 data: torch.Tensor
 
-                # move to GPU
                 if self.use_cuda:
-                    data, target = data.cuda(), target.cuda()
+                    target = target.cuda()
 
                 # reset RNN hidden state before each batch
                 self.model.rnn.hidden_state = None
@@ -95,6 +94,9 @@ class Classifier:
                 chunks = data.split(split_size=self.seq_len, dim=2)
 
                 for i, c in enumerate(chunks):
+                    if self.use_cuda:
+                        c = c.cuda()
+                        
                     self.optimizer.zero_grad()
                     output = self.model(c)
                     output = output.squeeze()
