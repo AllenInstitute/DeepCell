@@ -96,13 +96,11 @@ class RoiDataset(Dataset):
 
         data_dir = self.data_dir
 
-        if os.path.exists(f'{data_dir}/video_{roi_id}.npz'):
-            with np.load(f'{data_dir}/video_{roi_id}.npz') as data:
-                v = data['arr_0']
-        else:
-            v = np.load(f'{data_dir}/video_{roi_id}.npy')
+        v = np.load(f'{data_dir}/video_{roi_id}.npy')
 
         if self.video_max_frames:
+            # If video shorter than video_max_frames,
+            # pad with zeros
             if v.shape[0] < self.video_max_frames:
                 diff = self.video_max_frames - v.shape[0]
                 pad = np.zeros((diff, *self.image_dim))

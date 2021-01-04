@@ -3,6 +3,7 @@ import os
 import sys
 import torch
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from DataSplitter import DataSplitter
 from Metrics import Metrics, TrainingMetrics, CVMetrics
@@ -80,7 +81,7 @@ class Classifier:
             epoch_val_metrics = Metrics()
 
             self.model.train()
-            for batch_idx, (data, target) in enumerate(train_loader):
+            for batch_idx, (data, target) in enumerate(tqdm(train_loader, desc='Train')):
                 data: torch.Tensor
 
                 # move to GPU
@@ -92,8 +93,6 @@ class Classifier:
 
                 # split movie into seq_len sized chunks (truncated backprop through time)
                 chunks = data.split(split_size=self.seq_len, dim=2)
-
-                logger.info(f'BATCH {batch_idx}/{len(train_loader)}')
 
                 for i, c in enumerate(chunks):
                     self.optimizer.zero_grad()
@@ -114,7 +113,7 @@ class Classifier:
 
             if valid_loader:
                 self.model.eval()
-                for batch_idx, (data, target) in enumerate(valid_loader):
+                for batch_idx, (data, target) in enumerate(tqdm(valid_loader, desc='Val')):
                     # move to GPU
                     if self.use_cuda:
                         data, target = data.cuda(), target.cuda()
