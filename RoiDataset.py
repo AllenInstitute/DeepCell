@@ -96,7 +96,7 @@ class RoiDataset(Dataset):
 
         data_dir = self.data_dir
 
-        v = np.load(f'{data_dir}/video_{roi_id}.npy')
+        v = np.load(f'{data_dir}/max_{roi_id}.npy')
 
         if self.video_max_frames:
             # If video shorter than video_max_frames,
