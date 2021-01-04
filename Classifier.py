@@ -46,8 +46,8 @@ class Classifier:
 
         torch.save(self.model.state_dict(), f'{self.save_path}/model_init.pt')
 
-    def cross_validate(self, train_dataset: RoiDataset, data_splitter: DataSplitter, batch_size=64, sampler=None,
-                       n_splits=5, save_model=False, log_after_each_epoch=True):
+    def cross_validate(self, train_dataset: RoiDataset, data_splitter: DataSplitter, train_batch_size=64, valid_batch_size=64,
+                       sampler=None, n_splits=5, save_model=False, log_after_each_epoch=True):
         cv_metrics = CVMetrics(n_splits=n_splits)
 
         for i, (train, valid) in enumerate(data_splitter.get_cross_val_split(train_dataset=train_dataset,
@@ -56,8 +56,8 @@ class Classifier:
             logger.info(f'Fold {i}')
             logger.info(f'=========')
 
-            train_loader = DataLoader(dataset=train, shuffle=True, batch_size=batch_size, sampler=sampler)
-            valid_loader = DataLoader(dataset=valid, shuffle=False, batch_size=batch_size)
+            train_loader = DataLoader(dataset=train, shuffle=True, batch_size=train_batch_size, sampler=sampler)
+            valid_loader = DataLoader(dataset=valid, shuffle=False, batch_size=valid_batch_size)
             train_metrics, valid_metrics = self.train(train_loader=train_loader, valid_loader=valid_loader,
                                                       save_model=save_model, eval_fold=i,
                                                       log_after_each_epoch=log_after_each_epoch)
@@ -96,7 +96,7 @@ class Classifier:
                 for i, c in enumerate(chunks):
                     if self.use_cuda:
                         c = c.cuda()
-                        
+
                     self.optimizer.zero_grad()
                     output = self.model(c)
                     output = output.squeeze()
@@ -106,8 +106,8 @@ class Classifier:
                     self.optimizer.step()
                     self.model.rnn.detach_hidden_state()
 
-                    epoch_train_metrics.update_loss(loss=loss.item(), num_batches=len(train_loader))
-                    epoch_train_metrics.update_accuracies(y_true=target, y_out=output)
+                epoch_train_metrics.update_loss(loss=loss.item(), num_batches=len(train_loader))
+                epoch_train_metrics.update_accuracies(y_true=target, y_out=output)
 
             all_train_metrics.update(epoch=epoch,
                                      loss=epoch_train_metrics.loss,
@@ -119,6 +119,8 @@ class Classifier:
                     # move to GPU
                     if self.use_cuda:
                         data, target = data.cuda(), target.cuda()
+
+                    self.model.rnn.hidden_state = None
 
                     # update the average validation loss
                     with torch.no_grad():
