@@ -81,11 +81,13 @@ class Classifier:
             epoch_val_metrics = Metrics()
 
             self.model.train()
-            for batch_idx, (data, target) in enumerate(tqdm(train_loader, desc='Train')):
+            t = tqdm(train_loader, desc='Train')
+            for batch_idx, (data, target) in enumerate(t):
                 data: torch.Tensor
 
                 if self.use_cuda:
                     target = target.cuda()
+                    data = data.cuda()
 
                 # reset RNN hidden state before each batch
                 self.model.rnn.hidden_state = None
@@ -94,9 +96,6 @@ class Classifier:
                 chunks = data.split(split_size=self.seq_len, dim=2)
 
                 for i, c in enumerate(chunks):
-                    if self.use_cuda:
-                        c = c.cuda()
-
                     self.optimizer.zero_grad()
                     output = self.model(c)
                     output = output.squeeze()
@@ -108,6 +107,8 @@ class Classifier:
 
                 epoch_train_metrics.update_loss(loss=loss.item(), num_batches=len(train_loader))
                 epoch_train_metrics.update_accuracies(y_true=target, y_out=output)
+
+                t.set_description(desc=f'LOSS: {epoch_train_metrics.loss:.3f}\t F1: {epoch_train_metrics.F1:.3f}')
 
             all_train_metrics.update(epoch=epoch,
                                      loss=epoch_train_metrics.loss,
