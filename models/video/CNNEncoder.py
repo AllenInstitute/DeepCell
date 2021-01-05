@@ -9,7 +9,7 @@ class CNNEncoder(torch.nn.Module):
         features = torch.nn.Sequential(*conv_layers)
 
         if freeze_layers:
-            for p in self.features.parameters():
+            for p in features.parameters():
                 p.requires_grad = False
 
         avgpool = torch.nn.AdaptiveAvgPool2d((7, 7))
