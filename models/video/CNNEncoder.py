@@ -63,9 +63,10 @@ class CNNEncoder(torch.nn.Module):
         for i, v in enumerate(cfg[1:], start=1):
             layers += [
                 nn.Linear(cfg[i - 1], cfg[i]),
-                nn.ReLU(inplace=True),
-                nn.Dropout(p=dropout_prob)
+                nn.BatchNorm1d(cfg[i], momentum=0.01),
+                nn.ReLU(inplace=True)
             ]
 
+        layers.append(nn.Dropout(p=dropout_prob))
         layers.append(nn.Linear(cfg[-1], embed_dim))
         return nn.Sequential(*layers)
