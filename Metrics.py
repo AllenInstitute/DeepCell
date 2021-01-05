@@ -1,3 +1,5 @@
+from typing import List
+
 import numpy as np
 import torch
 from sklearn.metrics import average_precision_score
@@ -90,8 +92,8 @@ class Metrics:
 class CVMetrics:
     def __init__(self, n_splits):
         self.n_splits = n_splits
-        self.train_metrics = []
-        self.valid_metrics = []
+        self.train_metrics: List[TrainingMetrics] = []
+        self.valid_metrics: List[TrainingMetrics] = []
 
     def update(self, train_metrics, valid_metrics):
         self.train_metrics.append(train_metrics)
@@ -102,14 +104,14 @@ class CVMetrics:
         train_loss = sum([x.losses[x.best_epoch] for x in self.train_metrics]) / self.n_splits
         valid_loss = sum([x.losses[x.best_epoch] for x in self.valid_metrics]) / self.n_splits
 
-        train_aupr = sum([x.auprs[x.best_epoch] for x in self.train_metrics]) / self.n_splits
-        valid_aupr = sum([x.auprs[x.best_epoch] for x in self.valid_metrics]) / self.n_splits
+        train_f1 = sum([x.f1s[x.best_epoch] for x in self.train_metrics]) / self.n_splits
+        valid_f1 = sum([x.f1s[x.best_epoch] for x in self.valid_metrics]) / self.n_splits
 
         return {
             'train_loss': train_loss,
             'valid_loss': valid_loss,
-            'train_aupr': train_aupr,
-            'valid_aupr': valid_aupr
+            'train_f1': train_f1,
+            'valid_f1': valid_f1
         }
 
 

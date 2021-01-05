@@ -108,7 +108,7 @@ class Classifier:
                 epoch_train_metrics.update_loss(loss=loss.item(), num_batches=len(train_loader))
                 epoch_train_metrics.update_accuracies(y_true=target, y_out=output)
 
-                t.set_description(desc=f'LOSS: {epoch_train_metrics.loss*(batch_idx + 1):.3f}\t '
+                t.set_description(desc=f'LOSS: {epoch_train_metrics.loss*len(train_loader)/(batch_idx + 1):.3f}\t '
                                        f'F1: {epoch_train_metrics.F1:.3f}')
 
             all_train_metrics.update(epoch=epoch,
