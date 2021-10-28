@@ -62,7 +62,7 @@ def inference(model: torch.nn.Module, test_loader: DataLoader, checkpoint_path,
     num_iters = 1 if tta_num_iters == 0 else tta_num_iters
 
     y_scores = np.zeros((len(models), len(dataset), num_iters))
-    y_preds = np.zeros((len(models), len(dataset), num_iters))
+    print(y_scores.shape)
 
     for i, model_checkpoint in enumerate(models):
         state_dict = torch.load(f'{checkpoint_path}/{model_checkpoint}')
@@ -80,6 +80,7 @@ def inference(model: torch.nn.Module, test_loader: DataLoader, checkpoint_path,
                     output = model(data)
                     output = output.squeeze()
                     y_score = torch.sigmoid(output).cpu().numpy()
+                    print(y_score.shape)
                     start = prev_start
                     end = start + data.shape[0]
                     y_scores[i, start:end, iter] = y_score
