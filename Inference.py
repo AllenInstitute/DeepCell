@@ -85,7 +85,7 @@ def inference(model: torch.nn.Module, test_loader: DataLoader, checkpoint_path,
                     y_scores[i, start:end, iter] = y_score
                     prev_start = end
 
-        y_preds_model = y_preds.mean(axis=-1) > threshold
+        y_preds_model = y_scores.mean(axis=-1) > threshold
 
         if has_labels:
             TP = ((dataset.y == 1) & (y_preds_model == 1)).sum().item()
