@@ -82,7 +82,7 @@ def inference(model: torch.nn.Module, test_loader: DataLoader, checkpoint_path,
                     y_score = torch.sigmoid(output).cpu().numpy()
                     start = prev_start
                     end = start + data.shape[0]
-                    y_scores[i][start:end][iter] = y_score
+                    y_scores[i, start:end, iter] = y_score
                     prev_start = end
 
         y_preds_model = y_preds.mean(axis=-1) > threshold
