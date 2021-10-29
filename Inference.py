@@ -11,9 +11,14 @@ from Metrics import Metrics
 from RoiDataset import RoiDataset
 
 
-def inference(model: torch.nn.Module, test_loader: DataLoader, checkpoint_path,
-              has_labels=True, threshold=0.5, ensemble=True,
-              cv_fold=None, use_cuda=True,
+def inference(model: torch.nn.Module,
+              test_loader: DataLoader,
+              checkpoint_path: str,
+              has_labels=True,
+              threshold=0.5,
+              ensemble=True,
+              cv_fold=None,
+              use_cuda=True,
               tta_num_iters=0) -> Tuple[Metrics, pd.DataFrame]:
     """
     Args:
@@ -81,7 +86,6 @@ def inference(model: torch.nn.Module, test_loader: DataLoader, checkpoint_path,
                     output = model(data)
                     output = output.squeeze()
                     y_score = torch.sigmoid(output).cpu().numpy()
-                    # print(y_score.shape)
                     start = prev_start
                     end = start + data.shape[0]
                     y_scores[i, start:end, iter] = y_score
