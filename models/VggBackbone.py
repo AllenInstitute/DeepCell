@@ -4,13 +4,14 @@ from torch import nn
 
 
 class VggBackbone(torch.nn.Module):
-    def __init__(self, model, truncate_to_layer, classifier_cfg, dropout_prob=0.5, freeze_layers=True):
+    def __init__(self, model, truncate_to_layer, classifier_cfg,
+                 dropout_prob=0.5, freeze_up_to_layer=None):
         super().__init__()
         conv_layers = self._truncate_to_layer(model=model, layer=truncate_to_layer)
         self.features = torch.nn.Sequential(*conv_layers)
 
-        if freeze_layers:
-            for p in self.features.parameters():
+        for layer in self.features[:freeze_up_to_layer]:
+            for p in layer.parameters():
                 p.requires_grad = False
 
         self.avgpool = torch.nn.AdaptiveAvgPool2d((7, 7))
@@ -57,3 +58,10 @@ class VggBackbone(torch.nn.Module):
 
         layers.append(nn.Linear(cfg[-1], num_classes))
         return nn.Sequential(*layers)
+
+
+if __name__ == '__main__':
+    cnn = torchvision.models.vgg11_bn(pretrained=True, progress=False)
+    cnn = VggBackbone(model=cnn, truncate_to_layer=22, classifier_cfg=[512],
+                      freeze_up_to_layer=15)
+    pass
