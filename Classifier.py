@@ -1,6 +1,8 @@
 import logging
 import os
 import sys
+from pathlib import Path
+
 import torch
 from torch.utils.data import DataLoader
 
@@ -21,7 +23,7 @@ logger = logging.getLogger(__name__)
 class Classifier:
     def __init__(self, model: torch.nn.Module, n_epochs: int, optimizer,
                  criterion, save_path, scheduler=None, scheduler_step_after_batch=False, debug=False,
-                 early_stopping=30, use_cuda=True):
+                 early_stopping=30, use_cuda=True, model_load_path=None):
         self.n_epochs = n_epochs
         self.model = model
         self.optimizer_constructor = optimizer
@@ -34,6 +36,7 @@ class Classifier:
         self.save_path = save_path
         self.debug = debug
         self.early_stopping = early_stopping
+        self.model_load_path = model_load_path
 
         if not os.path.exists(f'{self.save_path}'):
             os.makedirs(f'{self.save_path}')
@@ -52,6 +55,10 @@ class Classifier:
             logger.info(f'=========')
             logger.info(f'Fold {i}')
             logger.info(f'=========')
+            
+            if self.model_load_path is not None:
+                self.model.load_state_dict(
+                    torch.load(Path(self.model_load_path) / f'{i}_model.pt'))
 
             train_loader = DataLoader(dataset=train, shuffle=True, batch_size=batch_size, sampler=sampler)
             valid_loader = DataLoader(dataset=valid, shuffle=False, batch_size=batch_size)
