@@ -55,7 +55,7 @@ class Classifier:
             logger.info(f'=========')
             logger.info(f'Fold {i}')
             logger.info(f'=========')
-            
+
             if self.model_load_path is not None:
                 self.model.load_state_dict(
                     torch.load(Path(self.model_load_path) / f'{i}_model.pt'))

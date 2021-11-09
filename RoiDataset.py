@@ -61,6 +61,11 @@ class RoiDataset(Dataset):
 
         input = self._extract_channels(obs=obs)
 
+        # Coerce to uint8
+        input = (input - input.min()) / (input.max() - input.min())
+        input *= 255
+        input = input.astype('uint8')
+
         if self.transform:
             avg, max_, mask = input[:, :, 0], input[:, :, 1], input[:, :, 2]
             if self.transform.avg_transform:
