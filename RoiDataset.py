@@ -9,7 +9,7 @@ from util import get_experiment_genotype_map
 
 
 class RoiDataset(Dataset):
-    def __init__(self, manifest_path, project_name, data_dir, image_dim=(128, 128), roi_ids=None,
+    def __init__(self, manifest_path, data_dir, image_dim=(128, 128), roi_ids=None,
                  transform: Transform = None, debug=False, has_labels=True, parse_from_manifest=True,
                  cre_line=None, exclude_mask=False):
         super().__init__()
@@ -18,7 +18,6 @@ class RoiDataset(Dataset):
             raise ValueError('need to provide roi ids if not parsing from manifest')
 
         self.manifest_path = manifest_path
-        self.project_name = project_name
         self.data_dir = data_dir
         self.image_dim = image_dim
         self.transform = transform
@@ -88,7 +87,21 @@ class RoiDataset(Dataset):
         return len(self.manifest)
 
     def _get_labels(self):
-        labels = [x[self.project_name]['majorityLabel'] for x in self.manifest]
+        def get_project_name(x):
+            """Project name is an alias for the labeling job.
+            It stores the majorityLabel. Labeled datasets come from multiple
+            labeling jobs. Find the project name that stores the label by
+            finding the dict with key 'majorityLabel'"""
+            for k in x:
+                if isinstance(x[k], dict):
+                    if 'majorityLabel' in x[k]:
+                        return k
+            raise RuntimeError(f'Found an observation in the manifest '
+                               f'without a valid label: {x}')
+
+        project_names = [get_project_name(x) for x in self.manifest]
+        labels = [self.manifest[i][project_names[i]]['majorityLabel'] for i
+                  in range(len(project_names))]
         labels = [int(x == 'cell') for x in labels]
         labels = np.array(labels)
         return labels
@@ -158,8 +171,8 @@ class SlcSampler(Sampler):
 
 
 if __name__ == '__main__':
-    project_name = 'ophys-experts-slc-oct-2020_ophys-experts-go-big-or-go-home'
     manifest_path = 's3://prod.slapp.alleninstitute.org/behavior_slc_oct_2020_behavior_3cre_1600roi_merged/output.manifest'
 
-    dataset = RoiDataset(manifest_path=manifest_path, project_name=project_name, data_dir='./data')
-
+    dataset = RoiDataset(manifest_path=manifest_path,
+                         data_dir='/Users/adam.amster/artifacts')
+    dataset[0]
