@@ -1,7 +1,6 @@
 import matplotlib.figure as mplt_fig
 import json
 import PIL.Image
-import copy
 import re
 import numpy as np
 import pandas as pd
@@ -28,32 +27,6 @@ def plot_rois(extract_list, background_img, color_map, axis):
                     1.0)
     axis.imshow(background_img)
     return axis
-
-
-def filter_rois(raw_roi_list,
-                stat_name=None,
-                min_stat=None,
-                min_area=None):
-
-    output = []
-    for roi in raw_roi_list:
-        scores = roi['classifier_scores']
-        if scores['area'] < min_area:
-            continue
-        stat = max(scores[f'corr_{stat_name}'],
-                   scores[f'maximg_{stat_name}'],
-                   scores[f'avgimg_{stat_name}'])
-        if stat < min_stat:
-            continue
-        new_roi = copy.deepcopy(roi)
-        if 'mask_matrix' in new_roi:
-            new_roi['mask'] = new_roi['mask_matrix']
-        if 'valid_roi' in new_roi:
-            new_roi['valid'] = new_roi['valid_roi']
-        if 'roi_id' in new_roi:
-            new_roi['id'] = new_roi['roi_id']
-        output.append(roi)
-    return output
 
 
 def generate_page(
