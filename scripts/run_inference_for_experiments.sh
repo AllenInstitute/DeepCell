@@ -8,7 +8,7 @@ use_cuda=$5
 readarray -t exp_ids < $experiment_ids_path
 for exp_id in "${exp_ids[@]}"
   do
-    ./run_inference_for_experiment \
+    ./run_inference_for_experiment.sh \
       "${exp_id}" \
       "${correlation_projection_path}" \
       "${model_weights_path}" \
