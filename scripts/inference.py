@@ -27,7 +27,7 @@ def main(experiment_id, rois_path: Path, data_dir: Path,
 
     with open(rois_path) as f:
         rois = json.load(f)
-        roi_ids = [x['roi-id'] for x in rois]
+        roi_ids = [x['id'] for x in rois]
 
     test = RoiDataset(manifest_path=None, data_dir=data_dir,
                       roi_ids=roi_ids,
