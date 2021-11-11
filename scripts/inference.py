@@ -12,8 +12,33 @@ from Transform import Transform
 from models.VggBackbone import VggBackbone
 
 
-def main(experiment_id, rois_path: Path, data_dir: Path,
-         model_weights_path: Path, output_path: Path, use_cuda=True):
+def run_inference_for_experiment(
+        experiment_id,
+        rois_path: Path,
+        data_dir: Path,
+        model_weights_path: Path,
+        output_path: Path,
+        use_cuda=True):
+    """
+    Runs inference for experiment and produces csv of predictions
+
+    Args:
+        experiment_id:
+            Experiment id to run predictions on
+        rois_path:
+            Path to ROIs. Needs to be in json format and each record needs
+            to have key "id"
+        data_dir:
+            Path to artifacts for inference
+        model_weights_path:
+            Path to Pytorch model weights that were saved using torch.save
+        output_path:
+            Path to save predictions csv
+        use_cuda:
+            True if on GPU
+    Returns:
+        None, but writes predictions csv to disk
+    """
     all_transform = transforms.Compose([
         iaa.Sequential([
             iaa.CenterCropToFixedSize(height=60, width=60)
@@ -74,6 +99,6 @@ if __name__ == '__main__':
 
     use_cuda = args.use_cuda == 'true'
 
-    main(experiment_id=args.experiment_id, rois_path=rois_path,
-         data_dir=data_dir, output_path=out_path, use_cuda=use_cuda,
-         model_weights_path=model_weights_path)
+    run_inference_for_experiment(experiment_id=args.experiment_id, rois_path=rois_path,
+                                 data_dir=data_dir, output_path=out_path, use_cuda=use_cuda,
+                                 model_weights_path=model_weights_path)
