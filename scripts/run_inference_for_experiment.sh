@@ -10,7 +10,7 @@ export PYTHONPATH=$PYTHONPATH:/home/adam.amster/DeepCell
 current_time=$(date "+%Y.%m.%d-%H.%M.%S")
 
 artifact_out_dir="${out_dir}/${exp_id}/artifacts"
-predictions_out_dir="${out_dir}/predictions/${current_time}"
+predictions_out_dir="${out_dir}/predictions/${exp_id}/${current_time}"
 log_out_dir="${out_dir}/logs/${exp_id}/${current_time}"
 log_path="${log_out_dir}/${exp_id}.log"
 
@@ -53,4 +53,4 @@ $conda_env ./inference.py \
 
 echo "Removing ${artifact_out_dir}" >> "${log_path}"
 
-rm -r "${artifact_out_dir}"
+#rm -r "${artifact_out_dir}"
