@@ -60,7 +60,7 @@ if __name__ == '__main__':
                         help='Path to trained model weights')
     parser.add_argument('--out_path', required=True, help='Where to store '
                                                           'predictions')
-    parser.add_argument('--use_cuda', default=False, help='Whether on GPU')
+    parser.add_argument('--use_cuda', required=True, help='Whether on GPU')
 
     args = parser.parse_args()
 
@@ -69,6 +69,11 @@ if __name__ == '__main__':
     model_weights_path = Path(args.model_weights_path)
     out_path = Path(args.out_path)
 
+    if args.use_cuda not in('true', 'false'):
+        raise ValueError('use_cuda must be one of "true" or "false"')
+
+    use_cuda = args.use_cuda == 'true'
+
     main(experiment_id=args.experiment_id, rois_path=rois_path,
-         data_dir=data_dir, output_path=out_path, use_cuda=args.use_cuda,
+         data_dir=data_dir, output_path=out_path, use_cuda=use_cuda,
          model_weights_path=model_weights_path)
