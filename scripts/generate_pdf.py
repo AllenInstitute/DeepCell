@@ -137,41 +137,39 @@ def path_to_rgb(file_path):
         for ic in range(3):
             out[:, :, ic] = img
         return out
-    assert False
 
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
+    parser.add_argument('--pdf_name', required=True)
     parser.add_argument('--output_root', type=str, default=None)
+    parser.add_argument('--rois_path', help='path to rois')
+    parser.add_argument('--other_projections_path',
+                        help='Path to max projection')
+    parser.add_argument('--correlation_projection_path',
+                        help='path to correlation projection images')
     parser.add_argument('--predictions_root', required=True)
     parser.add_argument('--n_roi', type=int, default=None)
 
     args = parser.parse_args()
     assert args.output_root is not None
-    output_path = f'{args.output_root}add_vasculature.pdf'
+    output_path = f'{args.output_root}/{args.pdf_name}.pdf'
 
-    info_dir = pathlib.Path('/allen/aibs/informatics')
-    assert info_dir.is_dir()
-    sfd_dir = info_dir / 'danielsf'
-    assert sfd_dir.is_dir()
-    s2p_dir = sfd_dir / 'suite2p_210921/v0.10.2/th_3'
-    assert s2p_dir.is_dir()
-    raw_dir = s2p_dir / 'production'
+    raw_dir = pathlib.Path(args.rois_path)
     assert raw_dir.is_dir()
 
-    aamster_dir = info_dir / 'aamster/ticket_325'
-    assert aamster_dir.is_dir()
-    max_dir = aamster_dir / 'other_projections'
-    assert max_dir.is_dir()
-    corr_dir = aamster_dir / 'metric_image'
+    corr_dir = pathlib.Path(args.correlation_projection_path)
     assert corr_dir.is_dir()
+
+    max_dir = pathlib.Path(args.other_projections_path)
+    assert max_dir.is_dir()
 
     predictions_dir = pathlib.Path(args.predictions_root)
 
     predictions_list = [n for n in predictions_dir.rglob('*.csv')]
 
-    color_map_path = s2p_dir / 'original_color_map.json'
+    color_map_path = raw_dir.parent / 'original_color_map.json'
     with open(color_map_path, 'rb') as in_file:
         global_color_map = json.load(in_file)
 
