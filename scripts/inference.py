@@ -60,8 +60,7 @@ if __name__ == '__main__':
                         help='Path to trained model weights')
     parser.add_argument('--out_path', required=True, help='Where to store '
                                                           'predictions')
-    parser.add_argument('--use_cuda', default=True, help='Whether on GPU',
-                        action='store_true')
+    parser.add_argument('--use_cuda', default=False, help='Whether on GPU')
 
     args = parser.parse_args()
 

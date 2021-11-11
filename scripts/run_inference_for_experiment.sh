@@ -22,7 +22,8 @@ rois_path="/allen/aibs/informatics/danielsf/suite2p_210921/v0.10.2/th_3/producti
 manifest="{
   \"experiment_id\": ${exp_id},
   \"binarized_rois_path\": "\"${rois_path}\"",
-  \"movie_path\": \"/allen/programs/braintv/workgroups/nc-ophys/danielk/deepinterpolation/experiments/ophys_experiment_${exp_id}/denoised.h5\"
+  \"movie_path\": \"/allen/programs/braintv/workgroups/nc-ophys/danielk/deepinterpolation/experiments/ophys_experiment_${exp_id}/denoised.h5\",
+  \"local_to_global_roi_id_map\": {}
 }"
 
 manifest_path="/tmp/${exp_id}_slapp_tform_manifest.json"
