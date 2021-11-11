@@ -11,7 +11,7 @@ current_time=$(date "+%Y.%m.%d-%H.%M.%S")
 
 artifact_out_dir="${out_dir}/${exp_id}/artifacts"
 predictions_out_dir="${out_dir}/predictions/${current_time}"
-log_out_dir="${out_dir}/logs/${current_time}"
+log_out_dir="${out_dir}/logs/${exp_id}/${current_time}"
 log_path="${log_out_dir}/${exp_id}.log"
 
 mkdir -p "${out_dir}"
