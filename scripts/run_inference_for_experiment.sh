@@ -12,6 +12,7 @@ current_time=$(date "+%Y.%m.%d-%H.%M.%S")
 artifact_out_dir="${out_dir}/${exp_id}/artifacts"
 predictions_out_dir="${out_dir}/predictions/${current_time}"
 log_out_dir="${out_dir}/logs/${current_time}"
+log_path="${log_out_dir}/${exp_id}.log"
 
 mkdir -p "${out_dir}"
 mkdir -p "${predictions_out_dir}"
@@ -29,6 +30,8 @@ manifest="{
 manifest_path="/tmp/${exp_id}_slapp_tform_manifest.json"
 echo "${manifest}" > "${manifest_path}"
 
+echo "Generating artifacts for ${exp_id}" >> "${log_path}"
+
 $conda_env -m slapp.transforms.transform_pipeline \
   --prod_segmentation_run_manifest "${manifest_path}" \
   --output_manifest "${out_dir}/manifest.json" \
@@ -36,7 +39,9 @@ $conda_env -m slapp.transforms.transform_pipeline \
   --artifact_basedir "${artifact_out_dir}" \
   --skip_movies True \
   --skip_traces True \
-  --all_ROIs True
+  --all_ROIs True &>> "${log_path}"
+
+echo "Running inference for ${exp_id}" >> "${log_path}"
 
 $conda_env ./inference.py \
   --experiment_id "${exp_id}" \
@@ -44,6 +49,8 @@ $conda_env ./inference.py \
   --data_dir "${artifact_out_dir}" \
   --model_weights_path "${model_weights_path}" \
   --out_path "${predictions_out_dir}" \
-  --use_cuda "${use_cuda}"
+  --use_cuda "${use_cuda}" &>> "${log_path}"
+
+echo "Removing ${artifact_out_dir}" >> "${log_path}"
 
 rm -r "${artifact_out_dir}"
