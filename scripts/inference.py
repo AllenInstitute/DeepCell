@@ -1,138 +1,75 @@
-import os
-
-import matplotlib.pyplot as plt
 import json
-import skimage.color
-import pandas as pd
-import numpy as np
 from pathlib import Path
-import slapp.utils.query_utils as qu
-import visual_behavior.data_access.loading as loading
-from matplotlib.backends.backend_pdf import PdfPages
 
-mapped_drive = '/Users/adam.amster/ibs-adama-ux3'
+import torchvision
+from torch.utils.data import DataLoader
+from torchvision.transforms import transforms
+from imgaug import augmenters as iaa
 
-# NOTE requires inference-plots env (dependency conflicts)
-
-def get_LIMS_data(dbconn, exp_id):
-    """get the rois, image projection paths from LIMS
-    """
-    results = {}
-    results['cell_rois'] = dbconn.query(
-            f"SELECT * FROM cell_rois WHERE ophys_experiment_id={exp_id}")
-    oeq = dbconn.query(
-            f"SELECT * FROM ophys_experiments WHERE id={exp_id}")[0]
-    sdir = Path(f"{mapped_drive}/{oeq['storage_directory']}")
-    shape = (oeq['movie_width'], oeq['movie_height'])
-    results['max_int_mask_image'] = str(next(sdir.rglob("maxInt_a13a.png")))
-    results['ophys_average_intensity_projection_image'] = str(next(
-            sdir.rglob("avgInt_a1X.png")))
-    results['id'] = exp_id
-    results['stimulus_name'] = ""
-    return results, shape
+from Inference import inference
+from RoiDataset import RoiDataset
+from Transform import Transform
+from models.VggBackbone import VggBackbone
 
 
-def rois_on_im(rois, im):
-    im = skimage.color.gray2rgb(im)
-    for roi in rois:
-        submask = np.array(roi['mask_matrix']).astype('uint8') * 255
-        r0 = roi['y']
-        r1 = roi['y'] + roi['height']
-        c0 = roi['x']
-        c1 = roi['x'] + roi['width']
-        im[:, :, 0][r0:r1, c0:c1][submask != 0] = submask[submask != 0] * 0.5
-    return im
+def main(experiment_id, rois_path: Path, data_dir: Path,
+         model_weights_path: Path, output_path: Path, use_cuda=True):
+    all_transform = transforms.Compose([
+        iaa.Sequential([
+            iaa.CenterCropToFixedSize(height=60, width=60)
+        ]).augment_image,
+        transforms.ToTensor(),
+        transforms.Normalize(
+            mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
 
+    test_transform = Transform(all_transform=all_transform)
 
-def reshape_mask(roi, im):
-    submask = np.array(roi['mask_matrix'])
-    mask = np.zeros(im.shape)
-    r0 = roi['y']
-    r1 = roi['y'] + roi['height']
-    c0 = roi['x']
-    c1 = roi['x'] + roi['width']
-    mask[r0:r1, c0:c1] = submask
-    return mask
+    with open(rois_path) as f:
+        rois = json.load(f)
+        roi_ids = [x['roi-id'] for x in rois]
 
+    test = RoiDataset(manifest_path=None, data_dir=data_dir,
+                      roi_ids=roi_ids,
+                      transform=test_transform, has_labels=False,
+                      parse_from_manifest=False)
+    test_dataloader = DataLoader(dataset=test, shuffle=False, batch_size=64)
 
+    cnn = torchvision.models.vgg11_bn(pretrained=True, progress=False)
+    cnn = VggBackbone(model=cnn, truncate_to_layer=15,
+                      classifier_cfg=[512, 512], dropout_prob=.7,
+                      freeze_up_to_layer=15)
+    _, inference_res = inference(model=cnn, test_loader=test_dataloader,
+                                 has_labels=False,
+                                 checkpoint_path=str(model_weights_path),
+                                 use_cuda=use_cuda)
+    inference_res['experiment_id'] = experiment_id
 
-
-def get_experiment_metadata(experiment_id):
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    path = Path(root) / 'ophys_metadata_lookup.txt'
-    df = pd.read_csv(path)
-    metadata = df[df['experiment_id'] == experiment_id].iloc[0]
-    return metadata.to_dict()
-
-
-def run_for_experiment(experiment_id):
-    # get max projection image
-    movie_path = loading.get_motion_corrected_movie_h5_location(experiment_id)
-    max_proj_path = Path(movie_path).parent / f'{experiment_id}_maximum_projection.png'
-    max_proj_path = f'{mapped_drive}/{max_proj_path}'
-    max_proj = plt.imread(max_proj_path)
-
-    # get LIMS results
-    creds = qu.get_db_credentials(env_prefix="LIMS_", **qu.lims_defaults)
-    conn = qu.DbConnection(**creds)
-    lims_data, shape = get_LIMS_data(conn, experiment_id)
-    lims_rois = lims_data['cell_rois']
-    valid_prod_rois = [r for r in lims_rois if r['valid_roi']]
-    invalid_prod_rois = [r for r in lims_rois if not r['valid_roi']]
-
-    # get binarized rois and labels
-    rois_path = f"{mapped_drive}/allen/aibs/informatics/danielk/dev_LIMS/new_labeling/{experiment_id}/binarize_output.json"
-    with open(rois_path, "r") as f:
-        cnn_rois = json.load(f)
-    labels_path = "/Users/adam.amster/Downloads/inference.csv"
-    labels = pd.read_csv(labels_path)
-    labels = labels[labels['experiment_id'] == experiment_id]
-    label_map = {i['roi-id']: i['y_score'] > .4 for _, i in labels.iterrows()}
-
-    cnn_rois = [i for i in cnn_rois if i['id'] in label_map]
-    valid_cnn_rois = [r for r in cnn_rois if label_map[r['id']]]
-    invalid_cnn_rois = [r for r in cnn_rois if not label_map[r['id']]]
-
-    im_prod_valid = rois_on_im(valid_prod_rois, max_proj)
-    im_prod_invalid = rois_on_im(invalid_prod_rois, max_proj)
-    im_cnn_valid = rois_on_im(valid_cnn_rois, max_proj)
-    im_cnn_invalid = rois_on_im(invalid_cnn_rois, max_proj)
-
-    f, a = plt.subplots(2, 2, clear=True, sharex=True, sharey=True, num=1)
-    a[0, 0].imshow(im_prod_valid)
-    a[0, 0].set_title(f"{len(valid_prod_rois)} Production Cells", fontsize=8)
-    a[0, 1].imshow(im_prod_invalid)
-    a[0, 1].set_title(f"{len(invalid_prod_rois)} Production NOT Cells", fontsize=8)
-    a[1, 0].imshow(im_cnn_valid)
-    a[1, 0].set_title(f"{len(valid_cnn_rois)} Suite2P + CNN Cells", fontsize=8)
-    a[1, 1].imshow(im_cnn_invalid)
-    a[1, 1].set_title(f"{len(invalid_cnn_rois)} Suite2P + CNN NOT Cells", fontsize=8)
-    _ = [ia.grid(alpha=0.7) for ia in a.flat]
-
-    # add metadata
-    metadata = get_experiment_metadata(experiment_id=experiment_id)
-    props = dict(boxstyle='round', facecolor='wheat', pad=1)
-    textstr = f'''
-    Experiment: {metadata["experiment_id"]}
-    Depth: {metadata["depth"]}
-    Rig: {metadata["rig"]}
-    Cre Line: {metadata["genotype"][:3]}
-    '''
-    plt.subplots_adjust(right=.7)
-
-    f.text(0.85, .75, textstr, bbox=props, fontsize=6, ha='center')
-    return f
+    inference_res.to_csv(output_path / f'{experiment_id}_inference.csv',
+                         index=False)
 
 
 if __name__ == '__main__':
-    inference_res = pd.read_csv('~/Downloads/inference.csv')
-    experiments = inference_res['experiment_id'].unique()
-    experiments = [974994099]
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    path = Path(root) / 'inference-output' / 'inference_plots.pdf'
-    with PdfPages(f'{path}') as pdf:
-        for i, experiment_id in enumerate(experiments):
-            print(f'experiment {i}')
-            f = run_for_experiment(experiment_id=experiment_id)
-            pdf.savefig(f)
-            plt.close()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--experiment_id', required=True,
+                        help='What experiment to run inference on')
+    parser.add_argument('--rois_path', required=True, help='Path to rois')
+    parser.add_argument('--data_dir', required=True, help='Path to artifacts')
+    parser.add_argument('--model_weights_path', required=True,
+                        help='Path to trained model weights')
+    parser.add_argument('--out_path', required=True, help='Where to store '
+                                                          'predictions')
+    parser.add_argument('--use_cuda', default=True, help='Whether on GPU',
+                        action='store_true')
+
+    args = parser.parse_args()
+
+    rois_path = Path(args.rois_path)
+    data_dir = Path(args.data_dir)
+    model_weights_path = Path(args.model_weights_path)
+    out_path = Path(args.out_path)
+
+    main(experiment_id=args.experiment_id, rois_path=rois_path,
+         data_dir=data_dir, output_path=out_path, use_cuda=args.use_cuda,
+         model_weights_path=model_weights_path)
