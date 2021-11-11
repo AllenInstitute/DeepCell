@@ -5,6 +5,8 @@ out_dir=$4
 use_cuda=$5
 conda_env=/allen/aibs/informatics/aamster/miniconda3/envs/deepcell/bin/python
 
+export PYTHONPATH=$PYTHONPATH:/home/adam.amster/DeepCell
+
 current_time=$(date "+%Y.%m.%d-%H.%M.%S")
 
 artifact_out_dir="${out_dir}/${exp_id}/artifacts"
