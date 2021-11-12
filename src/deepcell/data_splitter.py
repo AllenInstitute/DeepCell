@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn.model_selection import StratifiedShuffleSplit, StratifiedKFold
 
-from RoiDataset import RoiDataset
+from roi_dataset import RoiDataset
 
 
 class DataSplitter:

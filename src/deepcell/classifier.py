@@ -6,9 +6,9 @@ from pathlib import Path
 import torch
 from torch.utils.data import DataLoader
 
-from DataSplitter import DataSplitter
-from Metrics import Metrics, TrainingMetrics, CVMetrics
-from RoiDataset import RoiDataset
+from data_splitter import DataSplitter
+from metrics import Metrics, TrainingMetrics, CVMetrics
+from roi_dataset import RoiDataset
 
 logging.basicConfig(
     stream=sys.stdout,

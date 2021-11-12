@@ -1,3 +1,4 @@
+import h5py
 import matplotlib.figure as mplt_fig
 import json
 import PIL.Image
@@ -33,13 +34,15 @@ def generate_page(
         raw_roi_list=None,
         predictions: pd.DataFrame = None,
         color_map=None,
-        corr_img=None,
-        max_img=None,
+        corr_img_noisy=None,
+        max_img_noisy=None,
+        corr_img_denoised=None,
+        max_img_denoised=None,
         experiment_id=None,
         fontsize=15):
 
-    n_rows = 2
-    n_cols = 5
+    n_rows = 4
+    n_cols = 4
 
     raw_extract_list = []
     for roi in raw_roi_list:
@@ -51,7 +54,7 @@ def generate_page(
             roi['id'] = roi['roi_id']
         raw_extract_list.append(roi)
 
-    thresholds = (0.3, 0.4, 0.5)
+    thresholds = (0.3, 0.5)
     pred_ids = [predictions[predictions['y_score'] > threshold][
         'roi-id'].tolist() for threshold in thresholds]
 
@@ -62,16 +65,23 @@ def generate_page(
         valid_roi_list.append([roi_id_roi_map[int(id.split('_')[-1])] for id in
                            pred_ids[i]])
 
-    background_list = [corr_img]*n_cols
-    background_list += [max_img]*n_cols
+    background_list = [corr_img_denoised]*n_cols
+    background_list += [corr_img_noisy]*n_cols
+    background_list += [max_img_denoised]*n_cols
+    background_list += [max_img_noisy]*n_cols
 
-    title_list = [f'{experiment_id} correlation projection']
-    title_list += [f'all ROIs ({len(raw_extract_list)})']
-    title_list += [f'classifier score > {threshold} ({len(valid_roi_list[i])})'
-                   for i, threshold in enumerate(thresholds)]
+    title_list = []
+    for title in ('(denoised)', '(noisy)'):
+        title_list += [f'{experiment_id} correlation projection {title}']
+        title_list += [f'all ROIs ({len(raw_extract_list)})']
+        title_list += [f'classifier score > {threshold} ({len(valid_roi_list[i])})'
+                       for i, threshold in enumerate(thresholds)]
 
-    title_list += [f'{experiment_id} max projection']
-    title_list += [None]*(n_cols-1)
+    for title in ('(denoised)', '(noisy)'):
+        title_list += [f'{experiment_id} max projection {title}']
+        title_list += [f'all ROIs ({len(raw_extract_list)})']
+        title_list += [f'classifier score > {threshold} ({len(valid_roi_list[i])})'
+                       for i, threshold in enumerate(thresholds)]
 
     roi_set_List = [None, raw_extract_list]
     for i in range(len(thresholds)):
@@ -100,8 +110,7 @@ def generate_page(
     return fig
 
 
-def path_to_rgb(file_path):
-    img = np.array(PIL.Image.open(file_path, 'r'))
+def path_to_rgb(img: np.ndarray):
     if len(img.shape) == 3:
         assert img.shape[2] >= 3
         return img[:, :, :3]
@@ -118,10 +127,14 @@ if __name__ == "__main__":
     parser.add_argument('--pdf_name', required=True)
     parser.add_argument('--output_root', type=str, default=None)
     parser.add_argument('--rois_path', help='path to rois')
-    parser.add_argument('--other_projections_path',
-                        help='Path to max projection')
-    parser.add_argument('--correlation_projection_path',
-                        help='path to correlation projection images')
+    parser.add_argument('--max_projection_path_noisy',
+                        help='Path to noisy max projection')
+    parser.add_argument('--max_projection_path_denoised',
+                        help='Path to denoised max projection')
+    parser.add_argument('--correlation_projection_path_noisy',
+                        help='path to noisy correlation projection images')
+    parser.add_argument('--correlation_projection_path_denoised',
+                        help='path to denoised correlation projection images')
     parser.add_argument('--predictions_root', required=True)
     parser.add_argument('--n_roi', type=int, default=None)
 
@@ -132,11 +145,13 @@ if __name__ == "__main__":
     raw_dir = pathlib.Path(args.rois_path)
     assert raw_dir.is_dir()
 
-    corr_dir = pathlib.Path(args.correlation_projection_path)
-    assert corr_dir.is_dir()
+    corr_dir_noisy = pathlib.Path(args.correlation_projection_path_noisy)
+    corr_dir_denoised = pathlib.Path(args.correlation_projection_path_denoised)
+    assert corr_dir_noisy.is_dir()
 
-    max_dir = pathlib.Path(args.other_projections_path)
-    assert max_dir.is_dir()
+    max_dir_noisy = pathlib.Path(args.max_projection_path_noisy)
+    max_dir_denoised = pathlib.Path(args.max_projection_path_denoised)
+    assert max_dir_noisy.is_dir()
 
     predictions_dir = pathlib.Path(args.predictions_root)
 
@@ -156,15 +171,44 @@ if __name__ == "__main__":
             exp_id = exp_id_pattern.findall(str(predictions_path.name))[0]
             rois_path = raw_dir / f'{exp_id}_suite2p_rois.json'
 
-            max_img_path = max_dir / f'{exp_id}_max_proj.png'
-            if not max_img_path.is_file():
-                raise RuntimeError(f'{max_img_path} is not file')
-            corr_img_path = corr_dir / f'{exp_id}_correlation_proj.png'
-            if not corr_img_path.is_file():
-                raise RuntimeError(f'{corr_img_path} is not file')
+            with h5py.File(max_dir_noisy / f'{exp_id}_max_proj.h5', 'r') as f:
+                max_img_noisy = f['max'][()]
+                low, high = np.quantile(max_img_noisy, (.1, .99))
+                max_img_noisy[max_img_noisy <= low] = low
+                max_img_noisy[max_img_noisy >= high] = high
+                max_img_noisy = (max_img_noisy - max_img_noisy.min()) / (max_img_noisy.max() -
+                                                       max_img_noisy.min())
+                max_img_noisy *= 255
+                max_img_noisy = max_img_noisy.astype('uint8')
+            max_img_path_denoised = max_dir_denoised / f'{exp_id}_max_proj.png'
 
-            max_img = path_to_rgb(max_img_path)
-            corr_img = path_to_rgb(corr_img_path)
+            if not max_img_path_denoised.is_file():
+                raise RuntimeError(f'{max_img_path_denoised} is not file')
+            max_img_denoised = np.array(PIL.Image.open(
+                max_img_path_denoised, 'r'))
+
+            with h5py.File(corr_dir_noisy / f'{exp_id}_ff050_img.h5', 'r') as f:
+                corr_img_noisy = f['data'][()]
+                low, high = np.quantile(corr_img_noisy, (.1, .9))
+                corr_img_noisy[corr_img_noisy <= low] = low
+                corr_img_noisy[corr_img_noisy >= high] = high
+                corr_img_noisy = (corr_img_noisy - corr_img_noisy.min()) / (corr_img_noisy.max()
+                                                          - corr_img_noisy.min())
+                corr_img_noisy *= 255
+                corr_img_noisy = corr_img_noisy.astype('uint8')
+
+            corr_img_path_denoised = corr_dir_denoised / \
+                                     f'{exp_id}_correlation_proj.png'
+            corr_img_denoised = np.array(PIL.Image.open(
+                corr_img_path_denoised, 'r'))
+
+
+            max_img_noisy = path_to_rgb(max_img_noisy)
+            corr_img_noisy = path_to_rgb(corr_img_noisy)
+
+            max_img_denoised = path_to_rgb(max_img_denoised)
+            corr_img_denoised = path_to_rgb(corr_img_denoised)
+
             k = f'{exp_id}_suite2p_rois.json'
             color_map = global_color_map[k]
             predictions = pd.read_csv(predictions_path)
@@ -175,8 +219,10 @@ if __name__ == "__main__":
                     raw_roi_list=raw_rois_list,
                     predictions=predictions,
                     color_map=color_map,
-                    corr_img=corr_img,
-                    max_img=max_img,
+                    corr_img_noisy=corr_img_noisy,
+                    max_img_noisy=max_img_noisy,
+                    corr_img_denoised=corr_img_denoised,
+                    max_img_denoised=max_img_denoised,
                     experiment_id=exp_id,
                     fontsize=10)
             pdf_handle.savefig(fig)

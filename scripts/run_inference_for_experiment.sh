@@ -7,16 +7,11 @@ conda_env=/allen/aibs/informatics/aamster/miniconda3/envs/deepcell/bin/python
 
 export PYTHONPATH=$PYTHONPATH:/home/adam.amster/DeepCell
 
-current_time=$(date "+%Y.%m.%d-%H.%M.%S")
-
 artifact_out_dir="${out_dir}/${exp_id}/artifacts"
 predictions_out_dir="${out_dir}/predictions/"
-log_out_dir="${out_dir}/logs/${exp_id}/${current_time}"
-log_path="${log_out_dir}/${exp_id}.log"
 
 mkdir -p "${out_dir}"
 mkdir -p "${predictions_out_dir}"
-mkdir -p "${log_out_dir}"
 
 rois_path="/allen/aibs/informatics/danielsf/suite2p_210921/v0.10.2/th_3/production/${exp_id}_suite2p_rois.json"
 
@@ -30,7 +25,7 @@ manifest="{
 manifest_path="/tmp/${exp_id}_slapp_tform_manifest.json"
 echo "${manifest}" > "${manifest_path}"
 
-echo "Generating artifacts for ${exp_id}" >> "${log_path}"
+echo "Generating artifacts for ${exp_id}"
 
 $conda_env -m slapp.transforms.transform_pipeline \
   --prod_segmentation_run_manifest "${manifest_path}" \
@@ -39,9 +34,9 @@ $conda_env -m slapp.transforms.transform_pipeline \
   --artifact_basedir "${artifact_out_dir}" \
   --skip_movies True \
   --skip_traces True \
-  --all_ROIs True &>> "${log_path}"
+  --all_ROIs True
 
-echo "Running inference for ${exp_id}" >> "${log_path}"
+echo "Running inference for ${exp_id}"
 
 $conda_env ./inference.py \
   --experiment_id "${exp_id}" \
@@ -49,8 +44,8 @@ $conda_env ./inference.py \
   --data_dir "${artifact_out_dir}" \
   --model_weights_path "${model_weights_path}" \
   --out_path "${predictions_out_dir}" \
-  --use_cuda "${use_cuda}" &>> "${log_path}"
+  --use_cuda "${use_cuda}"
 
-echo "Removing ${artifact_out_dir}" >> "${log_path}"
+echo "Removing ${artifact_out_dir}"
 
 rm -r "${artifact_out_dir}"

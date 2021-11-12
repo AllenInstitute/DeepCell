@@ -6,10 +6,10 @@ from torch.utils.data import DataLoader
 from torchvision.transforms import transforms
 from imgaug import augmenters as iaa
 
-from Inference import inference
-from RoiDataset import RoiDataset
-from Transform import Transform
-from models.VggBackbone import VggBackbone
+from deepcell.inference import inference
+from deepcell.roi_dataset import RoiDataset
+from deepcell.transform import Transform
+from deepcell.models.VggBackbone import VggBackbone
 
 
 def run_inference_for_experiment(

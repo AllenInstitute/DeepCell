@@ -7,8 +7,8 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader
 
-from Metrics import Metrics
-from RoiDataset import RoiDataset
+from deepcell.metrics import Metrics
+from deepcell.roi_dataset import RoiDataset
 
 
 def inference(model: torch.nn.Module,

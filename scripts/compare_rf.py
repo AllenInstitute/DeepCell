@@ -2,12 +2,11 @@ import pandas as pd
 from torchvision import transforms
 from imgaug import augmenters as iaa
 import os
-from pathlib import Path
 import plotly.graph_objects as go
 
-from DataSplitter import DataSplitter
-from Transform import Transform
-from eda import display_roi
+from deepcell.data_splitter import DataSplitter
+from deepcell.transform import Transform
+from scripts.eda import display_roi
 
 project_name = 'ophys-experts-slc-oct-2020_ophys-experts-go-big-or-go-home'
 manifest_path = 's3://prod.slapp.alleninstitute.org/behavior_slc_oct_2020_behavior_3cre_1600roi_merged/output.manifest'

@@ -4,11 +4,11 @@ import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
-from models.CNN import CNN
-from Classifier import Classifier
-from DataSplitter import DataSplitter
-from HyperparamTuning import HyperparamTuner, ParamDistribution
-from RoiDataset import RoiDataset
+from deepcell.models import CNN
+from deepcell.classifier import Classifier
+from deepcell.data_splitter import DataSplitter
+from deepcell.hyperparam_tuning import HyperparamTuner, ParamDistribution
+from deepcell.roi_dataset import RoiDataset
 
 
 class Tests(unittest.TestCase):

@@ -4,9 +4,8 @@ import numpy as np
 
 from croissant.utils import read_jsonlines
 from plotly.subplots import make_subplots
-from sklearn.metrics import precision_recall_curve
 
-from util import get_experiment_genotype_map
+from deepcell.util import get_experiment_genotype_map
 
 project_name = 'ophys-experts-slc-oct-2020_ophys-experts-go-big-or-go-home'
 manifest_path = 's3://prod.slapp.alleninstitute.org/behavior_slc_oct_2020_behavior_3cre_1600roi_merged/output.manifest'
