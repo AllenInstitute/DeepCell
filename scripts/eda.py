@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 
-from RoiDataset import RoiDataset
+from deepcell.roi_dataset import RoiDataset
 
 
 def display_roi(roi_id, columns, rows, label, y_pred=None, channels=None, data: RoiDataset = None):

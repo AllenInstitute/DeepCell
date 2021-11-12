@@ -5,9 +5,9 @@ import sys
 import numpy as np
 import torch
 
-from DataSplitter import DataSplitter
-from Classifier import Classifier
-from RoiDataset import RoiDataset
+from deepcell.data_splitter import DataSplitter
+from deepcell.classifier import Classifier
+from roi_dataset import RoiDataset
 
 logging.basicConfig(
     stream=sys.stdout,
