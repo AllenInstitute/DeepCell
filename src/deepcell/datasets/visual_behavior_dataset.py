@@ -27,9 +27,13 @@ class VisualBehaviorDataset:
                  debug=False):
         """
         Args:
+            - artifact_destination
+                Where to download the artifacts to
             - exclude_projects:
                 an optional list of project names to exclude from being
                 included in the dataset
+            - debug
+                If True, will only download a few files
 
         """
         self._logger = logging.getLogger(__name__)
@@ -52,16 +56,23 @@ class VisualBehaviorDataset:
 
         if debug:
             self._dataset = self._dataset[:2]
+
+        self._update_artifact_locations_from_s3_to_local()
+
+        if debug:
             self._download_files()
         else:
-            self._logger.info('Downloading dataset')
-            self._download_dataset(artifact_dirs=artifact_dirs)
+            is_already_downloaded = self._are_files_already_downloaded()
+            if not is_already_downloaded:
+                self._logger.info('Downloading dataset')
+                self._download_dataset(artifact_dirs=artifact_dirs)
 
-        self._logger.info('Renaming artifacts')
-        self._rename_artifacts()
+                self._logger.info('Renaming artifacts')
+                self._rename_artifacts()
+            else:
+                self._logger.info('Dataset already downloaded...')
 
-        self._logger.info('Updating paths')
-        self._update_artifact_locations_from_s3_to_local()
+        self._validate_all_files_exist()
 
     @property
     def dataset(self) -> List[Artifact]:
@@ -288,11 +299,6 @@ class VisualBehaviorDataset:
         for i in range(len(self._dataset)):
             artifact = self._dataset[i]
 
-            for artifact_type in ('max', 'avg', 'mask'):
-                path = artifact_destination / \
-                       f'{artifact_type}_{artifact.roi_id}.png'
-                if not path.exists():
-                    raise RuntimeError(f'{path} does not exist')
             artifact = Artifact(
                 experiment_id=artifact.experiment_id,
                 roi_id=artifact.roi_id,
@@ -305,3 +311,24 @@ class VisualBehaviorDataset:
                 label=artifact.label
             )
             self._dataset[i] = artifact
+
+    def _are_files_already_downloaded(self):
+        """Returns True if all files already exist at destination"""
+        for roi in self._dataset:
+            if not roi.avg_projection_path.exists():
+                return False
+            if not roi.max_projection_path.exists():
+                return False
+            if not roi.mask_path.exists():
+                return False
+        return True
+
+    def _validate_all_files_exist(self):
+        """Validates that all files exist"""
+        for artifact in self._dataset:
+            for artifact_type in ('max', 'avg', 'mask'):
+                path = self._artifact_destination / \
+                       f'{artifact_type}_{artifact.roi_id}.png'
+                if not path.exists():
+                    raise RuntimeError(f'{path} does not exist')
+
