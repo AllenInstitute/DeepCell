@@ -1,6 +1,8 @@
+import glob
 import logging
 import os
 import re
+import shutil
 import tempfile
 from collections import defaultdict
 from pathlib import Path
@@ -215,14 +217,21 @@ class VisualBehaviorDataset:
     def _download_dataset(self, artifact_dirs: Iterable[str]):
         """Downloads artifacts given by artifact_dirs"""
         for bucket in artifact_dirs:
+            self._logger.info(f'Downloading from {bucket}')
+
             with tempfile.TemporaryDirectory() as d:
                 cmd = f'aws s3 sync {bucket} {d} --exclude "*" ' \
-                      f'--include "*.png"'
+                      f'--include "*.png" --quiet'
                 os.system(cmd)
 
                 # s3 sync downloads files include directory structure
                 # Remove directory structure and just copy files to destination
-                os.system(f'mv {d}/*/*.png {self._artifact_destination}')
+                self._logger.info('Cleaning up directory structure. Moving '
+                                  'files to artifact_destination')
+                for file in glob.glob(f'{d}/*/*.png'):
+                    if Path(file).exists():
+                        continue
+                    shutil.move(file, self._artifact_destination)
 
     def _download_files(self):
         """Use for debugging. Downloads select files. (slow)"""
