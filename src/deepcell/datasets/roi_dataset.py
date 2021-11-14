@@ -41,7 +41,7 @@ class RoiDataset(Dataset):
         self._image_dim = image_dim
         self.transform = transform
         self._exclude_mask = exclude_mask
-        self._y = np.array([x.label for x in self._dataset])
+        self._y = np.array([x.label == 'cell' for x in self._dataset])
 
         if cre_line:
             experiment_genotype_map = get_experiment_genotype_map()
