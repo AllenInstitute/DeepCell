@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 
 from data_splitter import DataSplitter
 from metrics import Metrics, TrainingMetrics, CVMetrics
-from roi_dataset import RoiDataset
+from deepcell.datasets.roi_dataset import RoiDataset
 
 logging.basicConfig(
     stream=sys.stdout,

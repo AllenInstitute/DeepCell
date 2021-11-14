@@ -8,7 +8,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from deepcell.metrics import Metrics
-from deepcell.roi_dataset import RoiDataset
+from deepcell.datasets.roi_dataset import RoiDataset
 
 
 def inference(model: torch.nn.Module,
@@ -115,6 +115,7 @@ def inference(model: torch.nn.Module,
     if has_labels:
         metrics.update_accuracies(y_true=dataset.y, y_score=y_scores, threshold=threshold)
 
-    df = pd.DataFrame({'roi-id': dataset.roi_ids, 'y_score': y_scores, 'y_pred': y_preds})
+    roi_ids = [x.roi_id for x in dataset]
+    df = pd.DataFrame({'roi-id': roi_ids, 'y_score': y_scores, 'y_pred': y_preds})
 
     return metrics, df

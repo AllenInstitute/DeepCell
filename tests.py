@@ -8,7 +8,7 @@ from deepcell.models import CNN
 from deepcell.classifier import Classifier
 from deepcell.data_splitter import DataSplitter
 from deepcell.hyperparam_tuning import HyperparamTuner, ParamDistribution
-from deepcell.roi_dataset import RoiDataset
+from deepcell.datasets.roi_dataset import RoiDataset
 
 
 class Tests(unittest.TestCase):

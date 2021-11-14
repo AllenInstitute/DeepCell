@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn.model_selection import StratifiedShuffleSplit, StratifiedKFold
 
-from roi_dataset import RoiDataset
+from deepcell.datasets.roi_dataset import RoiDataset
 
 
 class DataSplitter:
@@ -20,7 +20,7 @@ class DataSplitter:
         full_dataset = RoiDataset(manifest_path=self.manifest_path,
                                   data_dir=self.data_dir, cre_line=self.cre_line, image_dim=self.image_dim)
         sss = StratifiedShuffleSplit(n_splits=2, test_size=test_size, random_state=self.seed)
-        train_index, test_index = next(sss.split(np.zeros(len(full_dataset)), full_dataset.y))
+        train_index, test_index = next(sss.split(np.zeros(len(full_dataset)), full_dataset._y))
 
         roi_ids = np.array([x['roi-id'] for x in full_dataset.manifest])
         train_roi_ids = roi_ids[train_index]
@@ -37,7 +37,7 @@ class DataSplitter:
 
     def get_cross_val_split(self, train_dataset, n_splits=5, shuffle=True):
         skf = StratifiedKFold(n_splits=n_splits, shuffle=shuffle, random_state=self.seed)
-        for train_index, test_index in skf.split(np.zeros(len(train_dataset)), train_dataset.y):
+        for train_index, test_index in skf.split(np.zeros(len(train_dataset)), train_dataset._y):
             roi_ids = np.array([x['roi-id'] for x in train_dataset.manifest])
             train_roi_ids = roi_ids[train_index]
             valid_roi_ids = roi_ids[test_index]

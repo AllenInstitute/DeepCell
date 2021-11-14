@@ -7,7 +7,7 @@ from torchvision.transforms import transforms
 from imgaug import augmenters as iaa
 
 from deepcell.inference import inference
-from deepcell.roi_dataset import RoiDataset
+from deepcell.datasets.roi_dataset import RoiDataset
 from deepcell.transform import Transform
 from deepcell.models.VggBackbone import VggBackbone
 
