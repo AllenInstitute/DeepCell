@@ -10,6 +10,7 @@ from typing import Optional, List, Generator, Dict, Tuple, Set, Iterable, Union
 from urllib.parse import urlparse
 
 import boto3
+import numpy as np
 import pandas as pd
 from croissant.utils import read_jsonlines, json_load_local_or_s3
 from tqdm import tqdm
@@ -55,7 +56,16 @@ class VisualBehaviorDataset:
         os.makedirs(self._artifact_destination, exist_ok=True)
 
         if debug:
-            self._dataset = self._dataset[:2]
+            not_cell_idx = np.argwhere([
+                x.label != 'cell' for x in self._dataset])[:2]\
+                .squeeze().tolist()
+            cell_idx = np.argwhere([
+                x.label == 'cell' for x in self._dataset])[:2]\
+                .squeeze().tolist()
+            self._dataset = [
+                x for i, x in enumerate(self._dataset)
+                if i in not_cell_idx + cell_idx
+            ]
 
         self._update_artifact_locations_from_s3_to_local()
 
