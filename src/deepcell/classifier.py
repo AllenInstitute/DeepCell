@@ -6,8 +6,8 @@ from pathlib import Path
 import torch
 from torch.utils.data import DataLoader
 
-from data_splitter import DataSplitter
-from metrics import Metrics, TrainingMetrics, CVMetrics
+from deepcell.data_splitter import DataSplitter
+from deepcell.metrics import Metrics, TrainingMetrics, CVMetrics
 from deepcell.datasets.roi_dataset import RoiDataset
 
 logging.basicConfig(
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 class Classifier:
     def __init__(self, model: torch.nn.Module, n_epochs: int, optimizer,
                  criterion, save_path, scheduler=None, scheduler_step_after_batch=False, debug=False,
-                 early_stopping=30, use_cuda=True, model_load_path=None):
+                 early_stopping=30, model_load_path=None):
         self.n_epochs = n_epochs
         self.model = model
         self.optimizer_constructor = optimizer
@@ -32,7 +32,7 @@ class Classifier:
         self.scheduler = scheduler(self.optimizer) if scheduler is not None else None
         self.scheduler_step_after_batch = scheduler_step_after_batch
         self.criterion = criterion
-        self.use_cuda = use_cuda
+        self.use_cuda = torch.cuda.is_available()
         self.save_path = save_path
         self.debug = debug
         self.early_stopping = early_stopping

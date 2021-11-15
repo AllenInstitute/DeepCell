@@ -18,7 +18,6 @@ def inference(model: torch.nn.Module,
               threshold=0.5,
               ensemble=True,
               cv_fold=None,
-              use_cuda=True,
               tta_num_iters=0) -> Tuple[Metrics, pd.DataFrame]:
     """
     Args:
@@ -67,6 +66,8 @@ def inference(model: torch.nn.Module,
     num_iters = 1 if tta_num_iters == 0 else tta_num_iters
 
     y_scores = np.zeros((len(models), len(dataset), num_iters))
+
+    use_cuda = torch.cuda.is_available()
 
     for i, model_checkpoint in enumerate(models):
         map_location = None if use_cuda else torch.device('cpu')
