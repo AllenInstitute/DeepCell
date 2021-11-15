@@ -19,12 +19,16 @@ from deepcell.datasets.artifact import Artifact
 
 logging.basicConfig(level=logging.INFO)
 
+S3_MANIFEST_PREFIX = 'visual_behavior/manifests'
+
 
 class VisualBehaviorDataset:
     """Class representing the visual behavior dataset from AWS sagemaker
     labeling jobs"""
     def __init__(self, artifact_destination: Path,
                  exclude_projects: Optional[List[str]] = None,
+                 s3_manifest_prefix: str = S3_MANIFEST_PREFIX,
+                 download=True,
                  debug=False):
         """
         Args:
@@ -33,12 +37,17 @@ class VisualBehaviorDataset:
             - exclude_projects:
                 an optional list of project names to exclude from being
                 included in the dataset
+            - s3_manifest_prefix
+                Prefix on s3 where labeling manifests are stored
+            - download
+                Whether to download files from S3
             - debug
                 If True, will only download a few files
 
         """
         self._logger = logging.getLogger(__name__)
         self._exclude_projects = exclude_projects
+        self._s3_manifest_prefix = s3_manifest_prefix
         self._artifact_destination = artifact_destination
 
         # Due to historic reasons, some ROI ids are stored in the manifest
@@ -73,7 +82,7 @@ class VisualBehaviorDataset:
             self._download_files()
         else:
             is_already_downloaded = self._are_files_already_downloaded()
-            if not is_already_downloaded:
+            if download and not is_already_downloaded:
                 self._logger.info('Downloading dataset')
                 self._download_dataset(artifact_dirs=artifact_dirs)
 
@@ -132,7 +141,7 @@ class VisualBehaviorDataset:
         artifact_dirs = set()
         seen = set()
         project_name_meta = []
-        for manifest in manifests:
+        for file, manifest in manifests.items():
             for x in manifest:
                 if self._exclude_projects is not None:
                     if is_exclude_project(x=x):
@@ -161,11 +170,12 @@ class VisualBehaviorDataset:
                 roi_id = f'exp_{experiment_id}_roi_{roi_id}'
                 x['roi-id'] = roi_id
 
-                global_id = self._global_to_local_map['local_to_global'][
-                    roi_id]
-                if global_id in self._global_to_local_map['degeneracies']:
-                    # It is a duplicate
-                    continue
+                global_id = self._global_to_local_map[
+                    'local_to_global'].get(roi_id, None)
+                if global_id is not None:
+                    if global_id in self._global_to_local_map['degeneracies']:
+                        # It is a duplicate
+                        continue
 
                 if roi_id in seen:
                     # also a duplicate
@@ -194,7 +204,7 @@ class VisualBehaviorDataset:
                     continue
                 artifact_dir = re.match(
                     r's3://prod\.slapp\.alleninstitute\.org/([\w\d\-_]+)/',
-                    x['source-ref']).group()
+                    x['roi-mask-source-ref']).group()
                 artifact_dirs.add(artifact_dir)
 
                 artifact = Artifact(
@@ -203,6 +213,7 @@ class VisualBehaviorDataset:
                     max_projection_path=x['max-source-ref'],
                     avg_projection_path=x['avg-source-ref'],
                     mask_path=x['roi-mask-source-ref'],
+                    project_name=project_name,
                     label=label)
                 rois.append(artifact)
                 seen.add(roi_id)
@@ -210,7 +221,7 @@ class VisualBehaviorDataset:
 
     def _rename_artifacts(self):
         """
-        Conform artifacts to <experiment_id>_<roi_id> convention
+        Conform artifacts to exp_<experiment_id>_roi_<roi_id> convention
         Returns:
             None, renames files inplace
         """
@@ -230,14 +241,29 @@ class VisualBehaviorDataset:
                     original_id]['experiment_id']
                 roi_id = self._global_to_local_map['global_to_local'][
                     original_id]['roi_id']
-                new_id = f'exp_{exp_id}_roi_{roi_id}'
+            else:
+                # exp_<exp_id>_<roi_id>
+                exp_id = re.findall(r'\d+', file.stem)[0]
+                roi_id = original_id
 
-                original_path = self._artifact_destination / file
-                new_path = self._artifact_destination / f'{name[0]}_' \
-                                                        f'{new_id}{suffix}'
-                cmd = f'mv {original_path} {new_path}'
-                self._logger.debug(cmd)
-                os.system(cmd)
+            try:
+                int(exp_id)
+            except ValueError:
+                raise RuntimeError(f'Invalid exp_id: {exp_id}')
+            
+            try:
+                int(roi_id)
+            except ValueError:
+                raise RuntimeError(f'Invalid roi_id: {roi_id}')
+
+            new_id = f'exp_{exp_id}_roi_{roi_id}'
+
+            original_path = self._artifact_destination / file
+            new_path = self._artifact_destination / f'{name[0]}_' \
+                                                    f'{new_id}{suffix}'
+            cmd = f'mv {original_path} {new_path}'
+            self._logger.debug(cmd)
+            os.system(cmd)
 
     def _download_dataset(self, artifact_dirs: Iterable[str]):
         """Downloads artifacts given by artifact_dirs"""
@@ -253,8 +279,9 @@ class VisualBehaviorDataset:
                 # Remove directory structure and just copy files to destination
                 self._logger.info('Cleaning up directory structure. Moving '
                                   'files to artifact_destination')
-                for file in glob.glob(f'{d}/*/*.png'):
-                    if Path(file).exists():
+                files = glob.glob(f'{d}/*/*.png') + glob.glob(f'{d}/*.png')
+                for file in files:
+                    if (self._artifact_destination / Path(file).name).exists():
                         continue
                     shutil.move(file, self._artifact_destination)
 
@@ -280,8 +307,7 @@ class VisualBehaviorDataset:
                 self._logger.debug(cmd)
                 os.system(cmd)
 
-    @staticmethod
-    def _get_manifests() -> List[Generator[Dict, None, None]]:
+    def _get_manifests(self) -> Dict[str, Generator[Dict, None, None]]:
         """
         Each labeling job on AWS sagemaker produces a manifest
         This function retrieves all manifests for visual behavior labeling jobs
@@ -292,14 +318,14 @@ class VisualBehaviorDataset:
         s3 = boto3.client('s3')
         bucket = 'prod.slapp.alleninstitute.org'
 
-        prefix = 'visual_behavior/manifests/'
+        prefix = self._s3_manifest_prefix
         objs = s3.list_objects_v2(
             Bucket=bucket,
             Prefix=prefix)
         files = [obj['Key'] for obj in objs['Contents'] if
                  obj['Key'] != prefix]
-        manifests = [read_jsonlines(uri=f's3://{bucket}/{file}') for file in
-                     files]
+        manifests = {file: read_jsonlines(uri=f's3://{bucket}/{file}') for
+                     file in files}
         return manifests
 
     def _update_artifact_locations_from_s3_to_local(self):
@@ -322,7 +348,8 @@ class VisualBehaviorDataset:
                                      f'avg_{artifact.roi_id}.png'),
                 mask_path=(artifact_destination / f'mask_'
                                                   f'{artifact.roi_id}.png'),
-                label=artifact.label
+                label=artifact.label,
+                project_name=artifact.project_name
             )
             self._dataset[i] = artifact
 
