@@ -116,7 +116,7 @@ def inference(model: torch.nn.Module,
     if has_labels:
         metrics.update_accuracies(y_true=dataset.y, y_score=y_scores, threshold=threshold)
 
-    roi_ids = [x.roi_id for x in dataset]
+    roi_ids = [x.roi_id for x in dataset.artifacts]
     df = pd.DataFrame({'roi-id': roi_ids, 'y_score': y_scores, 'y_pred': y_preds})
 
     return metrics, df
