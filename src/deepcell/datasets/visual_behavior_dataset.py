@@ -49,7 +49,7 @@ class VisualBehaviorDataset:
                 '/global_to_local_mapping.json')
 
         self._logger.info('Reading manifests and preprocessing')
-        self._dataset, artifact_dirs, project_meta = self._get_dataset()
+        self._dataset, artifact_dirs, self._project_meta = self._get_dataset()
 
         self._debug = debug
 
@@ -87,6 +87,10 @@ class VisualBehaviorDataset:
     @property
     def dataset(self) -> List[Artifact]:
         return self._dataset
+
+    @property
+    def project_meta(self) -> pd.DataFrame:
+        return self._project_meta
 
     def _get_dataset(self) -> \
             Tuple[List[Artifact], Set[str], pd.DataFrame]:
