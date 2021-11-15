@@ -57,6 +57,10 @@ class RoiDataset(Dataset):
             self._y = np.array([0, 1])
 
     @property
+    def artifacts(self) -> List[Artifact]:
+        return self._dataset
+    
+    @property
     def y(self) -> np.ndarray:
         return self._y
 
