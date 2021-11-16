@@ -4,9 +4,9 @@
 #SBATCH --mail-type=BEGIN,END,FAIL # Send mail on begin, end, fail
 #SBATCH --mem=250gb
 #SBATCH --time=48:00:00
-#SBATCH --output=/allen/aibs/informatics/aamster/vasculature_artifacts/logs/%A-%a.log # Update this log path
+#SBATCH --output=/allen/aibs/informatics/aamster/pure_noise/logs/%A-%a.log # Update this log path
 #SBATCH --partition braintv
-#SBATCH --array=0-159
+#SBATCH --array=0-0 # Update this with number of experiments
 #SBATCH --ntasks=24
 
 experiment_ids_path=$1
@@ -26,12 +26,12 @@ predictions_out_dir="${out_dir}/predictions/"
 mkdir -p "${out_dir}"
 mkdir -p "${predictions_out_dir}"
 
-rois_path="/allen/aibs/informatics/danielsf/suite2p_210921/v0.10.2/th_3/production/${exp_id}_suite2p_rois.json"
+rois_path="${rois_path}/${exp_id}_suite2p_rois.json"
 
 manifest="{
   \"experiment_id\": ${exp_id},
   \"binarized_rois_path\": "\"${rois_path}\"",
-  \"movie_path\": \"/allen/programs/braintv/workgroups/nc-ophys/danielk/deepinterpolation/experiments/ophys_experiment_${exp_id}/denoised.h5\",
+  \"movie_path\": \"${movie_path}/${exp_id}/${exp_id}_movie.h5\",
   \"local_to_global_roi_id_map\": {}
 }"
 
