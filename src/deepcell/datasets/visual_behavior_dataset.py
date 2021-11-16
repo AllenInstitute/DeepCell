@@ -21,7 +21,7 @@ logging.basicConfig(level=logging.INFO)
 
 S3_MANIFEST_PREFIX = 'visual_behavior/manifests'
 
-# The minimum global ROI id that was used by SLAPP/sagemaker 
+# The minimum global ROI id that was used by SLAPP/sagemaker
 GLOBAL_ROI_ID_MIN = 1e6
 
 
@@ -139,6 +139,60 @@ class VisualBehaviorDataset:
                     break
             return exclude
 
+        def is_failed(x: dict):
+            """Checks whether this record is a failed record"""
+            metadata_key = [x for x in x.keys() if 'metadata' in x]
+            if len(metadata_key) == 1:
+                if 'failure-reason' in x[metadata_key[0]]:
+                    return True
+            return False
+
+        def get_roi_id(x: dict) -> str:
+            """Parses ROI id and converts to experiment-local"""
+            roi_id = x['roi-id']
+            try:
+                roi_id = int(roi_id)
+            except ValueError:
+                # ie 'exp_920211809_226'
+                roi_id = roi_id.split('_')[-1]
+                roi_id = int(roi_id)
+
+            if roi_id >= GLOBAL_ROI_ID_MIN:
+                # convert to experiment-local
+                roi_id = self._global_to_local_map['global_to_local'][str(
+                    roi_id)]
+                roi_id = roi_id['roi_id']
+
+            roi_id = f'exp_{experiment_id}_roi_{roi_id}'
+            return roi_id
+
+        def is_duplicate(global_to_local_map: dict, roi_id: str, seen: set) \
+                -> bool:
+            """Check if roi id is duplicate. If duplicate, it is either
+            listed as a degeneracy in the global_to_local_map or has already
+            been seen"""
+            global_id = global_to_local_map[
+                'local_to_global'].get(roi_id, None)
+            if global_id is not None:
+                if global_id in global_to_local_map['degeneracies']:
+                    return True
+
+            if roi_id in seen:
+                return True
+
+            return False
+
+        def get_project_name(x: dict) -> Optional[str]:
+            """Get project name by checking for a dict with key
+            'workerAnnotations or majorityLabel'"""
+            project_name = None
+            for key in x:
+                if isinstance(x[key], dict):
+                    if 'workerAnnotations' in x[key] or 'majorityLabel' in \
+                            x[key]:
+                        return key
+            return project_name
+
         manifests = self._get_manifests()
         rois = []
         artifact_dirs = set()
@@ -150,48 +204,22 @@ class VisualBehaviorDataset:
                     if is_exclude_project(x=x):
                         continue
 
-                metadata_key = [x for x in x.keys() if 'metadata' in x]
-                if len(metadata_key) == 1:
-                    if 'failure-reason' in x[metadata_key[0]]:
-                        continue
-                experiment_id = x['experiment-id']
-                roi_id = x['roi-id']
-
-                try:
-                    roi_id = int(roi_id)
-                except ValueError:
-                    # ie 'exp_920211809_226'
-                    roi_id = roi_id.split('_')[-1]
-
-                if int(roi_id) >= GLOBAL_ROI_ID_MIN:
-                    # it is global, the globally unique ids start at 1000000
-                    # and no experiment would have that many ROIs
-                    roi_id = self._global_to_local_map['global_to_local'][str(
-                        roi_id)]
-                    roi_id = roi_id['roi_id']
-
-                roi_id = f'exp_{experiment_id}_roi_{roi_id}'
-                x['roi-id'] = roi_id
-
-                global_id = self._global_to_local_map[
-                    'local_to_global'].get(roi_id, None)
-                if global_id is not None:
-                    if global_id in self._global_to_local_map['degeneracies']:
-                        # It is a duplicate
-                        continue
-
-                if roi_id in seen:
-                    # also a duplicate
+                if is_failed(x=x):
                     continue
 
-                label = None
-                project_name = None
-                for key in x:
-                    if isinstance(x[key], dict):
-                        if 'majorityLabel' in x[key]:
-                            label = x[key]['majorityLabel']
-                            project_name = key
-                            break
+                experiment_id = x['experiment-id']
+                roi_id = get_roi_id(x=x)
+                x['roi-id'] = roi_id
+
+                if is_duplicate(
+                        roi_id=roi_id,
+                        global_to_local_map=self._global_to_local_map,
+                        seen=seen):
+                    continue
+
+                project_name = get_project_name(x=x)
+
+                label = x[project_name].get('majorityLabel', None)
                 if label is None:
                     continue
 
