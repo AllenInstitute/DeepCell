@@ -15,7 +15,7 @@ import pandas as pd
 from croissant.utils import read_jsonlines, json_load_local_or_s3
 from tqdm import tqdm
 
-from deepcell.datasets.artifact import Artifact
+from deepcell.datasets.model_input import ModelInput
 
 logging.basicConfig(level=logging.INFO)
 
@@ -97,7 +97,7 @@ class VisualBehaviorDataset:
         self._validate_all_files_exist()
 
     @property
-    def dataset(self) -> List[Artifact]:
+    def dataset(self) -> List[ModelInput]:
         return self._dataset
 
     @property
@@ -105,7 +105,7 @@ class VisualBehaviorDataset:
         return self._project_meta
 
     def _get_dataset(self) -> \
-            Tuple[List[Artifact], Set[str], pd.DataFrame]:
+            Tuple[List[ModelInput], Set[str], pd.DataFrame]:
         """
         Each labeling job on AWS sagemaker produces a manifest.
         This function combines those manifests into a single set of labeled
@@ -238,7 +238,7 @@ class VisualBehaviorDataset:
                     x['roi-mask-source-ref']).group()
                 artifact_dirs.add(artifact_dir)
 
-                artifact = Artifact(
+                artifact = ModelInput(
                     roi_id=x['roi-id'],
                     experiment_id=x['experiment-id'],
                     max_projection_path=x['max-source-ref'],
@@ -370,7 +370,7 @@ class VisualBehaviorDataset:
         for i in range(len(self._dataset)):
             artifact = self._dataset[i]
 
-            artifact = Artifact(
+            artifact = ModelInput(
                 experiment_id=artifact.experiment_id,
                 roi_id=artifact.roi_id,
                 max_projection_path=(artifact_destination /

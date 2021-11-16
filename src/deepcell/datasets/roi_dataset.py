@@ -5,14 +5,14 @@ from PIL import Image
 import numpy as np
 from torch.utils.data import Dataset
 
-from deepcell.datasets.artifact import Artifact
+from deepcell.datasets.model_input import ModelInput
 from deepcell.transform import Transform
 from deepcell.util import get_experiment_genotype_map
 
 
 class RoiDataset(Dataset):
     def __init__(self,
-                 dataset: List[Artifact],
+                 dataset: List[ModelInput],
                  image_dim=(128, 128),
                  transform: Transform = None,
                  debug=False,
@@ -57,7 +57,7 @@ class RoiDataset(Dataset):
             self._y = np.array([0, 1])
 
     @property
-    def artifacts(self) -> List[Artifact]:
+    def artifacts(self) -> List[ModelInput]:
         return self._dataset
     
     @property

@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader
 from torchvision.transforms import transforms
 from imgaug import augmenters as iaa
 
+from deepcell.datasets.model_input import ModelInput
 from deepcell.inference import inference
 from deepcell.datasets.roi_dataset import RoiDataset
 from deepcell.transform import Transform
@@ -54,10 +55,12 @@ def run_inference_for_experiment(
         rois = json.load(f)
         roi_ids = [f'{experiment_id}_{x["id"]}' for x in rois]
 
-    test = RoiDataset(manifest_path=None, data_dir=data_dir,
-                      roi_ids=roi_ids,
-                      transform=test_transform, has_labels=False,
-                      parse_from_manifest=False)
+    model_inputs = [
+        ModelInput.from_data_dir(data_dir=data_dir,
+                                 experiment_id=experiment_id,
+                                 roi_id=roi_id) for roi_id in roi_ids]
+    test = RoiDataset(dataset=model_inputs,
+                      transform=test_transform)
     test_dataloader = DataLoader(dataset=test, shuffle=False, batch_size=64)
 
     cnn = torchvision.models.vgg11_bn(pretrained=True, progress=False)
@@ -66,8 +69,7 @@ def run_inference_for_experiment(
                       freeze_up_to_layer=15)
     _, inference_res = inference(model=cnn, test_loader=test_dataloader,
                                  has_labels=False,
-                                 checkpoint_path=str(model_weights_path),
-                                 use_cuda=use_cuda)
+                                 checkpoint_path=str(model_weights_path))
     inference_res['experiment_id'] = experiment_id
 
     inference_res.to_csv(output_path / f'{experiment_id}_inference.csv',
