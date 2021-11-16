@@ -93,11 +93,6 @@ if __name__ == '__main__':
     model_weights_path = Path(args.model_weights_path)
     out_path = Path(args.out_path)
 
-    if args.use_cuda not in('true', 'false'):
-        raise ValueError('use_cuda must be one of "true" or "false"')
-
-    use_cuda = args.use_cuda == 'true'
-
     run_inference_for_experiment(experiment_id=args.experiment_id, rois_path=rois_path,
                                  data_dir=data_dir, output_path=out_path,
                                  model_weights_path=model_weights_path)
