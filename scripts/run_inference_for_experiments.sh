@@ -13,8 +13,7 @@ experiment_ids_path=$1
 correlation_projection_path=$2
 model_weights_path=$3
 out_dir=$4
-use_cuda=$5
-conda_env=$6
+conda_env=$5
 
 
 readarray -t exp_ids < "${experiment_ids_path}"
@@ -57,8 +56,7 @@ $conda_env -m deepcell.modules.run_inference \
   --rois_path "${rois_path}" \
   --data_dir "${artifact_out_dir}" \
   --model_weights_path "${model_weights_path}" \
-  --out_path "${predictions_out_dir}" \
-  --use_cuda "${use_cuda}"
+  --out_path "${predictions_out_dir}"
 
 echo "Removing ${artifact_out_dir}"
 

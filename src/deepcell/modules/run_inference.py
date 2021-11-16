@@ -18,8 +18,7 @@ def run_inference_for_experiment(
         rois_path: Path,
         data_dir: Path,
         model_weights_path: Path,
-        output_path: Path,
-        use_cuda=True):
+        output_path: Path):
     """
     Runs inference for experiment and produces csv of predictions
 
@@ -87,8 +86,6 @@ if __name__ == '__main__':
                         help='Path to trained model weights')
     parser.add_argument('--out_path', required=True, help='Where to store '
                                                           'predictions')
-    parser.add_argument('--use_cuda', required=True, help='Whether on GPU')
-
     args = parser.parse_args()
 
     rois_path = Path(args.rois_path)
@@ -102,5 +99,5 @@ if __name__ == '__main__':
     use_cuda = args.use_cuda == 'true'
 
     run_inference_for_experiment(experiment_id=args.experiment_id, rois_path=rois_path,
-                                 data_dir=data_dir, output_path=out_path, use_cuda=use_cuda,
+                                 data_dir=data_dir, output_path=out_path,
                                  model_weights_path=model_weights_path)
