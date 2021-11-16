@@ -10,10 +10,12 @@
 #SBATCH --ntasks=24
 
 experiment_ids_path=$1
-correlation_projection_path=$2
-model_weights_path=$3
-out_dir=$4
-conda_env=$5
+rois_path=$2
+movie_path=$3
+correlation_projection_path=$4
+model_weights_path=$5
+out_dir=$6
+conda_env=$7
 
 
 readarray -t exp_ids < "${experiment_ids_path}"
