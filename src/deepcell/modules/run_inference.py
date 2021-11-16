@@ -52,12 +52,11 @@ def run_inference_for_experiment(
 
     with open(rois_path) as f:
         rois = json.load(f)
-        roi_ids = [f'{experiment_id}_{x["id"]}' for x in rois]
 
     model_inputs = [
         ModelInput.from_data_dir(data_dir=data_dir,
                                  experiment_id=experiment_id,
-                                 roi_id=roi_id) for roi_id in roi_ids]
+                                 roi_id=roi['id']) for roi in rois]
     test = RoiDataset(dataset=model_inputs,
                       transform=test_transform)
     test_dataloader = DataLoader(dataset=test, shuffle=False, batch_size=64)
