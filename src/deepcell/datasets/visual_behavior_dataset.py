@@ -21,6 +21,9 @@ logging.basicConfig(level=logging.INFO)
 
 S3_MANIFEST_PREFIX = 'visual_behavior/manifests'
 
+# The minimum global ROI id that was used by SLAPP/sagemaker 
+GLOBAL_ROI_ID_MIN = 1e6
+
 
 class VisualBehaviorDataset:
     """Class representing the visual behavior dataset from AWS sagemaker
@@ -160,7 +163,7 @@ class VisualBehaviorDataset:
                     # ie 'exp_920211809_226'
                     roi_id = roi_id.split('_')[-1]
 
-                if int(roi_id) >= 1000000:
+                if int(roi_id) >= GLOBAL_ROI_ID_MIN:
                     # it is global, the globally unique ids start at 1000000
                     # and no experiment would have that many ROIs
                     roi_id = self._global_to_local_map['global_to_local'][str(
@@ -236,7 +239,7 @@ class VisualBehaviorDataset:
             except ValueError:
                 # If not an int, just assume it is already in local format
                 continue
-            if int(original_id) >= 1000000:
+            if int(original_id) >= GLOBAL_ROI_ID_MIN:
                 exp_id = self._global_to_local_map['global_to_local'][
                     original_id]['experiment_id']
                 roi_id = self._global_to_local_map['global_to_local'][
