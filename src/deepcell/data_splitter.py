@@ -22,7 +22,7 @@ class DataSplitter:
         self.image_dim = image_dim
 
     def get_train_test_split(self, test_size):
-        full_dataset = RoiDataset(dataset=self._model_inputs,
+        full_dataset = RoiDataset(model_inputs=self._model_inputs,
                                   cre_line=self.cre_line,
                                   image_dim=self.image_dim)
         sss = StratifiedShuffleSplit(n_splits=2, test_size=test_size,
@@ -30,10 +30,10 @@ class DataSplitter:
         train_index, test_index = next(sss.split(np.zeros(len(full_dataset)),
                                                  full_dataset.y))
 
-        train_dataset = self._sample_dataset(dataset=full_dataset.artifacts,
+        train_dataset = self._sample_dataset(dataset=full_dataset.model_inputs,
                                              index=train_index,
                                              transform=self.train_transform)
-        test_dataset = self._sample_dataset(dataset=full_dataset.artifacts,
+        test_dataset = self._sample_dataset(dataset=full_dataset.model_inputs,
                                             index=test_index,
                                             transform=self.test_transform)
 
@@ -45,10 +45,10 @@ class DataSplitter:
                               random_state=self.seed)
         for train_index, test_index in skf.split(np.zeros(len(train_dataset)),
                                                  train_dataset.y):
-            train = self._sample_dataset(dataset=train_dataset.artifacts,
+            train = self._sample_dataset(dataset=train_dataset.model_inputs,
                                          index=train_index,
                                          transform=self.train_transform)
-            valid = self._sample_dataset(dataset=train_dataset.artifacts,
+            valid = self._sample_dataset(dataset=train_dataset.model_inputs,
                                          index=test_index,
                                          transform=self.test_transform)
             yield train, valid
@@ -71,7 +71,7 @@ class DataSplitter:
         """
         index = set(index)
         artifacts = [x for i, x in enumerate(dataset) if i in index]
-        return RoiDataset(dataset=artifacts,
+        return RoiDataset(model_inputs=artifacts,
                           transform=transform,
                           exclude_mask=self.exclude_mask,
                           image_dim=self.image_dim)

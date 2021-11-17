@@ -28,15 +28,15 @@ def test_ids_different():
     data_splitter = \
         DataSplitter(model_inputs=model_inputs, seed=1234)
     train, test = data_splitter.get_train_test_split(test_size=.3)
-    assert len(set([x.roi_id for x in train.artifacts]).intersection(
-        [x.roi_id for x in test.artifacts])) == 0
+    assert len(set([x.roi_id for x in train.model_inputs]).intersection(
+        [x.roi_id for x in test.model_inputs])) == 0
     for train, val in data_splitter.get_cross_val_split(train_dataset=train):
-        assert len(set([x.roi_id for x in train.artifacts]).intersection(
-            [x.roi_id for x in val.artifacts])) == 0
-        assert len(set([x.roi_id for x in train.artifacts]).intersection(
-            [x.roi_id for x in test.artifacts])) == 0
-        assert len(set([x.roi_id for x in val.artifacts]).intersection(
-            [x.roi_id for x in test.artifacts])) == 0
+        assert len(set([x.roi_id for x in train.model_inputs]).intersection(
+            [x.roi_id for x in val.model_inputs])) == 0
+        assert len(set([x.roi_id for x in train.model_inputs]).intersection(
+            [x.roi_id for x in test.model_inputs])) == 0
+        assert len(set([x.roi_id for x in val.model_inputs]).intersection(
+            [x.roi_id for x in test.model_inputs])) == 0
 
 
 class Tests(unittest.TestCase):

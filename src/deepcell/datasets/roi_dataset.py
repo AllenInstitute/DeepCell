@@ -12,7 +12,7 @@ from deepcell.util import get_experiment_genotype_map
 
 class RoiDataset(Dataset):
     def __init__(self,
-                 dataset: List[ModelInput],
+                 model_inputs: List[ModelInput],
                  image_dim=(128, 128),
                  transform: Transform = None,
                  debug=False,
@@ -21,7 +21,7 @@ class RoiDataset(Dataset):
         """
 
         Args:
-            dataset:
+            model_inputs:
                 A set of records in this dataset
             image_dim:
                 Dimensions of artifacts
@@ -37,11 +37,11 @@ class RoiDataset(Dataset):
         """
         super().__init__()
 
-        self._dataset = dataset
+        self._model_inputs = model_inputs
         self._image_dim = image_dim
         self.transform = transform
         self._exclude_mask = exclude_mask
-        self._y = np.array([int(x.label == 'cell') for x in self._dataset])
+        self._y = np.array([int(x.label == 'cell') for x in self._model_inputs])
 
         if cre_line:
             experiment_genotype_map = get_experiment_genotype_map()
@@ -52,20 +52,20 @@ class RoiDataset(Dataset):
         if debug:
             not_cell_idx = np.argwhere(self._y == 0)[0][0]
             cell_idx = np.argwhere(self._y == 1)[0][0]
-            self._dataset = [
-                self._dataset[not_cell_idx], self._dataset[cell_idx]]
+            self._model_inputs = [
+                self._model_inputs[not_cell_idx], self._model_inputs[cell_idx]]
             self._y = np.array([0, 1])
 
     @property
-    def artifacts(self) -> List[ModelInput]:
-        return self._dataset
+    def model_inputs(self) -> List[ModelInput]:
+        return self._model_inputs
     
     @property
     def y(self) -> np.ndarray:
         return self._y
 
     def __getitem__(self, index):
-        obs = self._dataset[index]
+        obs = self._model_inputs[index]
 
         input = self._construct_input(obs=obs)
 
@@ -90,7 +90,7 @@ class RoiDataset(Dataset):
         return input, target
 
     def __len__(self):
-        return len(self._dataset)
+        return len(self._model_inputs)
 
     def _construct_input(self, obs) -> np.ndarray:
         """
@@ -138,8 +138,8 @@ class RoiDataset(Dataset):
         Returns:
             None, modifies inplace
         """
-        self._dataset = [
-            x for x in self._dataset if experiment_genotype_map[
+        self._model_inputs = [
+            x for x in self._model_inputs if experiment_genotype_map[
                 x.experiment_id].startswith(cre_line)]
 
 
@@ -148,6 +148,6 @@ if __name__ == '__main__':
         from deepcell.datasets.visual_behavior_dataset import VisualBehaviorDataset
         ds = VisualBehaviorDataset(debug=True,
                                    artifact_destination=Path('/tmp/artifacts'))
-        dataset = RoiDataset(dataset=ds.dataset)
+        dataset = RoiDataset(model_inputs=ds.dataset)
         dataset[0]
     main()

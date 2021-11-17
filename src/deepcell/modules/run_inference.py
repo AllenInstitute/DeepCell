@@ -57,7 +57,7 @@ def run_inference_for_experiment(
         ModelInput.from_data_dir(data_dir=data_dir,
                                  experiment_id=experiment_id,
                                  roi_id=roi['id']) for roi in rois]
-    test = RoiDataset(dataset=model_inputs,
+    test = RoiDataset(model_inputs=model_inputs,
                       transform=test_transform)
     test_dataloader = DataLoader(dataset=test, shuffle=False, batch_size=64)
 
