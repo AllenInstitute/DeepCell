@@ -42,7 +42,7 @@ class Classifier:
             os.makedirs(f'{self.save_path}')
 
         if self.use_cuda:
-            self.model.cuda()
+            self.model = self.model.cuda()
 
         torch.save(self.model.state_dict(), f'{self.save_path}/model_init.pt')
 
