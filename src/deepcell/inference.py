@@ -77,13 +77,15 @@ def inference(model: torch.nn.Module,
 
         model.eval()
 
+        if use_cuda:
+            model.cuda()
+
         for iter in range(num_iters):
             prev_start = 0
 
             for data, _ in test_loader:
                 if use_cuda:
                     data = data.cuda()
-                    model = model.cuda()
 
                 with torch.no_grad():
                     output = model(data)
