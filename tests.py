@@ -1,6 +1,8 @@
 import unittest
+from pathlib import Path
 
 import torch
+from deepcell.datasets.model_input import ModelInput
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
@@ -11,14 +13,36 @@ from deepcell.hyperparam_tuning import HyperparamTuner, ParamDistribution
 from deepcell.datasets.roi_dataset import RoiDataset
 
 
+def test_ids_different():
+    """Tests that the following ids are different:
+    1. Train/test
+    2. Train CV split / Val CV split
+    3. Train CV split / Test
+    4. Val CV split / Test"""
+    model_inputs = [ModelInput(roi_id=f'{i}',
+                               experiment_id='foo',
+                               mask_path=Path('foo'),
+                               max_projection_path=Path('foo'),
+                               avg_projection_path=Path('foo')
+                               ) for i in range(5000)]
+    data_splitter = \
+        DataSplitter(model_inputs=model_inputs, seed=1234)
+    train, test = data_splitter.get_train_test_split(test_size=.3)
+    assert len(set([x.roi_id for x in train.artifacts]).intersection(
+        [x.roi_id for x in test.artifacts])) == 0
+    for train, val in data_splitter.get_cross_val_split(train_dataset=train):
+        assert len(set([x.roi_id for x in train.artifacts]).intersection(
+            [x.roi_id for x in val.artifacts])) == 0
+        assert len(set([x.roi_id for x in train.artifacts]).intersection(
+            [x.roi_id for x in test.artifacts])) == 0
+        assert len(set([x.roi_id for x in val.artifacts]).intersection(
+            [x.roi_id for x in test.artifacts])) == 0
+
+
 class Tests(unittest.TestCase):
     @classmethod
-    def setUpClass(cls):
-        cls.manifest_path = 's3://prod.slapp.alleninstitute.org/behavior_slc_oct_2020/20201020135214/expert_output/ophys-experts-slc-oct-2020/manifests/output/output.manifest'
-        cls.project_name = 'ophys-experts-slc-oct-2020'
-
     def test_train_test_ids_different(self):
-        data_splitter = DataSplitter(manifest_path=self.manifest_path, project_name=self.project_name)
+        data_splitter = DataSplitter()
         train, test = data_splitter.get_train_test_split(test_size=.3)
         common_ids = set(train.roi_ids).intersection(test.roi_ids)
         self.assertEqual(len(common_ids), 0)

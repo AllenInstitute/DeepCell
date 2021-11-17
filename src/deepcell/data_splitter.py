@@ -10,10 +10,10 @@ from deepcell.transform import Transform
 
 
 class DataSplitter:
-    def __init__(self, artifacts: List[ModelInput], train_transform=None,
+    def __init__(self, model_inputs: List[ModelInput], train_transform=None,
                  test_transform=None, seed=None,
                  cre_line=None, exclude_mask=False, image_dim=(128, 128)):
-        self._artifacts = artifacts
+        self._model_inputs = model_inputs
         self.train_transform = train_transform
         self.test_transform = test_transform
         self.seed = seed
@@ -22,7 +22,7 @@ class DataSplitter:
         self.image_dim = image_dim
 
     def get_train_test_split(self, test_size):
-        full_dataset = RoiDataset(dataset=self._artifacts,
+        full_dataset = RoiDataset(dataset=self._model_inputs,
                                   cre_line=self.cre_line,
                                   image_dim=self.image_dim)
         sss = StratifiedShuffleSplit(n_splits=2, test_size=test_size,
@@ -30,10 +30,12 @@ class DataSplitter:
         train_index, test_index = next(sss.split(np.zeros(len(full_dataset)),
                                                  full_dataset.y))
 
-        train_dataset = self._get_dataset(index=train_index,
-                                          transform=self.train_transform)
-        test_dataset = self._get_dataset(index=test_index,
-                                         transform=self.test_transform)
+        train_dataset = self._sample_dataset(dataset=full_dataset.artifacts,
+                                             index=train_index,
+                                             transform=self.train_transform)
+        test_dataset = self._sample_dataset(dataset=full_dataset.artifacts,
+                                            index=test_index,
+                                            transform=self.test_transform)
 
         return train_dataset, test_dataset
 
@@ -43,17 +45,22 @@ class DataSplitter:
                               random_state=self.seed)
         for train_index, test_index in skf.split(np.zeros(len(train_dataset)),
                                                  train_dataset.y):
-            train = self._get_dataset(index=train_index,
-                                      transform=self.train_transform)
-            valid = self._get_dataset(index=test_index,
-                                      transform=self.test_transform)
+            train = self._sample_dataset(dataset=train_dataset.artifacts,
+                                         index=train_index,
+                                         transform=self.train_transform)
+            valid = self._sample_dataset(dataset=train_dataset.artifacts,
+                                         index=test_index,
+                                         transform=self.test_transform)
             yield train, valid
 
-    def _get_dataset(self, index: List[int],
-                     transform: Transform) -> RoiDataset:
+    def _sample_dataset(self, dataset: List[ModelInput],
+                        index: List[int],
+                        transform: Transform) -> RoiDataset:
         """Returns RoiDataset of Artifacts at index
 
         Args:
+            dataset:
+                Initial dataset to sample from
             index:
                 List of index of artifacts to construct dataset
             transform:
@@ -63,19 +70,8 @@ class DataSplitter:
             RoiDataset
         """
         index = set(index)
-        artifacts = [x for i, x in enumerate(self._artifacts) if i in index]
+        artifacts = [x for i, x in enumerate(dataset) if i in index]
         return RoiDataset(dataset=artifacts,
                           transform=transform,
                           exclude_mask=self.exclude_mask,
                           image_dim=self.image_dim)
-
-
-if __name__ == '__main__':
-    def main():
-        from pathlib import Path
-        dest = Path('/tmp/artifacts')
-        dataset = VisualBehaviorDataset(artifact_destination=dest, debug=True)
-        data_splitter = DataSplitter(artifacts=dataset.dataset, seed=1234)
-        train, test = data_splitter.get_train_test_split(test_size=.3)
-
-    main()
