@@ -83,6 +83,7 @@ def inference(model: torch.nn.Module,
             for data, _ in test_loader:
                 if use_cuda:
                     data = data.cuda()
+                    model = model.cuda()
 
                 with torch.no_grad():
                     output = model(data)
