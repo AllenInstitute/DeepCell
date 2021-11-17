@@ -1,4 +1,7 @@
-from setuptools import setup
+from setuptools import setup, find_packages
+
+with open("requirements.txt", "r") as f:
+    required = f.read().splitlines()
 
 setup(
       name="DeepCell",
@@ -9,5 +12,7 @@ setup(
       author_email="adam.amster@alleninstitute.org",
       url="https://github.com/AllenInstitute/DeepCell",
       package_dir={"": "src"},
-      setup_requires=["setuptools_scm"]
+      packages=find_packages(where="src"),
+      setup_requires=["setuptools_scm"],
+      install_requires=required
 )

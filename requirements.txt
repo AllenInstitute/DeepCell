@@ -1,0 +1,11 @@
+setuptools
+torch
+torchvision
+numpy
+pillow
+scikit-learn
+imgaug
+pandas
+matplotlib
+jsonlines
+slapp
