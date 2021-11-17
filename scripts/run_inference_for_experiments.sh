@@ -17,6 +17,8 @@ model_weights_path=$5
 out_dir=$6
 conda_env=$7
 
+conda activate "$conda_env"
+pip install git+https://github.com/AllenInstitute/segmentation-labeling-app.git
 
 readarray -t exp_ids < "${experiment_ids_path}"
 
