@@ -8,7 +8,7 @@ imgaug
 pandas
 matplotlib
 jsonlines
-slapp
+git+https://github.com/AllenInstitute/segmentation-labeling-app.git
 boto3
 tqdm
 croissant-ml
