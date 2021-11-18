@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 from sklearn.model_selection import StratifiedShuffleSplit, StratifiedKFold
@@ -55,7 +55,7 @@ class DataSplitter:
 
     def _sample_dataset(self, dataset: List[ModelInput],
                         index: List[int],
-                        transform: Transform) -> RoiDataset:
+                        transform: Optional[Transform] = None) -> RoiDataset:
         """Returns RoiDataset of Artifacts at index
 
         Args:
@@ -64,13 +64,12 @@ class DataSplitter:
             index:
                 List of index of artifacts to construct dataset
             transform:
-                transform to pass to RoiDataset
+                optional transform to pass to RoiDataset
 
         Returns
             RoiDataset
         """
-        index = set(index)
-        artifacts = [x for i, x in enumerate(dataset) if i in index]
+        artifacts = [dataset[i] for i in index]
         return RoiDataset(model_inputs=artifacts,
                           transform=transform,
                           exclude_mask=self.exclude_mask,
