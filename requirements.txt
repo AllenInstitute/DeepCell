@@ -8,4 +8,6 @@ imgaug
 pandas
 matplotlib
 jsonlines
-slapp
+boto3
+tqdm
+croissant-ml

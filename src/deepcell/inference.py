@@ -8,7 +8,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from deepcell.metrics import Metrics
-from deepcell.roi_dataset import RoiDataset
+from deepcell.datasets.roi_dataset import RoiDataset
 
 
 def inference(model: torch.nn.Module,
@@ -18,7 +18,6 @@ def inference(model: torch.nn.Module,
               threshold=0.5,
               ensemble=True,
               cv_fold=None,
-              use_cuda=True,
               tta_num_iters=0) -> Tuple[Metrics, pd.DataFrame]:
     """
     Args:
@@ -68,6 +67,8 @@ def inference(model: torch.nn.Module,
 
     y_scores = np.zeros((len(models), len(dataset), num_iters))
 
+    use_cuda = torch.cuda.is_available()
+
     for i, model_checkpoint in enumerate(models):
         map_location = None if use_cuda else torch.device('cpu')
         state_dict = torch.load(f'{checkpoint_path}/{model_checkpoint}',
@@ -75,6 +76,9 @@ def inference(model: torch.nn.Module,
         model.load_state_dict(state_dict)
 
         model.eval()
+
+        if use_cuda:
+            model.cuda()
 
         for iter in range(num_iters):
             prev_start = 0
@@ -115,6 +119,7 @@ def inference(model: torch.nn.Module,
     if has_labels:
         metrics.update_accuracies(y_true=dataset.y, y_score=y_scores, threshold=threshold)
 
-    df = pd.DataFrame({'roi-id': dataset.roi_ids, 'y_score': y_scores, 'y_pred': y_preds})
+    roi_ids = [x.roi_id for x in dataset.model_inputs]
+    df = pd.DataFrame({'roi-id': roi_ids, 'y_score': y_scores, 'y_pred': y_preds})
 
     return metrics, df

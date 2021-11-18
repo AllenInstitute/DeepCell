@@ -15,9 +15,10 @@ movie_path=$3
 correlation_projection_path=$4
 model_weights_path=$5
 out_dir=$6
-use_cuda=$7
-conda_env=$8
+conda_env=$7
 
+conda activate "$conda_env"
+pip install git+https://github.com/AllenInstitute/segmentation-labeling-app.git
 
 readarray -t exp_ids < "${experiment_ids_path}"
 
@@ -59,8 +60,7 @@ $conda_env -m deepcell.modules.run_inference \
   --rois_path "${rois_path}" \
   --data_dir "${artifact_out_dir}" \
   --model_weights_path "${model_weights_path}" \
-  --out_path "${predictions_out_dir}" \
-  --use_cuda "${use_cuda}"
+  --out_path "${predictions_out_dir}"
 
 echo "Removing ${artifact_out_dir}"
 

@@ -6,8 +6,9 @@ from torch.utils.data import DataLoader
 from torchvision.transforms import transforms
 from imgaug import augmenters as iaa
 
+from deepcell.datasets.model_input import ModelInput
 from deepcell.inference import inference
-from deepcell.roi_dataset import RoiDataset
+from deepcell.datasets.roi_dataset import RoiDataset
 from deepcell.transform import Transform
 from deepcell.models.VggBackbone import VggBackbone
 
@@ -17,8 +18,7 @@ def run_inference_for_experiment(
         rois_path: Path,
         data_dir: Path,
         model_weights_path: Path,
-        output_path: Path,
-        use_cuda=True):
+        output_path: Path):
     """
     Runs inference for experiment and produces csv of predictions
 
@@ -52,12 +52,13 @@ def run_inference_for_experiment(
 
     with open(rois_path) as f:
         rois = json.load(f)
-        roi_ids = [f'{experiment_id}_{x["id"]}' for x in rois]
 
-    test = RoiDataset(manifest_path=None, data_dir=data_dir,
-                      roi_ids=roi_ids,
-                      transform=test_transform, has_labels=False,
-                      parse_from_manifest=False)
+    model_inputs = [
+        ModelInput.from_data_dir(data_dir=data_dir,
+                                 experiment_id=experiment_id,
+                                 roi_id=roi['id']) for roi in rois]
+    test = RoiDataset(model_inputs=model_inputs,
+                      transform=test_transform)
     test_dataloader = DataLoader(dataset=test, shuffle=False, batch_size=64)
 
     cnn = torchvision.models.vgg11_bn(pretrained=True, progress=False)
@@ -66,8 +67,7 @@ def run_inference_for_experiment(
                       freeze_up_to_layer=15)
     _, inference_res = inference(model=cnn, test_loader=test_dataloader,
                                  has_labels=False,
-                                 checkpoint_path=str(model_weights_path),
-                                 use_cuda=use_cuda)
+                                 checkpoint_path=str(model_weights_path))
     inference_res['experiment_id'] = experiment_id
 
     inference_res.to_csv(output_path / f'{experiment_id}_inference.csv',
@@ -85,8 +85,6 @@ if __name__ == '__main__':
                         help='Path to trained model weights')
     parser.add_argument('--out_path', required=True, help='Where to store '
                                                           'predictions')
-    parser.add_argument('--use_cuda', required=True, help='Whether on GPU')
-
     args = parser.parse_args()
 
     rois_path = Path(args.rois_path)
@@ -94,11 +92,6 @@ if __name__ == '__main__':
     model_weights_path = Path(args.model_weights_path)
     out_path = Path(args.out_path)
 
-    if args.use_cuda not in('true', 'false'):
-        raise ValueError('use_cuda must be one of "true" or "false"')
-
-    use_cuda = args.use_cuda == 'true'
-
     run_inference_for_experiment(experiment_id=args.experiment_id, rois_path=rois_path,
-                                 data_dir=data_dir, output_path=out_path, use_cuda=use_cuda,
+                                 data_dir=data_dir, output_path=out_path,
                                  model_weights_path=model_weights_path)
