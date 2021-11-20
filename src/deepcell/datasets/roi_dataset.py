@@ -111,6 +111,9 @@ class RoiDataset(Dataset):
             mask = Image.open(f)
             mask = np.array(mask)
 
+        avg[np.where(mask == 0)] = 0
+        max[np.where(mask == 0)] = 0
+
         res = np.zeros((*self._image_dim, 3), dtype=np.uint8)
         res[:, :, 0] = avg
         res[:, :, 1] = max
@@ -144,10 +147,20 @@ class RoiDataset(Dataset):
 
 
 if __name__ == '__main__':
+    from torchvision import transforms
+    from imgaug import augmenters as iaa
     def main():
-        from deepcell.datasets.visual_behavior_dataset import VisualBehaviorDataset
-        ds = VisualBehaviorDataset(debug=True,
-                                   artifact_destination=Path('/tmp/artifacts'))
-        dataset = RoiDataset(model_inputs=ds.dataset)
-        dataset[0]
+        artifacts = [ModelInput.from_data_dir(
+            data_dir='/tmp/artifacts',
+            experiment_id='871196379', roi_id='1')]
+        all_transform = transforms.Compose([
+            iaa.Sequential([
+                iaa.CenterCropToFixedSize(height=60, width=60)
+            ]).augment_image
+        ])
+
+        test_transform = Transform(all_transform=all_transform)
+        dataset = RoiDataset(model_inputs=artifacts, transform=test_transform)
+        for _ in dataset:
+            pass
     main()
