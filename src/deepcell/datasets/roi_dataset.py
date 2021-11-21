@@ -17,7 +17,8 @@ class RoiDataset(Dataset):
                  transform: Transform = None,
                  debug=False,
                  cre_line=None,
-                 exclude_mask=False):
+                 exclude_mask=False,
+                 mask_out_projections=False):
         """
 
         Args:
@@ -34,6 +35,9 @@ class RoiDataset(Dataset):
                 Whether to limit to a cre_line
             exclude_mask:
                 Whether to exclude the mask from input to the model
+            mask_out_projections:
+                Whether to mask out projections to only include pixels in
+                the mask
         """
         super().__init__()
 
@@ -41,6 +45,7 @@ class RoiDataset(Dataset):
         self._image_dim = image_dim
         self.transform = transform
         self._exclude_mask = exclude_mask
+        self._mask_out_projections = mask_out_projections
         self._y = np.array([int(x.label == 'cell') for x in self._model_inputs])
 
         if cre_line:
@@ -111,8 +116,9 @@ class RoiDataset(Dataset):
             mask = Image.open(f)
             mask = np.array(mask)
 
-        avg[np.where(mask == 0)] = 0
-        max[np.where(mask == 0)] = 0
+        if self._mask_out_projections:
+            avg[np.where(mask == 0)] = 0
+            max[np.where(mask == 0)] = 0
 
         res = np.zeros((*self._image_dim, 3), dtype=np.uint8)
         res[:, :, 0] = avg

@@ -12,19 +12,23 @@ from deepcell.transform import Transform
 class DataSplitter:
     def __init__(self, model_inputs: List[ModelInput], train_transform=None,
                  test_transform=None, seed=None,
-                 cre_line=None, exclude_mask=False, image_dim=(128, 128)):
+                 cre_line=None, exclude_mask=False,
+                 mask_out_projections=False, image_dim=(128, 128)):
         self._model_inputs = model_inputs
         self.train_transform = train_transform
         self.test_transform = test_transform
         self.seed = seed
         self.cre_line = cre_line
         self.exclude_mask = exclude_mask
+        self.mask_out_projections = mask_out_projections
         self.image_dim = image_dim
 
     def get_train_test_split(self, test_size):
-        full_dataset = RoiDataset(model_inputs=self._model_inputs,
-                                  cre_line=self.cre_line,
-                                  image_dim=self.image_dim)
+        full_dataset = RoiDataset(
+            model_inputs=self._model_inputs,
+            cre_line=self.cre_line,
+            mask_out_projections=self.mask_out_projections,
+            image_dim=self.image_dim)
         sss = StratifiedShuffleSplit(n_splits=2, test_size=test_size,
                                      random_state=self.seed)
         train_index, test_index = next(sss.split(np.zeros(len(full_dataset)),
@@ -73,4 +77,5 @@ class DataSplitter:
         return RoiDataset(model_inputs=artifacts,
                           transform=transform,
                           exclude_mask=self.exclude_mask,
+                          mask_out_projections=self.mask_out_projections,
                           image_dim=self.image_dim)
