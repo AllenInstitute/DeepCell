@@ -22,21 +22,34 @@ class VisualBehaviorExtendedDataset(VisualBehaviorDataset):
     def _get_manifests(self) -> Dict[str, Generator[Dict, None, None]]:
         manifests = super()._get_manifests()
 
-        def update_vasculature_manifest(manifest):
+        def update_manifest(manifest,
+                            name: str,
+                            label: str,
+                            creation_date: datetime):
+            """
+            Adds key <name> which contains label, as well as creation date
+            Args:
+                manifest:
+                    The manifest to add to
+                name:
+                    Name of the "project"
+                label:
+                    Label to assign to each observation
+                creation_date:
+                    Date this data was compiled
+
+            Returns:
+
+            """
             new_manifest = []
             for x in manifest:
-                roi_id = x['roi-id']
-                exp_id = x['experiment-id']
-
                 x[name] = {
                     # These ROIs are all not cell
-                    'majorityLabel': 'not cell'
+                    'majorityLabel': label
                 }
 
                 x[f'{name}-metadata'] = {
-                    'creation-date': datetime.datetime(year=2021,
-                                                       month=11,
-                                                       day=11)
+                    'creation-date': creation_date
                 }
                 new_manifest.append(x)
 
@@ -46,7 +59,17 @@ class VisualBehaviorExtendedDataset(VisualBehaviorDataset):
         for i, (file, manifest) in enumerate(manifests.items()):
             file_name = Path(file).name
             if file_name == 'vasculature.manifest':
-                name = 'add_vasculature'
-                manifest = update_vasculature_manifest(manifest=manifest)
+                manifest = update_manifest(manifest=manifest,
+                                           name='add_vasculature',
+                                           creation_date=datetime.datetime(
+                                             year=2021, month=11, day=11),
+                                           label='not cell')
+                manifests[file] = manifest
+            elif file_name == 'large_processes_manifest':
+                manifest = update_manifest(manifest=manifest,
+                                           name='large_processes',
+                                           creation_date=datetime.datetime(
+                                             year=2021, month=11, day=22),
+                                           label='cell')
                 manifests[file] = manifest
         return manifests
