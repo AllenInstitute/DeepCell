@@ -65,7 +65,7 @@ class VisualBehaviorExtendedDataset(VisualBehaviorDataset):
                                              year=2021, month=11, day=11),
                                            label='not cell')
                 manifests[file] = manifest
-            elif file_name == 'large_processes_manifest':
+            elif file_name == 'large_processes_manifest.json':
                 manifest = update_manifest(manifest=manifest,
                                            name='large_processes',
                                            creation_date=datetime.datetime(
