@@ -24,6 +24,13 @@ S3_MANIFEST_PREFIX = 'visual_behavior/manifests'
 # The minimum global ROI id that was used by SLAPP/sagemaker
 GLOBAL_ROI_ID_MIN = 1e6
 
+# These labeling projects were added after first week of december 2020 and
+# were found to hurt performance
+EXCLUDE_PROJECTS = [
+    'ophys-experts-slc-oct-2020_ophys-experts-go-big-or-go-home',
+    'ophys-expert-danielsf-additions'
+]
+
 
 class VisualBehaviorDataset:
     """Class representing the visual behavior dataset from AWS sagemaker
@@ -48,6 +55,9 @@ class VisualBehaviorDataset:
                 If True, will only download a few files
 
         """
+        if exclude_projects is None:
+            exclude_projects = EXCLUDE_PROJECTS
+
         self._logger = logging.getLogger(__name__)
         self._exclude_projects = exclude_projects
         self._s3_manifest_prefix = s3_manifest_prefix
