@@ -18,7 +18,9 @@ def run_inference_for_experiment(
         rois_path: Path,
         data_dir: Path,
         model_weights_path: Path,
-        output_path: Path):
+        output_path: Path,
+        center_crop_size=(60, 60)
+        ):
     """
     Runs inference for experiment and produces csv of predictions
 
@@ -34,14 +36,15 @@ def run_inference_for_experiment(
             Path to Pytorch model weights that were saved using torch.save
         output_path:
             Path to save predictions csv
-        use_cuda:
-            True if on GPU
+        center_crop_size:
+            Height, width to center crop inputs
     Returns:
         None, but writes predictions csv to disk
     """
     all_transform = transforms.Compose([
         iaa.Sequential([
-            iaa.CenterCropToFixedSize(height=60, width=60)
+            iaa.CenterCropToFixedSize(height=center_crop_size[0],
+                                      width=center_crop_size[1])
         ]).augment_image,
         transforms.ToTensor(),
         transforms.Normalize(
@@ -63,8 +66,7 @@ def run_inference_for_experiment(
 
     cnn = torchvision.models.vgg11_bn(pretrained=True, progress=False)
     cnn = VggBackbone(model=cnn, truncate_to_layer=15,
-                      classifier_cfg=[512, 512], dropout_prob=.7,
-                      freeze_up_to_layer=15)
+                      classifier_cfg=[512, 512], dropout_prob=.7)
     _, inference_res = inference(model=cnn, test_loader=test_dataloader,
                                  has_labels=False,
                                  checkpoint_path=str(model_weights_path))
@@ -85,6 +87,9 @@ if __name__ == '__main__':
                         help='Path to trained model weights')
     parser.add_argument('--out_path', required=True, help='Where to store '
                                                           'predictions')
+    parser.add_argument('--center_crop_size', default='60x60',
+                        help='Height, width to center crop inputs. '
+                             'Should be of form "60x60"')
     args = parser.parse_args()
 
     rois_path = Path(args.rois_path)
@@ -92,6 +97,9 @@ if __name__ == '__main__':
     model_weights_path = Path(args.model_weights_path)
     out_path = Path(args.out_path)
 
+    center_crop_size = args.center_crop_size.split('x')
+
     run_inference_for_experiment(experiment_id=args.experiment_id, rois_path=rois_path,
                                  data_dir=data_dir, output_path=out_path,
-                                 model_weights_path=model_weights_path)
+                                 model_weights_path=model_weights_path,
+                                 center_crop_size=center_crop_size)
