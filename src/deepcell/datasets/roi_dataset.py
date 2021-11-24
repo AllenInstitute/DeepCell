@@ -18,7 +18,8 @@ class RoiDataset(Dataset):
                  debug=False,
                  cre_line=None,
                  exclude_mask=False,
-                 mask_out_projections=False):
+                 mask_out_projections=False,
+                 use_correlation_projection=False):
         """
 
         Args:
@@ -38,6 +39,8 @@ class RoiDataset(Dataset):
             mask_out_projections:
                 Whether to mask out projections to only include pixels in
                 the mask
+            use_correlation_projection
+                Whether to use correlation projection instead of avg projection
         """
         super().__init__()
 
@@ -47,6 +50,7 @@ class RoiDataset(Dataset):
         self._exclude_mask = exclude_mask
         self._mask_out_projections = mask_out_projections
         self._y = np.array([int(x.label == 'cell') for x in self._model_inputs])
+        self._use_correlation_projection = use_correlation_projection
 
         if cre_line:
             experiment_genotype_map = get_experiment_genotype_map()
@@ -104,34 +108,39 @@ class RoiDataset(Dataset):
         Returns:
             A numpy array of type uint8 and shape *dim, 3
         """
-        with open(obs.avg_projection_path, 'rb') as f:
-            avg = Image.open(f)
-            avg = np.array(avg)
+        res = np.zeros((*self._image_dim, 3), dtype=np.uint8)
+
+        if self._use_correlation_projection:
+            with open(obs.correlation_projection_path, 'rb') as f:
+                corr = Image.open(f)
+                corr = np.array(corr)
+                res[:, :, 0] = corr
+        else:
+            with open(obs.avg_projection_path, 'rb') as f:
+                avg = Image.open(f)
+                avg = np.array(avg)
+                res[:, :, 0] = avg
 
         with open(obs.max_projection_path, 'rb') as f:
             max = Image.open(f)
             max = np.array(max)
+            res[:, :, 1] = max
 
         with open(obs.mask_path, 'rb') as f:
             mask = Image.open(f)
             mask = np.array(mask)
+            if self._exclude_mask:
+                res[:, :, 2] = max
+            else:
+                try:
+                    res[:, :, 2] = mask
+                except ValueError:
+                    # TODO fix this issue
+                    pass
 
         if self._mask_out_projections:
-            avg[np.where(mask == 0)] = 0
-            max[np.where(mask == 0)] = 0
-
-        res = np.zeros((*self._image_dim, 3), dtype=np.uint8)
-        res[:, :, 0] = avg
-        res[:, :, 1] = max
-
-        if self._exclude_mask:
-            res[:, :, 2] = max
-        else:
-            try:
-                res[:, :, 2] = mask
-            except ValueError:
-                # TODO fix this issue
-                pass
+            res[:, :, 0][np.where(mask == 0)] = 0
+            res[:, :, 1][np.where(mask == 0)] = 0
 
         return res
 

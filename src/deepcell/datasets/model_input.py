@@ -6,9 +6,10 @@ class ModelInput:
     def __init__(self,
                  roi_id: str,
                  experiment_id: str,
-                 max_projection_path: Path,
                  avg_projection_path: Path,
                  mask_path: Path,
+                 max_projection_path: Optional[Path] = None,
+                 correlation_projection_path: Optional[Path] = None,
                  project_name: Optional[str] = None,
                  label: Optional[str] = None):
         """
@@ -21,6 +22,8 @@ class ModelInput:
                 Experiment id
             max_projection_path:
                 max projection path
+            correlation_projection_path:
+                correlation projection path
             avg_projection_path:
                 average projection path
             mask_path:
@@ -32,9 +35,13 @@ class ModelInput:
                 optional label assigned to this example
                 will be None if at test time (not labeled)
         """
+        if max_projection_path is None and correlation_projection_path is None:
+            raise ValueError('Must supply one of max_projection_path or '
+                             'correlation_projection_path')
         self._roi_id = roi_id
         self._experiment_id = experiment_id
         self._max_projection_path = max_projection_path
+        self._correlation_projection_path = correlation_projection_path
         self._avg_projection_path = avg_projection_path
         self._mask_path = mask_path
         self._project_name = project_name
@@ -49,8 +56,12 @@ class ModelInput:
         return self._experiment_id
 
     @property
-    def max_projection_path(self) -> Path:
+    def max_projection_path(self) -> Optional[Path]:
         return self._max_projection_path
+
+    @property
+    def correlation_projection_path(self) -> Optional[Path]:
+        return self._correlation_projection_path
 
     @property
     def avg_projection_path(self) -> Path:
@@ -83,11 +94,52 @@ class ModelInput:
             roi_id
                 ROI id
         """
+        def get_path(data_dir: Path, artifact_type: str, experiment_id: str,
+                     roi_id: str):
+            """Checks whether path format is
+            <artifact_type>_<exp_id>_<roi_id> or
+            <artifact_type>_exp_<exp_id>_roi_<roi_id>"""
+            if (data_dir / f'{artifact_type}_{experiment_id}_'
+                           f'{roi_id}.png').exists():
+                return (data_dir / f'{artifact_type}_{experiment_id}_'
+                           f'{roi_id}.png')
+            elif (data_dir / f'{artifact_type}_exp_{experiment_id}_roi_'
+                             f'{roi_id}.png').exists():
+                return (data_dir / f'{artifact_type}_exp_{experiment_id}_roi_'
+                             f'{roi_id}.png')
+            else:
+                raise RuntimeError(f'{artifact_type} could not be found for '
+                                   f'experiment id {experiment_id}, roi id '
+                                   f'{roi_id}')
         data_dir = Path(data_dir)
+
+        try:
+            correlation_projection_path = get_path(data_dir=data_dir,
+                                                   artifact_type='corr',
+                                                   experiment_id=experiment_id,
+                                                   roi_id=roi_id)
+        except RuntimeError:
+            # correlation projection doesn't exist
+            correlation_projection_path = None
+
+        avg_proj_path = get_path(data_dir=data_dir,
+                                 artifact_type='avg',
+                                 experiment_id=experiment_id,
+                                 roi_id=roi_id)
+        mask_path = get_path(data_dir=data_dir,
+                             artifact_type='mask',
+                             experiment_id=experiment_id,
+                             roi_id=roi_id)
+        max_path = get_path(data_dir=data_dir,
+                            artifact_type='max',
+                            experiment_id=experiment_id,
+                            roi_id=roi_id)
+
         return ModelInput(
             experiment_id=experiment_id,
-            avg_projection_path=data_dir / f'avg_{experiment_id}_{roi_id}.png',
-            mask_path=data_dir / f'mask_{experiment_id}_{roi_id}.png',
-            max_projection_path=data_dir / f'max_{experiment_id}_{roi_id}.png',
+            avg_projection_path=avg_proj_path,
+            mask_path=mask_path,
+            correlation_projection_path=correlation_projection_path,
+            max_projection_path=max_path,
             roi_id=roi_id
         )

@@ -19,8 +19,9 @@ def run_inference_for_experiment(
         data_dir: Path,
         model_weights_path: Path,
         output_path: Path,
-        center_crop_size=(60, 60)
-        ):
+        center_crop_size=(60, 60),
+        use_correlation_projection=False
+    ):
     """
     Runs inference for experiment and produces csv of predictions
 
@@ -38,6 +39,8 @@ def run_inference_for_experiment(
             Path to save predictions csv
         center_crop_size:
             Height, width to center crop inputs
+        use_correlation_projection:
+            Whether to use correlation projection instead of avg projection
     Returns:
         None, but writes predictions csv to disk
     """
@@ -61,7 +64,8 @@ def run_inference_for_experiment(
                                  experiment_id=experiment_id,
                                  roi_id=roi['id']) for roi in rois]
     test = RoiDataset(model_inputs=model_inputs,
-                      transform=test_transform)
+                      transform=test_transform,
+                      use_correlation_projection=use_correlation_projection)
     test_dataloader = DataLoader(dataset=test, shuffle=False, batch_size=64)
 
     cnn = torchvision.models.vgg11_bn(pretrained=True, progress=False)
