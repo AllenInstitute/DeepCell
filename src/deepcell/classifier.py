@@ -135,6 +135,16 @@ class Classifier:
                     time_since_best_epoch += 1
                     if time_since_best_epoch > self.early_stopping:
                         logger.info('Stopping due to early stopping')
+                        torch.save({
+                            'train': {
+                                'losses': all_train_metrics.losses[:epoch],
+                                'auprs': all_train_metrics.auprs[:epoch]
+                            },
+                            'val': {
+                                'losses': all_val_metrics.losses[:epoch],
+                                'auprs': all_val_metrics.auprs[:epoch]
+                            }
+                        }, f'{self.save_path}/{eval_fold}_performance.pkl')
                         return all_train_metrics, all_val_metrics
 
             if not self.scheduler_step_after_batch:
@@ -152,7 +162,6 @@ class Classifier:
                             )
 
         return all_train_metrics, all_val_metrics
-
 
     def _reset(self):
         # reset model weights
