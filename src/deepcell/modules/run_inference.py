@@ -94,6 +94,8 @@ if __name__ == '__main__':
     parser.add_argument('--center_crop_size', default='60x60',
                         help='Height, width to center crop inputs. '
                              'Should be of form "60x60"')
+    parser.add_argument('--use_correlation_projection', action='store_true',
+                        default=False)
     args = parser.parse_args()
 
     rois_path = Path(args.rois_path)
@@ -104,7 +106,9 @@ if __name__ == '__main__':
     center_crop_size = tuple(
         [int(x) for x in args.center_crop_size.split('x')])
 
-    run_inference_for_experiment(experiment_id=args.experiment_id, rois_path=rois_path,
-                                 data_dir=data_dir, output_path=out_path,
-                                 model_weights_path=model_weights_path,
-                                 center_crop_size=center_crop_size)
+    run_inference_for_experiment(
+        experiment_id=args.experiment_id, rois_path=rois_path,
+        data_dir=data_dir, output_path=out_path,
+        model_weights_path=model_weights_path,
+        center_crop_size=center_crop_size,
+        use_correlation_projection=args.use_correlation_projection)
