@@ -97,7 +97,8 @@ if __name__ == '__main__':
     model_weights_path = Path(args.model_weights_path)
     out_path = Path(args.out_path)
 
-    center_crop_size = args.center_crop_size.split('x')
+    center_crop_size = tuple(
+        [int(x) for x in args.center_crop_size.split('x')])
 
     run_inference_for_experiment(experiment_id=args.experiment_id, rois_path=rois_path,
                                  data_dir=data_dir, output_path=out_path,
