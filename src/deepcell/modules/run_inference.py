@@ -95,7 +95,8 @@ if __name__ == '__main__':
                         help='Height, width to center crop inputs. '
                              'Should be of form "60x60"')
     parser.add_argument('--use_correlation_projection', action='store_true',
-                        default=False)
+                        default=False, help='Whether to use correlation '
+                                            'projection instead of avg')
     args = parser.parse_args()
 
     rois_path = Path(args.rois_path)
