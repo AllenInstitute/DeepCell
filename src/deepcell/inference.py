@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Tuple, Union
+from typing import Tuple, Union, Dict
 
 import numpy as np
 import os
@@ -146,7 +146,7 @@ def cv_performance(
         model: torch.nn.Module, data_splitter: DataSplitter,
         train: RoiDataset,
         checkpoint_path: Union[str, Path],
-        threshold=0.5) -> Tuple[pd.DataFrame, float, float, float]:
+        threshold=0.5) -> Tuple[pd.DataFrame, Dict]:
     """
     Evaluates each of the k trained models on the respective validation set
     Returns the CV predictions as well as performance stats
@@ -163,7 +163,8 @@ def cv_performance(
         threshold
             classification threshold
     Returns:
-        Dataframe of predictions, mean precision, recall, aupr across folds
+        Dataframe of predictions, precision, recall, aupr (mean, std) across
+        folds
     """
     y_scores = []
     y_preds = []
@@ -201,7 +202,12 @@ def cv_performance(
         index=roi_ids)
     df['error'] = (df['y_true'] - df['y_score']).abs().round(2)
 
-    precision = sum(precisions) / len(precisions)
-    recall = sum(recalls) / len(recalls)
-    aupr = sum(auprs) / len(auprs)
-    return df.sort_values('error', ascending=False), precision, recall, aupr
+    precisions = np.array(precisions)
+    recalls = np.array(recalls)
+    auprs = np.array(auprs)
+    metrics = {
+        'precision': (precisions.mean(), precisions.std()),
+        'recall': (recalls.mean(), recalls.std()),
+        'aupr': (auprs.mean(), auprs.std())
+    }
+    return df.sort_values('error', ascending=False), metrics
