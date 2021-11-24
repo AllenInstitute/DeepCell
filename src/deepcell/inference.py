@@ -1,14 +1,19 @@
-from typing import Tuple
+from pathlib import Path
+from typing import Tuple, Union
 
 import numpy as np
 import os
 import pandas as pd
 
 import torch
+from sklearn.metrics import precision_score, recall_score, \
+    average_precision_score
 from torch.utils.data import DataLoader
 
 from deepcell.metrics import Metrics
 from deepcell.datasets.roi_dataset import RoiDataset
+
+from src.deepcell.data_splitter import DataSplitter
 
 
 def inference(model: torch.nn.Module,
@@ -18,7 +23,8 @@ def inference(model: torch.nn.Module,
               threshold=0.5,
               ensemble=True,
               cv_fold=None,
-              tta_num_iters=0) -> Tuple[Metrics, pd.DataFrame]:
+              tta_num_iters=0,
+              tta_stat='avg') -> Tuple[Metrics, pd.DataFrame]:
     """
     Args:
         model:
@@ -40,6 +46,8 @@ def inference(model: torch.nn.Module,
             Should be True if on GPU
         tta_num_iters:
             Number of times to perform test-time augmentation (default 0)
+        tta_stat
+            Stat to apply to aggregate tta iters
 
     Returns:
         Tuple of Metrics object and dataframe of predictions
@@ -59,7 +67,8 @@ def inference(model: torch.nn.Module,
 
     if ensemble:
         models = os.listdir(checkpoint_path)
-        models = [model for model in models if model != 'model_init.pt']
+        models = [model for model in models if model != 'model_init.pt' and
+                  Path(model).suffix == '.pt']
     else:
         models = [f'{cv_fold}_model.pt']
 
@@ -110,7 +119,15 @@ def inference(model: torch.nn.Module,
             print(f'{model_checkpoint} f1: {f1}')
 
     # average over num_iters
-    y_scores = y_scores.mean(axis=-1)
+    if tta_num_iters > 0:
+        if tta_stat == 'avg':
+            y_scores = y_scores.mean(axis=-1)
+        elif tta_stat == 'max':
+            y_scores = y_scores.max(axis=-1)
+        else:
+            raise ValueError('tta_stat must by either "max" or "avg"')
+    else:
+        y_scores = y_scores.mean(axis=-1)
 
     # average over len(models)
     y_scores = y_scores.mean(axis=0)
@@ -123,3 +140,68 @@ def inference(model: torch.nn.Module,
     df = pd.DataFrame({'roi-id': roi_ids, 'y_score': y_scores, 'y_pred': y_preds})
 
     return metrics, df
+
+
+def cv_performance(
+        model: torch.nn.Module, data_splitter: DataSplitter,
+        train: RoiDataset,
+        checkpoint_path: Union[str, Path],
+        threshold=0.5) -> Tuple[pd.DataFrame, float, float, float]:
+    """
+    Evaluates each of the k trained models on the respective validation set
+    Returns the CV predictions as well as performance stats
+
+    Args:
+        model:
+            Model to evaluate
+        data_splitter:
+            DataSplitter instance
+        train:
+            Train dataset
+        checkpoint_path:
+            Model weights to load
+        threshold
+            classification threshold
+    Returns:
+        Dataframe of predictions, mean precision, recall, aupr across folds
+    """
+    y_scores = []
+    y_preds = []
+    y_true = []
+    roi_ids = []
+    precisions = []
+    recalls = []
+    auprs = []
+
+    for i, (_, val) in enumerate(
+            data_splitter.get_cross_val_split(train_dataset=train)):
+        val_loader = DataLoader(dataset=val, shuffle=False, batch_size=64)
+        _, res = inference(model=model, test_loader=val_loader,
+                           threshold=threshold,
+                           cv_fold=i, ensemble=False,
+                           checkpoint_path=checkpoint_path)
+
+        res['y_true'] = val.y
+
+        y_scores += res['y_score'].tolist()
+        y_preds += res['y_pred'].tolist()
+        y_true += res['y_true'].tolist()
+        roi_ids += res['roi-id'].tolist()
+
+        precision = precision_score(y_pred=res['y_pred'], y_true=res['y_true'])
+        recall = recall_score(y_pred=res['y_pred'], y_true=res['y_true'])
+        aupr = average_precision_score(y_score=res['y_score'],
+                                       y_true=res['y_true'])
+        precisions.append(precision)
+        recalls.append(recall)
+        auprs.append(aupr)
+
+    df = pd.DataFrame(
+        {'y_true': y_true, 'y_score': y_scores, 'y_pred': y_preds},
+        index=roi_ids)
+    df['error'] = (df['y_true'] - df['y_score']).abs().round(2)
+
+    precision = sum(precisions) / len(precisions)
+    recall = sum(recalls) / len(recalls)
+    aupr = sum(auprs) / len(auprs)
+    return df.sort_values('error', ascending=False), precision, recall, aupr
