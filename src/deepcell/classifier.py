@@ -77,7 +77,7 @@ class Classifier:
         all_train_metrics = TrainingMetrics(n_epochs=self.n_epochs)
         all_val_metrics = TrainingMetrics(n_epochs=self.n_epochs)
 
-        best_epoch_metric = float('inf')
+        best_epoch_metric = -float('inf')
         time_since_best_epoch = 0
 
         for epoch in range(self.n_epochs):
@@ -124,7 +124,7 @@ class Classifier:
                                          loss=epoch_val_metrics.loss,
                                          aupr=epoch_val_metrics.AUPR)
 
-                if epoch_val_metrics.loss < best_epoch_metric:
+                if epoch_val_metrics.AUPR > best_epoch_metric:
                     if save_model:
                         torch.save(self.model.state_dict(), f'{self.save_path}/{eval_fold}_model.pt')
                     all_train_metrics.best_epoch = epoch
