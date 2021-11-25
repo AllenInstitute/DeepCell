@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 from pathlib import Path
+from typing import Optional
 
 import torch
 from torch.utils.data import DataLoader
@@ -61,12 +62,39 @@ class Classifier:
             if self.model_load_path is not None:
                 x = torch.load(Path(self.model_load_path) / f'{i}_model.pt')
                 self.model.load_state_dict(x['state_dict'])
+                train_metrics = TrainingMetrics(
+                    n_epochs=self.n_epochs,
+                    losses=x['performance']['train']['losses'],
+                    auprs=x['performance']['train']['auprs'],
+                    best_epoch=x['performance']['train']['best_epoch'],
+                    best_metric=x['performance']['train']['best_metric'],
+                    best_metric_value=x['performance']['train'][
+                        'best_metric_value'],
+                    metric_larger_is_better=x['performance']['train'][
+                        'metric_larger_is_better']
+                )
+                val_metrics = TrainingMetrics(
+                    n_epochs=self.n_epochs,
+                    losses=x['performance']['val']['losses'],
+                    auprs=x['performance']['val']['auprs'],
+                    best_epoch=x['performance']['val']['best_epoch'],
+                    best_metric=x['performance']['val']['best_metric'],
+                    best_metric_value=x['performance']['val'][
+                        'best_metric_value'],
+                    metric_larger_is_better=x['performance']['val'][
+                        'metric_larger_is_better']
+                )
+            else:
+                train_metrics = TrainingMetrics(n_epochs=self.n_epochs)
+                val_metrics = TrainingMetrics(n_epochs=self.n_epochs)
 
             train_loader = DataLoader(dataset=train, shuffle=True, batch_size=batch_size, sampler=sampler)
             valid_loader = DataLoader(dataset=valid, shuffle=False, batch_size=batch_size)
-            train_metrics, valid_metrics = self.train(train_loader=train_loader, valid_loader=valid_loader,
-                                                      save_model=save_model, eval_fold=i,
-                                                      log_after_each_epoch=log_after_each_epoch)
+            train_metrics, valid_metrics = self.train(
+                train_loader=train_loader, valid_loader=valid_loader,
+                save_model=save_model, eval_fold=i,
+                log_after_each_epoch=log_after_each_epoch,
+                train_metrics=train_metrics, val_metrics=val_metrics)
 
             cv_metrics.update(train_metrics=train_metrics, valid_metrics=valid_metrics)
 
@@ -75,14 +103,22 @@ class Classifier:
         return cv_metrics
 
     def train(self, train_loader: DataLoader, eval_fold=None, valid_loader: DataLoader = None,
-              log_after_each_epoch=True, save_model=False):
-        all_train_metrics = TrainingMetrics(n_epochs=self.n_epochs)
-        all_val_metrics = TrainingMetrics(n_epochs=self.n_epochs)
+              log_after_each_epoch=True, save_model=False,
+              train_metrics: Optional[TrainingMetrics] = None,
+              val_metrics: Optional[TrainingMetrics] = None):
+        if train_metrics is not None:
+            all_train_metrics = train_metrics
+        else:
+            all_train_metrics = TrainingMetrics(n_epochs=self.n_epochs)
 
-        best_epoch_metric = -float('inf')
+        if val_metrics is not None:
+            all_val_metrics = val_metrics
+        else:
+            all_val_metrics = TrainingMetrics(n_epochs=self.n_epochs)
+
         time_since_best_epoch = 0
 
-        for epoch in range(self.n_epochs):
+        for epoch in range(train_metrics.best_epoch, self.n_epochs):
             epoch_train_metrics = Metrics()
             epoch_val_metrics = Metrics()
 
@@ -123,27 +159,18 @@ class Classifier:
                         epoch_val_metrics.update_outputs(y_true=target, y_out=output)
 
                 all_val_metrics.update(epoch=epoch,
-                                         loss=epoch_val_metrics.loss,
-                                         aupr=epoch_val_metrics.AUPR)
+                                       loss=epoch_val_metrics.loss,
+                                       aupr=epoch_val_metrics.AUPR)
 
-                if epoch_val_metrics.AUPR > best_epoch_metric:
+                if all_val_metrics.best_epoch == epoch:
                     if save_model:
                         torch.save({
                             'state_dict': self.model.state_dict(),
                             'performance':  {
-                                'train': {
-                                    'losses': all_train_metrics.losses[:epoch],
-                                    'auprs': all_train_metrics.auprs[:epoch]
-                                },
-                                'val': {
-                                    'losses': all_val_metrics.losses[:epoch],
-                                    'auprs': all_val_metrics.auprs[:epoch]
-                                }
+                                'train': all_train_metrics.to_dict(),
+                                'val': all_val_metrics.to_dict()
                             }
                         }, f'{self.save_path}/{eval_fold}_model.pt')
-                    all_train_metrics.best_epoch = epoch
-                    all_val_metrics.best_epoch = epoch
-                    best_epoch_metric = epoch_val_metrics.AUPR
                     time_since_best_epoch = 0
                 else:
                     time_since_best_epoch += 1

@@ -1,17 +1,98 @@
+from typing import Optional
+
 import numpy as np
 import torch
 from sklearn.metrics import average_precision_score
 
 
 class TrainingMetrics:
-    def __init__(self, n_epochs):
-        self.losses = np.zeros(n_epochs)
-        self.auprs = np.zeros(n_epochs)
-        self.best_epoch = None
+    def __init__(self, n_epochs,
+                 losses: Optional[np.ndarray] = None,
+                 auprs: Optional[np.ndarray] = None,
+                 best_epoch=0,
+                 best_metric='aupr',
+                 best_metric_value: Optional[float] = None,
+                 metric_larger_is_better=True):
+        """
+        Container for training metrics
+        Args:
+            n_epochs:
+                Number of training epochs
+            losses:
+                If provided, will prepend these losses.
+                Useful if continuing training
+            auprs:
+                If provided, will prepend these auprs.
+                Useful if continuing training
+            best_epoch
+                If provided will set best_epoch to this
+                Useful if continuing training
+            best_metric
+                Metric to use for early stopping
+            best_metric_value
+                Best metric value so far.
+                Used for early stopping
+            metric_larger_is_better
+                Whether a larger value of the metric is better
+        """
+        if losses is not None:
+            losses = np.array(losses.tolist() + [0] * n_epochs)
+        else:
+            losses = np.zeros(n_epochs)
+
+        if auprs is not None:
+            auprs = np.array(auprs.tolist() + [0] * n_epochs)
+        else:
+            auprs = np.zeros(n_epochs)
+
+        self.losses = losses
+        self.auprs = auprs
+        self.best_epoch = best_epoch
+        self._best_metric = best_metric
+        self._metric_larger_is_better = metric_larger_is_better
+
+        if best_metric_value is None:
+            if best_metric == 'aupr':
+                best_metric_value = -float('inf')
+            elif best_metric == 'loss':
+                best_metric_value = float('inf')
+            else:
+                raise ValueError(f'Unsupported best_metric. Needs to be '
+                                 f'either "aupr" or "loss"')
+        self._best_metric_value = best_metric_value
 
     def update(self, epoch, loss, aupr):
         self.losses[epoch] = loss
         self.auprs[epoch] = aupr
+
+        if self._best_metric == 'aupr':
+            metric = aupr
+        else:
+            metric = loss
+
+        if self._metric_larger_is_better:
+            if metric > self._best_metric_value:
+                self._best_metric_value = metric
+                self.best_epoch = epoch
+        else:
+            if metric < self._best_metric_value:
+                self._best_metric_value = metric
+                self.best_epoch = epoch
+
+    @property
+    def best_metric_value(self) -> float:
+        return self._best_metric_value
+
+    def to_dict(self) -> dict:
+        d = {
+            'auprs': self.auprs[:self.best_epoch],
+            'losses': self.losses[:self.best_epoch],
+            'best_epoch': self.best_epoch,
+            'best_metric': self._best_metric,
+            'best_metric_value': self._best_metric_value,
+            'metric_larger_is_better': self._metric_larger_is_better
+        }
+        return d
 
 
 class Metrics:
