@@ -12,8 +12,7 @@ from torch.utils.data import DataLoader
 
 from deepcell.metrics import Metrics
 from deepcell.datasets.roi_dataset import RoiDataset
-
-from src.deepcell.data_splitter import DataSplitter
+from deepcell.data_splitter import DataSplitter
 
 
 def inference(model: torch.nn.Module,
