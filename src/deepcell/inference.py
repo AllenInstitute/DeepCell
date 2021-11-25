@@ -79,9 +79,9 @@ def inference(model: torch.nn.Module,
 
     for i, model_checkpoint in enumerate(models):
         map_location = None if use_cuda else torch.device('cpu')
-        state_dict = torch.load(f'{checkpoint_path}/{model_checkpoint}',
-                                map_location=map_location)
-        model.load_state_dict(state_dict)
+        x = torch.load(f'{checkpoint_path}/{model_checkpoint}',
+                       map_location=map_location)
+        model.load_state_dict(x['state_dict'])
 
         model.eval()
 

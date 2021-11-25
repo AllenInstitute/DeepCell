@@ -57,8 +57,8 @@ class Classifier:
             logger.info(f'=========')
 
             if self.model_load_path is not None:
-                self.model.load_state_dict(
-                    torch.load(Path(self.model_load_path) / f'{i}_model.pt'))
+                x = torch.load(Path(self.model_load_path) / f'{i}_model.pt')
+                self.model.load_state_dict(x['state_dict'])
 
             train_loader = DataLoader(dataset=train, shuffle=True, batch_size=batch_size, sampler=sampler)
             valid_loader = DataLoader(dataset=valid, shuffle=False, batch_size=batch_size)
@@ -126,7 +126,19 @@ class Classifier:
 
                 if epoch_val_metrics.AUPR > best_epoch_metric:
                     if save_model:
-                        torch.save(self.model.state_dict(), f'{self.save_path}/{eval_fold}_model.pt')
+                        torch.save({
+                            'state_dict': self.model.state_dict(),
+                            'performance':  {
+                                'train': {
+                                    'losses': all_train_metrics.losses[:epoch],
+                                    'auprs': all_train_metrics.auprs[:epoch]
+                                },
+                                'val': {
+                                    'losses': all_val_metrics.losses[:epoch],
+                                    'auprs': all_val_metrics.auprs[:epoch]
+                                }
+                            }
+                        }, f'{self.save_path}/{eval_fold}_model.pt')
                     all_train_metrics.best_epoch = epoch
                     all_val_metrics.best_epoch = epoch
                     best_epoch_metric = epoch_val_metrics.loss
@@ -135,16 +147,6 @@ class Classifier:
                     time_since_best_epoch += 1
                     if time_since_best_epoch > self.early_stopping:
                         logger.info('Stopping due to early stopping')
-                        torch.save({
-                            'train': {
-                                'losses': all_train_metrics.losses[:epoch],
-                                'auprs': all_train_metrics.auprs[:epoch]
-                            },
-                            'val': {
-                                'losses': all_val_metrics.losses[:epoch],
-                                'auprs': all_val_metrics.auprs[:epoch]
-                            }
-                        }, f'{self.save_path}/{eval_fold}_performance.pkl')
                         return all_train_metrics, all_val_metrics
 
             if not self.scheduler_step_after_batch:
@@ -165,8 +167,8 @@ class Classifier:
 
     def _reset(self):
         # reset model weights
-        state_dict = torch.load(f'{self.save_path}/model_init.pt')
-        self.model.load_state_dict(state_dict)
+        x = torch.load(f'{self.save_path}/model_init.pt')
+        self.model.load_state_dict(x['state_dict'])
 
         # reset optimizer
         self.optimizer = self.optimizer_constructor()
