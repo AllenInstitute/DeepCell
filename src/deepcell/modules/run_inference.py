@@ -20,7 +20,8 @@ def run_inference_for_experiment(
         model_weights_path: Path,
         output_path: Path,
         center_crop_size=(60, 60),
-        use_correlation_projection=False
+        use_correlation_projection=False,
+        mask_projections=False
     ):
     """
     Runs inference for experiment and produces csv of predictions
@@ -41,6 +42,8 @@ def run_inference_for_experiment(
             Height, width to center crop inputs
         use_correlation_projection:
             Whether to use correlation projection instead of avg projection
+        mask_projections
+            Whether to mask the projections using the segmentation mask
     Returns:
         None, but writes predictions csv to disk
     """
@@ -65,7 +68,8 @@ def run_inference_for_experiment(
                                  roi_id=roi['id']) for roi in rois]
     test = RoiDataset(model_inputs=model_inputs,
                       transform=test_transform,
-                      use_correlation_projection=use_correlation_projection)
+                      use_correlation_projection=use_correlation_projection,
+                      mask_out_projections=mask_projections)
     test_dataloader = DataLoader(dataset=test, shuffle=False, batch_size=64)
 
     cnn = torchvision.models.vgg11_bn(pretrained=True, progress=False)
@@ -97,6 +101,9 @@ if __name__ == '__main__':
     parser.add_argument('--use_correlation_projection',
                         default='false', help='Whether to use correlation '
                                               'projection instead of avg')
+    parser.add_argument('--mask_projections', default=False,
+                        help='Whether to mask projections using the '
+                             'segmentation mask')
     args = parser.parse_args()
 
     rois_path = Path(args.rois_path)
@@ -112,9 +119,16 @@ if __name__ == '__main__':
 
     use_correlation_projection = args.use_correlation_projection == 'true'
 
+    if args.mask_projections not in ('true', 'false'):
+        raise ValueError('Invalid value for mask_projections')
+
+    mask_projections = args.mask_projections == 'true'
+
     run_inference_for_experiment(
         experiment_id=args.experiment_id, rois_path=rois_path,
         data_dir=data_dir, output_path=out_path,
         model_weights_path=model_weights_path,
         center_crop_size=center_crop_size,
-        use_correlation_projection=use_correlation_projection)
+        use_correlation_projection=use_correlation_projection,
+        mask_projections=mask_projections
+    )

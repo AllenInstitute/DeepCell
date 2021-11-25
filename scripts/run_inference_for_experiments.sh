@@ -18,6 +18,7 @@ out_dir=$6
 conda_env=$7
 center_crop_size=$8
 use_correlation_projection=$9
+mask_projections=$10
 
 conda activate "$conda_env"
 pip install git+https://github.com/AllenInstitute/segmentation-labeling-app.git
@@ -64,7 +65,8 @@ $conda_env -m deepcell.modules.run_inference \
   --model_weights_path "${model_weights_path}" \
   --out_path "${predictions_out_dir}" \
   --center_crop_size "${center_crop_size}" \
-  --use_correlation_projection "${use_correlation_projection}"
+  --use_correlation_projection "${use_correlation_projection}" \
+  --mask_projections "${mask_projections}"
 
 echo "Removing ${artifact_out_dir}"
 
