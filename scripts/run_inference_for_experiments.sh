@@ -18,7 +18,7 @@ out_dir=$6
 conda_env=$7
 center_crop_size=$8
 use_correlation_projection=$9
-mask_projections=$10
+mask_projections=${10}
 
 conda activate "$conda_env"
 pip install git+https://github.com/AllenInstitute/segmentation-labeling-app.git
