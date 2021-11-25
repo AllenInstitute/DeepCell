@@ -81,7 +81,13 @@ def inference(model: torch.nn.Module,
         map_location = None if use_cuda else torch.device('cpu')
         x = torch.load(f'{checkpoint_path}/{model_checkpoint}',
                        map_location=map_location)
-        model.load_state_dict(x['state_dict'])
+
+        if 'state_dict' in x:
+            state_dict = x['state_dict']
+        else:
+            # backwards compatability
+            state_dict = x
+        model.load_state_dict(state_dict=state_dict)
 
         model.eval()
 
