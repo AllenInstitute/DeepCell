@@ -118,7 +118,7 @@ class Classifier:
 
         time_since_best_epoch = 0
 
-        for epoch in range(val_metrics.best_epoch, self.n_epochs):
+        for epoch in range(val_metrics.best_epoch + 1, self.n_epochs):
             epoch_train_metrics = Metrics()
             epoch_val_metrics = Metrics()
 
