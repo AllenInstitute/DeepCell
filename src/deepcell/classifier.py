@@ -141,7 +141,7 @@ class Classifier:
                         }, f'{self.save_path}/{eval_fold}_model.pt')
                     all_train_metrics.best_epoch = epoch
                     all_val_metrics.best_epoch = epoch
-                    best_epoch_metric = epoch_val_metrics.loss
+                    best_epoch_metric = epoch_val_metrics.AUPR
                     time_since_best_epoch = 0
                 else:
                     time_since_best_epoch += 1
