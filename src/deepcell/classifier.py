@@ -44,7 +44,9 @@ class Classifier:
         if self.use_cuda:
             self.model = self.model.cuda()
 
-        torch.save(self.model.state_dict(), f'{self.save_path}/model_init.pt')
+        torch.save({
+            'state_dict': self.model.state_dict()
+        }, f'{self.save_path}/model_init.pt')
 
     def cross_validate(self, train_dataset: RoiDataset, data_splitter: DataSplitter, batch_size=64, sampler=None,
                        n_splits=5, save_model=False, log_after_each_epoch=True):
