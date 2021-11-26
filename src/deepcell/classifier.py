@@ -169,8 +169,10 @@ class Classifier:
                         torch.save({
                             'state_dict': self.model.state_dict(),
                             'performance':  {
-                                'train': all_train_metrics.to_dict(),
-                                'val': all_val_metrics.to_dict()
+                                'train': all_train_metrics.to_dict(
+                                    best_epoch=all_val_metrics.best_epoch),
+                                'val': all_val_metrics.to_dict(
+                                    best_epoch=all_val_metrics.best_epoch)
                             }
                         }, f'{self.save_path}/{eval_fold}_model.pt')
                     time_since_best_epoch = 0

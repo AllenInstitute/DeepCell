@@ -83,11 +83,11 @@ class TrainingMetrics:
     def best_metric_value(self) -> float:
         return self._best_metric_value
 
-    def to_dict(self) -> dict:
+    def to_dict(self, best_epoch: int) -> dict:
         d = {
-            'auprs': self.auprs[:self.best_epoch],
-            'losses': self.losses[:self.best_epoch],
-            'best_epoch': self.best_epoch,
+            'auprs': self.auprs[:best_epoch+1],
+            'losses': self.losses[:best_epoch+1],
+            'best_epoch': best_epoch,
             'best_metric': self._best_metric,
             'best_metric_value': self._best_metric_value,
             'metric_larger_is_better': self._metric_larger_is_better
