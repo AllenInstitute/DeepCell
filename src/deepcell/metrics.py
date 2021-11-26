@@ -9,7 +9,7 @@ class TrainingMetrics:
     def __init__(self, n_epochs,
                  losses: Optional[np.ndarray] = None,
                  auprs: Optional[np.ndarray] = None,
-                 best_epoch=0,
+                 best_epoch=-1,
                  best_metric='aupr',
                  best_metric_value: Optional[float] = None,
                  metric_larger_is_better=True):
