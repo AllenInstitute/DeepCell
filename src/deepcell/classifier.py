@@ -34,10 +34,12 @@ class Classifier:
         self.scheduler_step_after_batch = scheduler_step_after_batch
         self.criterion = criterion
         self.use_cuda = torch.cuda.is_available()
-        self.save_path = save_path
         self.debug = debug
         self.early_stopping = early_stopping
         self.model_load_path = model_load_path
+
+        self.save_path = save_path if model_load_path is None else \
+            f'{save_path}_continue'
 
         if not os.path.exists(f'{self.save_path}'):
             os.makedirs(f'{self.save_path}')
