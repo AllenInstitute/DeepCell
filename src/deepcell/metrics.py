@@ -8,9 +8,9 @@ from sklearn.metrics import average_precision_score
 class TrainingMetrics:
     def __init__(self, n_epochs,
                  losses: Optional[np.ndarray] = None,
-                 auprs: Optional[np.ndarray] = None,
+                 f1s: Optional[np.ndarray] = None,
                  best_epoch=-1,
-                 best_metric='aupr',
+                 best_metric='f1',
                  best_metric_value: Optional[float] = None,
                  metric_larger_is_better=True):
         """
@@ -21,8 +21,8 @@ class TrainingMetrics:
             losses:
                 If provided, will prepend these losses.
                 Useful if continuing training
-            auprs:
-                If provided, will prepend these auprs.
+            f1s:
+                If provided, will prepend these f1s.
                 Useful if continuing training
             best_epoch
                 If provided will set best_epoch to this
@@ -40,33 +40,33 @@ class TrainingMetrics:
         else:
             losses = np.zeros(n_epochs)
 
-        if auprs is not None:
-            auprs = np.array(auprs.tolist() + [0] * n_epochs)
+        if f1s is not None:
+            f1s = np.array(f1s.tolist() + [0] * n_epochs)
         else:
-            auprs = np.zeros(n_epochs)
+            f1s = np.zeros(n_epochs)
 
         self.losses = losses
-        self.auprs = auprs
+        self.f1s = f1s
         self.best_epoch = best_epoch
         self._best_metric = best_metric
         self._metric_larger_is_better = metric_larger_is_better
 
         if best_metric_value is None:
-            if best_metric == 'aupr':
+            if best_metric == 'f1':
                 best_metric_value = -float('inf')
             elif best_metric == 'loss':
                 best_metric_value = float('inf')
             else:
                 raise ValueError(f'Unsupported best_metric. Needs to be '
-                                 f'either "aupr" or "loss"')
+                                 f'either "f1" or "loss"')
         self._best_metric_value = best_metric_value
 
-    def update(self, epoch, loss, aupr):
+    def update(self, epoch, loss, f1):
         self.losses[epoch] = loss
-        self.auprs[epoch] = aupr
+        self.f1s[epoch] = f1
 
-        if self._best_metric == 'aupr':
-            metric = aupr
+        if self._best_metric == 'f1':
+            metric = f1
         else:
             metric = loss
 
@@ -85,7 +85,7 @@ class TrainingMetrics:
 
     def to_dict(self, best_epoch: int) -> dict:
         d = {
-            'auprs': self.auprs[:best_epoch+1],
+            'f1s': self.f1s[:best_epoch+1],
             'losses': self.losses[:best_epoch+1],
             'best_epoch': best_epoch,
             'best_metric': self._best_metric,

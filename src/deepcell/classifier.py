@@ -67,7 +67,7 @@ class Classifier:
                 train_metrics = TrainingMetrics(
                     n_epochs=self.n_epochs,
                     losses=x['performance']['train']['losses'],
-                    auprs=x['performance']['train']['auprs'],
+                    f1s=x['performance']['train']['f1s'],
                     best_epoch=x['performance']['train']['best_epoch'],
                     best_metric=x['performance']['train']['best_metric'],
                     best_metric_value=x['performance']['train'][
@@ -78,7 +78,7 @@ class Classifier:
                 val_metrics = TrainingMetrics(
                     n_epochs=self.n_epochs,
                     losses=x['performance']['val']['losses'],
-                    auprs=x['performance']['val']['auprs'],
+                    f1s=x['performance']['val']['f1s'],
                     best_epoch=x['performance']['val']['best_epoch'],
                     best_metric=x['performance']['val']['best_metric'],
                     best_metric_value=x['performance']['val'][
@@ -142,7 +142,7 @@ class Classifier:
 
             all_train_metrics.update(epoch=epoch,
                                      loss=epoch_train_metrics.loss,
-                                     aupr=epoch_train_metrics.AUPR)
+                                     f1=epoch_train_metrics.F1)
 
             if valid_loader:
                 self.model.eval()
@@ -162,7 +162,7 @@ class Classifier:
 
                 all_val_metrics.update(epoch=epoch,
                                        loss=epoch_val_metrics.loss,
-                                       aupr=epoch_val_metrics.AUPR)
+                                       f1=epoch_val_metrics.F1)
 
                 if all_val_metrics.best_epoch == epoch:
                     if save_model:
@@ -191,8 +191,8 @@ class Classifier:
 
             if log_after_each_epoch:
                 logger.info(f'Epoch: {epoch + 1} \t'
-                            f'Train AUPR: {epoch_train_metrics.AUPR:.6f} \t'
-                            f'Val AUPR: {epoch_val_metrics.AUPR:.6f}\t'
+                            f'Train F1: {epoch_train_metrics.F1:.6f} \t'
+                            f'Val F1: {epoch_val_metrics.F1:.6f}\t'
                             f'Val Loss: {epoch_val_metrics.loss}'
                             )
 
