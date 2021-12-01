@@ -106,7 +106,9 @@ class Metrics:
 
     @property
     def F1(self):
-        f1 = f1_score(y_true=self.y_trues, y_pred=self.y_scores > 0.5,
+        y_pred = np.array(self.y_scores) > 0.5
+        y_pred = y_pred.astype('int')
+        f1 = f1_score(y_true=self.y_trues, y_pred=y_pred,
                       zero_division=0)
         return f1
 
