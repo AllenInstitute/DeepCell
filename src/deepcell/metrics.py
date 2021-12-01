@@ -2,7 +2,7 @@ from typing import Optional
 
 import numpy as np
 import torch
-from sklearn.metrics import average_precision_score
+from sklearn.metrics import average_precision_score, f1_score
 
 
 class TrainingMetrics:
@@ -105,31 +105,10 @@ class Metrics:
         self.y_trues = []
 
     @property
-    def precision(self):
-        try:
-            res = self.TP / (self.TP + self.FP)
-        except ZeroDivisionError:
-            res = 0.0
-        return res
-
-    @property
-    def recall(self):
-        try:
-            res = self.TP / (self.TP + self.FN)
-        except ZeroDivisionError:
-            res = 0.0
-        return res
-
-    @property
     def F1(self):
-        precision = self.precision
-        recall = self.recall
-
-        try:
-            res = 2 * precision * recall / (recall + precision)
-        except ZeroDivisionError:
-            res = 0.0
-        return res
+        f1 = f1_score(y_true=self.y_trues, y_pred=self.y_scores > 0.5,
+                      zero_division=0)
+        return f1
 
     @property
     def AUPR(self):
