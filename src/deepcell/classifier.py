@@ -112,13 +112,15 @@ class Classifier:
             all_train_metrics = train_metrics
         else:
             all_train_metrics = TrainingMetrics(n_epochs=self.n_epochs,
-                                                best_metric='loss')
+                                                best_metric='loss',
+                                                metric_larger_is_better=False)
 
         if val_metrics is not None:
             all_val_metrics = val_metrics
         else:
             all_val_metrics = TrainingMetrics(n_epochs=self.n_epochs,
-                                              best_metric='loss')
+                                              best_metric='loss',
+                                              metric_larger_is_better=False)
 
         time_since_best_epoch = 0
 
