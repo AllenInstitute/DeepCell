@@ -111,12 +111,14 @@ class Classifier:
         if train_metrics is not None:
             all_train_metrics = train_metrics
         else:
-            all_train_metrics = TrainingMetrics(n_epochs=self.n_epochs)
+            all_train_metrics = TrainingMetrics(n_epochs=self.n_epochs,
+                                                best_metric='loss')
 
         if val_metrics is not None:
             all_val_metrics = val_metrics
         else:
-            all_val_metrics = TrainingMetrics(n_epochs=self.n_epochs)
+            all_val_metrics = TrainingMetrics(n_epochs=self.n_epochs,
+                                              best_metric='loss')
 
         time_since_best_epoch = 0
 
@@ -185,7 +187,7 @@ class Classifier:
             if not self.scheduler_step_after_batch:
                 if self.scheduler is not None:
                     if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-                        self.scheduler.step(epoch_val_metrics.AUPR)
+                        self.scheduler.step(epoch_val_metrics.loss)
                     else:
                         self.scheduler.step()
 
