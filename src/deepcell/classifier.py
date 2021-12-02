@@ -225,8 +225,8 @@ class Classifier:
                 'state_dict'],
             'performance': {
                 'train': all_train_metrics.to_dict(
-                    to_epoch=epoch),
+                    to_epoch=epoch, best_epoch=all_train_metrics.best_epoch),
                 'val': all_val_metrics.to_dict(
-                    to_epoch=epoch)
+                    to_epoch=epoch, best_epoch=all_val_metrics.best_epoch)
             }
         }, f'{self.save_path}/{eval_fold}_model.pt')

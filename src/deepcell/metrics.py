@@ -83,10 +83,12 @@ class TrainingMetrics:
     def best_metric_value(self) -> float:
         return self._best_metric_value
 
-    def to_dict(self, to_epoch: int) -> dict:
+    def to_dict(self, best_epoch: int, to_epoch: int) -> dict:
         """
 
         Args:
+            best_epoch:
+                If early stopping, indicates best epoch
             to_epoch:
                 If early stopping, truncates performance to `to_epoch`
         Returns:
@@ -95,7 +97,7 @@ class TrainingMetrics:
         d = {
             'f1s': self.f1s[:to_epoch + 1],
             'losses': self.losses[:to_epoch + 1],
-            'best_epoch': to_epoch,
+            'best_epoch': best_epoch,
             'best_metric': self._best_metric,
             'best_metric_value': self._best_metric_value,
             'metric_larger_is_better': self._metric_larger_is_better
