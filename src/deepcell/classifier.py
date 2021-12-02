@@ -171,9 +171,13 @@ class Classifier:
                                        f1=epoch_val_metrics.F1)
 
                 if all_val_metrics.best_epoch == epoch:
+                    scheduler_state_dict = self.scheduler.state_dict() if \
+                        self.scheduler is not None else None
                     if save_model:
                         torch.save({
-                            'state_dict': self.model.state_dict()
+                            'state_dict': self.model.state_dict(),
+                            'optimizer': self.optimizer.state_dict(),
+                            'scheduler': scheduler_state_dict,
                         }, f'{self.save_path}/{eval_fold}_model.pt')
                     time_since_best_epoch = 0
                 else:
@@ -223,14 +227,14 @@ class Classifier:
                                     all_val_metrics: TrainingMetrics,
                                     epoch: int):
         """Writes model weights and training performance to disk"""
-        scheduler = self.scheduler.state_dict() if self.scheduler is not \
-            None else None
         torch.save({
             'state_dict': torch.load(
                 f'{self.save_path}/{eval_fold}_model.pt')[
                 'state_dict'],
-            'optimizer': self.optimizer.state_dict(),
-            'scheduler': scheduler,
+            'optimizer': torch.load(f'{self.save_path}/'
+                                    f'{eval_fold}_model.pt')['optimizer'],
+            'scheduler': torch.load(f'{self.save_path}/'
+                                    f'{eval_fold}_model.pt')['scheduler'],
             'performance': {
                 'train': all_train_metrics.to_dict(
                     to_epoch=epoch, best_epoch=all_train_metrics.best_epoch),
