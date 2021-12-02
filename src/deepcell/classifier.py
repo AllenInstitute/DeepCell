@@ -64,6 +64,8 @@ class Classifier:
                 x = torch.load(Path(self.model_load_path) / f'{i}_model.pt')
                 self.model.load_state_dict(x['state_dict'])
                 self.optimizer.load_state_dict(x['optimizer'])
+                if self.scheduler is not None:
+                    self.scheduler.load_state_dict(x['scheduler'])
                 train_metrics = TrainingMetrics(
                     n_epochs=self.n_epochs,
                     losses=x['performance']['train']['losses'],
@@ -221,11 +223,14 @@ class Classifier:
                                     all_val_metrics: TrainingMetrics,
                                     epoch: int):
         """Writes model weights and training performance to disk"""
+        scheduler = self.scheduler.state_dict() if self.scheduler is not \
+            None else None
         torch.save({
             'state_dict': torch.load(
                 f'{self.save_path}/{eval_fold}_model.pt')[
                 'state_dict'],
             'optimizer': self.optimizer.state_dict(),
+            'scheduler': scheduler,
             'performance': {
                 'train': all_train_metrics.to_dict(
                     to_epoch=epoch, best_epoch=all_train_metrics.best_epoch),
