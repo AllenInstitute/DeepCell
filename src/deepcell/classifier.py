@@ -37,9 +37,7 @@ class Classifier:
         self.debug = debug
         self.early_stopping = early_stopping
         self.model_load_path = model_load_path
-
-        self.save_path = save_path if model_load_path is None else \
-            f'{save_path}_continue'
+        self.save_path = save_path
 
         if not os.path.exists(f'{self.save_path}'):
             os.makedirs(f'{self.save_path}')
@@ -171,19 +169,17 @@ class Classifier:
                 if all_val_metrics.best_epoch == epoch:
                     if save_model:
                         torch.save({
-                            'state_dict': self.model.state_dict(),
-                            'performance':  {
-                                'train': all_train_metrics.to_dict(
-                                    best_epoch=all_val_metrics.best_epoch),
-                                'val': all_val_metrics.to_dict(
-                                    best_epoch=all_val_metrics.best_epoch)
-                            }
+                            'state_dict': self.model.state_dict()
                         }, f'{self.save_path}/{eval_fold}_model.pt')
                     time_since_best_epoch = 0
                 else:
                     time_since_best_epoch += 1
                     if time_since_best_epoch > self.early_stopping:
                         logger.info('Stopping due to early stopping')
+                        self._save_model_and_performance(
+                            eval_fold=eval_fold,
+                            all_train_metrics=all_train_metrics,
+                            all_val_metrics=all_val_metrics, epoch=epoch)
                         return all_train_metrics, all_val_metrics
 
             if not self.scheduler_step_after_batch:
@@ -199,6 +195,10 @@ class Classifier:
                             f'Val F1: {epoch_val_metrics.F1:.6f}\t'
                             f'Val Loss: {epoch_val_metrics.loss}'
                             )
+        self._save_model_and_performance(eval_fold=eval_fold,
+                                         all_train_metrics=all_train_metrics,
+                                         all_val_metrics=all_val_metrics,
+                                         epoch=self.n_epochs)
 
         return all_train_metrics, all_val_metrics
 
@@ -213,3 +213,20 @@ class Classifier:
         # reset scheduler
         if self.scheduler is not None:
             self.scheduler = self.scheduler_contructor(self.optimizer)
+
+    def _save_model_and_performance(self, eval_fold: int,
+                                    all_train_metrics: TrainingMetrics,
+                                    all_val_metrics: TrainingMetrics,
+                                    epoch: int):
+        """Writes model weights and training performance to disk"""
+        torch.save({
+            'state_dict': torch.load(
+                f'{self.save_path}/{eval_fold}_model.pt')[
+                'state_dict'],
+            'performance': {
+                'train': all_train_metrics.to_dict(
+                    to_epoch=epoch),
+                'val': all_val_metrics.to_dict(
+                    to_epoch=epoch)
+            }
+        }, f'{self.save_path}/{eval_fold}_model.pt')
