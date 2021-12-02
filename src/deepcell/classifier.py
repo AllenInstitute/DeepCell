@@ -37,7 +37,8 @@ class Classifier:
         self.debug = debug
         self.early_stopping = early_stopping
         self.model_load_path = model_load_path
-        self.save_path = save_path
+        self.save_path = f'{save_path}_continue' if model_load_path is not \
+            None else save_path
 
         if not os.path.exists(f'{self.save_path}'):
             os.makedirs(f'{self.save_path}')
