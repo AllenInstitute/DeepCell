@@ -234,7 +234,7 @@ class Classifier:
             checkpoint_path = save_path / f'{eval_fold}_model.pt'
         else:
             # No better model was found. Use previously saved best model
-            checkpoint_path = Path(str(save_path).replace('continue', '')) / \
+            checkpoint_path = Path(str(save_path).replace('_continue', '')) / \
                 f'{eval_fold}_model.pt'
         checkpoint = torch.load(checkpoint_path)
         torch.save({
