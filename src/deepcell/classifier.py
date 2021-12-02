@@ -227,14 +227,20 @@ class Classifier:
                                     all_val_metrics: TrainingMetrics,
                                     epoch: int):
         """Writes model weights and training performance to disk"""
+        save_path = Path(self.save_path)
+        if (save_path / f'{eval_fold}_model.pt').exists():
+            # If we are continuing training (adds _continue suffix to save
+            # path) and a better model was found
+            checkpoint_path = save_path / f'{eval_fold}_model.pt'
+        else:
+            # No better model was found. Use previously saved best model
+            checkpoint_path = Path(str(save_path).replace('continue', '')) / \
+                f'{eval_fold}_model.pt'
+        checkpoint = torch.load(checkpoint_path)
         torch.save({
-            'state_dict': torch.load(
-                f'{self.save_path}/{eval_fold}_model.pt')[
-                'state_dict'],
-            'optimizer': torch.load(f'{self.save_path}/'
-                                    f'{eval_fold}_model.pt')['optimizer'],
-            'scheduler': torch.load(f'{self.save_path}/'
-                                    f'{eval_fold}_model.pt')['scheduler'],
+            'state_dict': checkpoint['state_dict'],
+            'optimizer': checkpoint['optimizer'],
+            'scheduler': checkpoint['scheduler'],
             'performance': {
                 'train': all_train_metrics.to_dict(
                     to_epoch=epoch, best_epoch=all_train_metrics.best_epoch),
