@@ -380,6 +380,13 @@ class VisualBehaviorDataset:
         for i in range(len(self._dataset)):
             artifact = self._dataset[i]
 
+            correlation_projection_path = (artifact_destination /
+                                           f'corr_{artifact.roi_id}.png')
+            if not correlation_projection_path.exists():
+                # Due to historical reasons, we cannot produce correlation
+                # projection for all inputs
+                correlation_projection_path = None
+
             artifact = ModelInput(
                 experiment_id=artifact.experiment_id,
                 roi_id=artifact.roi_id,
@@ -387,6 +394,7 @@ class VisualBehaviorDataset:
                                      f'max_{artifact.roi_id}.png'),
                 avg_projection_path=(artifact_destination /
                                      f'avg_{artifact.roi_id}.png'),
+                correlation_projection_path=correlation_projection_path,
                 mask_path=(artifact_destination / f'mask_'
                                                   f'{artifact.roi_id}.png'),
                 label=artifact.label,
