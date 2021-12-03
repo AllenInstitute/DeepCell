@@ -101,7 +101,7 @@ class RoiDataset(Dataset):
     def __len__(self):
         return len(self._model_inputs)
 
-    def _construct_input(self, obs) -> np.ndarray:
+    def _construct_input(self, obs: ModelInput) -> np.ndarray:
         """
         Construct a single input
 
@@ -111,10 +111,16 @@ class RoiDataset(Dataset):
         res = np.zeros((*self._image_dim, 3), dtype=np.uint8)
 
         if self._use_correlation_projection:
-            with open(obs.correlation_projection_path, 'rb') as f:
-                corr = Image.open(f)
-                corr = np.array(corr)
-                res[:, :, 0] = corr
+            if obs.correlation_projection_path is not None:
+                with open(obs.correlation_projection_path, 'rb') as f:
+                    corr = Image.open(f)
+                    corr = np.array(corr)
+                    res[:, :, 0] = corr
+            else:
+                with open(obs.avg_projection_path, 'rb') as f:
+                    avg = Image.open(f)
+                    avg = np.array(avg)
+                    res[:, :, 0] = avg
         else:
             with open(obs.avg_projection_path, 'rb') as f:
                 avg = Image.open(f)

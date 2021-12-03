@@ -13,7 +13,30 @@ class DataSplitter:
     def __init__(self, model_inputs: List[ModelInput], train_transform=None,
                  test_transform=None, seed=None,
                  cre_line=None, exclude_mask=False,
-                 mask_out_projections=False, image_dim=(128, 128)):
+                 mask_out_projections=False, image_dim=(128, 128),
+                 use_correlation_projection=False):
+        """
+
+        Args:
+            model_inputs:
+                List of model inputs
+            train_transform:
+                Transforms to apply to training data
+            test_transform:
+                Transforms to apply to test data
+            seed:
+                Seed for random shuffling
+            cre_line:
+                Whether to filter to cre_line
+            exclude_mask:
+                Whether to exclude the mask from input
+            mask_out_projections:
+                Whether to mask out the projections using the segmentation mask
+            image_dim:
+                Input image dimension
+            use_correlation_projection:
+                Whether to use correlation projection instead of avg
+        """
         self._model_inputs = model_inputs
         self.train_transform = train_transform
         self.test_transform = test_transform
@@ -22,13 +45,16 @@ class DataSplitter:
         self.exclude_mask = exclude_mask
         self.mask_out_projections = mask_out_projections
         self.image_dim = image_dim
+        self._use_correlation_projection = use_correlation_projection
 
     def get_train_test_split(self, test_size):
         full_dataset = RoiDataset(
             model_inputs=self._model_inputs,
             cre_line=self.cre_line,
             mask_out_projections=self.mask_out_projections,
-            image_dim=self.image_dim)
+            image_dim=self.image_dim,
+            use_correlation_projection=self._use_correlation_projection
+        )
         sss = StratifiedShuffleSplit(n_splits=2, test_size=test_size,
                                      random_state=self.seed)
         train_index, test_index = next(sss.split(np.zeros(len(full_dataset)),
@@ -74,8 +100,10 @@ class DataSplitter:
             RoiDataset
         """
         artifacts = [dataset[i] for i in index]
-        return RoiDataset(model_inputs=artifacts,
-                          transform=transform,
-                          exclude_mask=self.exclude_mask,
-                          mask_out_projections=self.mask_out_projections,
-                          image_dim=self.image_dim)
+        return RoiDataset(
+            model_inputs=artifacts,
+            transform=transform,
+            exclude_mask=self.exclude_mask,
+            mask_out_projections=self.mask_out_projections,
+            image_dim=self.image_dim,
+            use_correlation_projection=self._use_correlation_projection)
