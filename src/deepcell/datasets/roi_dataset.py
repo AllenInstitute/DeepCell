@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 
 import cv2
 from PIL import Image
@@ -21,8 +21,7 @@ class RoiDataset(Dataset):
                  exclude_mask=False,
                  mask_out_projections=False,
                  use_correlation_projection=False,
-                 filter_out_small_regions_in_disjoint_mask=False
-                 ):
+                 center_soma_in_disjoint_mask=False):
         """
 
         Args:
@@ -44,9 +43,9 @@ class RoiDataset(Dataset):
                 the mask
             use_correlation_projection
                 Whether to use correlation projection instead of avg projection
-            filter_out_small_regions_in_disjoint_mask
+            center_soma_in_disjoint_mask
                 If the segmentation mask contains disjoint regions, take the
-                largest, which is usually the soma
+                largest, which is usually the soma, and center it.
         """
         super().__init__()
 
@@ -57,8 +56,7 @@ class RoiDataset(Dataset):
         self._mask_out_projections = mask_out_projections
         self._y = np.array([int(x.label == 'cell') for x in self._model_inputs])
         self._use_correlation_projection = use_correlation_projection
-        self._filter_out_small_regions_in_disjoint_mask \
-            = filter_out_small_regions_in_disjoint_mask
+        self._center_soma_in_disjoint_mask = center_soma_in_disjoint_mask
 
         if cre_line:
             experiment_genotype_map = get_experiment_genotype_map()
@@ -80,14 +78,6 @@ class RoiDataset(Dataset):
     @property
     def y(self) -> np.ndarray:
         return self._y
-
-    @property
-    def filter_out_small_regions_in_disjoint_mask(self):
-        return self._filter_out_small_regions_in_disjoint_mask
-
-    @filter_out_small_regions_in_disjoint_mask.setter
-    def filter_out_small_regions_in_disjoint_mask(self, val: bool):
-        self._filter_out_small_regions_in_disjoint_mask = val
 
     def __getitem__(self, index):
         obs = self._model_inputs[index]
@@ -124,27 +114,55 @@ class RoiDataset(Dataset):
         Returns:
             A numpy array of type uint8 and shape *dim, 3
         """
-        def select_largest_disconnected_region(mask: np.ndarray):
+        def find_translation_px(mask: np.ndarray) -> np.ndarray:
             """
-            The segmentation mask can be disjoint. Select the disjoint
-            region with the largest area or return the segmentation mask if
-            there is only one region
+            The segmentation mask can be disjoint. This can make the
+            segmentation mask not centered in frame, which hurts
+            performance. Select the disjoint
+            region with the largest area (assumes this is the soma) and find
+            translation amount in pixels to make it centered
             Args:
                 mask:
                     Segmentation mask
             Returns:
-                Returns the segmentation mask back if only 1 region,
-                else returns the region with largest area
+                Returns the translation amount in pixels to center a soma (
+                assuming the soma has the largest area in a disjoint mask)
             """
+            def calc_contour_center(contour) -> np.ndarray:
+                x, y, w, h = cv2.boundingRect(contour)
+                return np.array([y + h / 2, x + w / 2])
+
             contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
                                            cv2.CHAIN_APPROX_SIMPLE)
             if len(contours) > 1:
                 mask_areas = np.array([cv2.contourArea(x) for x in contours])
                 largest_mask_idx = np.argmax(mask_areas)
                 largest_contour = contours[largest_mask_idx]
-                mask = np.zeros(mask.shape, dtype=mask.dtype)
-                cv2.drawContours(mask, [largest_contour], -1, (1, ), 1)
-            return mask
+                largest_mask_center = calc_contour_center(
+                    contour=largest_contour)
+                frame_center = np.array(self._image_dim) / 2
+                diff_from_center = frame_center - largest_mask_center
+                return diff_from_center
+            return np.array([0, 0])
+
+        def center_soma(x: np.ndarray, translate_px: np.ndarray):
+            """
+            Centers a soma in frame
+            Args:
+                x: input
+                translate_px: amount to translate the input in frame
+
+            Returns:
+                input with soma centered
+            """
+            transform = transforms.Compose([
+                iaa.Sequential([
+                    iaa.Affine(translate_px={'x': int(translate_px[1]),
+                                             'y': int(translate_px[0])})
+                ]).augment_image
+            ])
+            x = transform(x)
+            return x
 
         res = np.zeros((*self._image_dim, 3), dtype=np.uint8)
 
@@ -174,9 +192,6 @@ class RoiDataset(Dataset):
             mask = Image.open(f)
             mask = np.array(mask)
 
-            if self._filter_out_small_regions_in_disjoint_mask:
-                mask = select_largest_disconnected_region(mask=mask)
-
             if self._exclude_mask:
                 res[:, :, 2] = max
             else:
@@ -189,6 +204,10 @@ class RoiDataset(Dataset):
         if self._mask_out_projections:
             res[:, :, 0][np.where(mask == 0)] = 0
             res[:, :, 1][np.where(mask == 0)] = 0
+
+        if self._center_soma_in_disjoint_mask:
+            translation_px = find_translation_px(mask=mask)
+            res = center_soma(x=res, translate_px=translation_px)
 
         return res
 
