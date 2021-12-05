@@ -38,7 +38,7 @@ class DataSplitter:
             use_correlation_projection:
                 Whether to use correlation projection instead of avg
             center_cell
-                Try to center the cell. Only applied on validation/test
+                Try to center the cell. Valid values are "test", "all" or False
         """
         self._model_inputs = model_inputs
         self.train_transform = train_transform
@@ -49,6 +49,10 @@ class DataSplitter:
         self.mask_out_projections = mask_out_projections
         self.image_dim = image_dim
         self._use_correlation_projection = use_correlation_projection
+
+        if center_cell not in ('test', 'all', False):
+            raise ValueError(f'Invalid value for center_cell. Valid '
+                             f'values are "test", "all", or False')
         self._center_cell = center_cell
 
     def get_train_test_split(self, test_size):
@@ -64,14 +68,17 @@ class DataSplitter:
         train_index, test_index = next(sss.split(np.zeros(len(full_dataset)),
                                                  full_dataset.y))
 
-        train_dataset = self._sample_dataset(dataset=full_dataset.model_inputs,
-                                             index=train_index,
-                                             transform=self.train_transform)
+        train_dataset = self._sample_dataset(
+            dataset=full_dataset.model_inputs,
+            index=train_index,
+            transform=self.train_transform,
+            center_cell=self._center_cell == 'all')
+
         test_dataset = self._sample_dataset(
             dataset=full_dataset.model_inputs,
             index=test_index,
             transform=self.test_transform,
-            center_cell=self._center_cell)
+            center_cell=True if self._center_cell else False)
 
         return train_dataset, test_dataset
 
@@ -81,14 +88,17 @@ class DataSplitter:
                               random_state=self.seed)
         for train_index, test_index in skf.split(np.zeros(len(train_dataset)),
                                                  train_dataset.y):
-            train = self._sample_dataset(dataset=train_dataset.model_inputs,
-                                         index=train_index,
-                                         transform=self.train_transform)
+            train = self._sample_dataset(
+                dataset=train_dataset.model_inputs,
+                index=train_index,
+                transform=self.train_transform,
+                center_cell=self._center_cell == 'all'
+            )
             valid = self._sample_dataset(
                 dataset=train_dataset.model_inputs,
                 index=test_index,
                 transform=self.test_transform,
-                center_cell=self._center_cell)
+                center_cell=True if self._center_cell else False)
             yield train, valid
 
     def _sample_dataset(self, dataset: List[ModelInput],
