@@ -14,7 +14,8 @@ class DataSplitter:
                  test_transform=None, seed=None,
                  cre_line=None, exclude_mask=False,
                  mask_out_projections=False, image_dim=(128, 128),
-                 use_correlation_projection=False):
+                 use_correlation_projection=False,
+                 filter_out_small_regions_in_disjoint_mask=False):
         """
 
         Args:
@@ -36,6 +37,10 @@ class DataSplitter:
                 Input image dimension
             use_correlation_projection:
                 Whether to use correlation projection instead of avg
+            filter_out_small_regions_in_disjoint_mask
+                If the segmentation mask contains disjoint regions, take the
+                largest, which is usually the soma. Only applied on the
+                validation/test set
         """
         self._model_inputs = model_inputs
         self.train_transform = train_transform
@@ -46,6 +51,8 @@ class DataSplitter:
         self.mask_out_projections = mask_out_projections
         self.image_dim = image_dim
         self._use_correlation_projection = use_correlation_projection
+        self._filter_out_small_regions_in_disjoint_mask = \
+            filter_out_small_regions_in_disjoint_mask
 
     def get_train_test_split(self, test_size):
         full_dataset = RoiDataset(
@@ -63,9 +70,12 @@ class DataSplitter:
         train_dataset = self._sample_dataset(dataset=full_dataset.model_inputs,
                                              index=train_index,
                                              transform=self.train_transform)
-        test_dataset = self._sample_dataset(dataset=full_dataset.model_inputs,
-                                            index=test_index,
-                                            transform=self.test_transform)
+        test_dataset = self._sample_dataset(
+            dataset=full_dataset.model_inputs,
+            index=test_index,
+            transform=self.test_transform,
+            filter_out_small_regions_in_disjoint_mask=
+            self._filter_out_small_regions_in_disjoint_mask)
 
         return train_dataset, test_dataset
 
@@ -78,14 +88,19 @@ class DataSplitter:
             train = self._sample_dataset(dataset=train_dataset.model_inputs,
                                          index=train_index,
                                          transform=self.train_transform)
-            valid = self._sample_dataset(dataset=train_dataset.model_inputs,
-                                         index=test_index,
-                                         transform=self.test_transform)
+            valid = self._sample_dataset(
+                dataset=train_dataset.model_inputs,
+                index=test_index,
+                transform=self.test_transform,
+                filter_out_small_regions_in_disjoint_mask=
+                self._filter_out_small_regions_in_disjoint_mask)
             yield train, valid
 
     def _sample_dataset(self, dataset: List[ModelInput],
                         index: List[int],
-                        transform: Optional[Transform] = None) -> RoiDataset:
+                        transform: Optional[Transform] = None,
+                        filter_out_small_regions_in_disjoint_mask=False) -> \
+            RoiDataset:
         """Returns RoiDataset of Artifacts at index
 
         Args:
@@ -95,6 +110,9 @@ class DataSplitter:
                 List of index of artifacts to construct dataset
             transform:
                 optional transform to pass to RoiDataset
+            filter_out_small_regions_in_disjoint_mask
+                If the segmentation mask contains disjoint regions, take the
+                largest, which is usually the soma.
 
         Returns
             RoiDataset
@@ -106,4 +124,7 @@ class DataSplitter:
             exclude_mask=self.exclude_mask,
             mask_out_projections=self.mask_out_projections,
             image_dim=self.image_dim,
-            use_correlation_projection=self._use_correlation_projection)
+            use_correlation_projection=self._use_correlation_projection,
+            filter_out_small_regions_in_disjoint_mask=
+            filter_out_small_regions_in_disjoint_mask
+        )

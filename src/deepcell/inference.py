@@ -151,7 +151,9 @@ def cv_performance(
         model: torch.nn.Module, data_splitter: DataSplitter,
         train: RoiDataset,
         checkpoint_path: Union[str, Path],
-        threshold=0.5) -> Tuple[pd.DataFrame, Dict]:
+        threshold=0.5,
+        filter_out_small_regions_in_disjoint_mask=False) \
+        -> Tuple[pd.DataFrame, Dict]:
     """
     Evaluates each of the k trained models on the respective validation set
     Returns the CV predictions as well as performance stats

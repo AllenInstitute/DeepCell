@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import List
 
+import cv2
 from PIL import Image
 import numpy as np
 from torch.utils.data import Dataset
@@ -19,7 +20,9 @@ class RoiDataset(Dataset):
                  cre_line=None,
                  exclude_mask=False,
                  mask_out_projections=False,
-                 use_correlation_projection=False):
+                 use_correlation_projection=False,
+                 filter_out_small_regions_in_disjoint_mask=False
+                 ):
         """
 
         Args:
@@ -41,6 +44,9 @@ class RoiDataset(Dataset):
                 the mask
             use_correlation_projection
                 Whether to use correlation projection instead of avg projection
+            filter_out_small_regions_in_disjoint_mask
+                If the segmentation mask contains disjoint regions, take the
+                largest, which is usually the soma
         """
         super().__init__()
 
@@ -51,6 +57,8 @@ class RoiDataset(Dataset):
         self._mask_out_projections = mask_out_projections
         self._y = np.array([int(x.label == 'cell') for x in self._model_inputs])
         self._use_correlation_projection = use_correlation_projection
+        self._filter_out_small_regions_in_disjoint_mask \
+            = filter_out_small_regions_in_disjoint_mask
 
         if cre_line:
             experiment_genotype_map = get_experiment_genotype_map()
@@ -72,6 +80,14 @@ class RoiDataset(Dataset):
     @property
     def y(self) -> np.ndarray:
         return self._y
+
+    @property
+    def filter_out_small_regions_in_disjoint_mask(self):
+        return self._filter_out_small_regions_in_disjoint_mask
+
+    @filter_out_small_regions_in_disjoint_mask.setter
+    def filter_out_small_regions_in_disjoint_mask(self, val: bool):
+        self._filter_out_small_regions_in_disjoint_mask = val
 
     def __getitem__(self, index):
         obs = self._model_inputs[index]
@@ -108,6 +124,28 @@ class RoiDataset(Dataset):
         Returns:
             A numpy array of type uint8 and shape *dim, 3
         """
+        def select_largest_disconnected_region(mask: np.ndarray):
+            """
+            The segmentation mask can be disjoint. Select the disjoint
+            region with the largest area or return the segmentation mask if
+            there is only one region
+            Args:
+                mask:
+                    Segmentation mask
+            Returns:
+                Returns the segmentation mask back if only 1 region,
+                else returns the region with largest area
+            """
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
+                                           cv2.CHAIN_APPROX_SIMPLE)
+            if len(contours) > 1:
+                mask_areas = np.array([cv2.contourArea(x) for x in contours])
+                largest_mask_idx = np.argmax(mask_areas)
+                largest_contour = contours[largest_mask_idx]
+                mask = np.zeros(mask.shape, dtype=mask.dtype)
+                cv2.drawContours(mask, [largest_contour], -1, (1, ), 1)
+            return mask
+
         res = np.zeros((*self._image_dim, 3), dtype=np.uint8)
 
         if self._use_correlation_projection:
@@ -135,6 +173,10 @@ class RoiDataset(Dataset):
         with open(obs.mask_path, 'rb') as f:
             mask = Image.open(f)
             mask = np.array(mask)
+
+            if self._filter_out_small_regions_in_disjoint_mask:
+                mask = select_largest_disconnected_region(mask=mask)
+
             if self._exclude_mask:
                 res[:, :, 2] = max
             else:
