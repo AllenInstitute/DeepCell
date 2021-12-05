@@ -1,10 +1,11 @@
-from pathlib import Path
-from typing import List, Tuple
+from typing import List
 
 import cv2
 from PIL import Image
 import numpy as np
 from torch.utils.data import Dataset
+from torchvision import transforms
+from imgaug import augmenters as iaa
 
 from deepcell.datasets.model_input import ModelInput
 from deepcell.transform import Transform
@@ -229,9 +230,9 @@ class RoiDataset(Dataset):
 
 
 if __name__ == '__main__':
-    from torchvision import transforms
-    from imgaug import augmenters as iaa
     def main():
+        from torchvision import transforms
+        from imgaug import augmenters as iaa
         artifacts = [ModelInput.from_data_dir(
             data_dir='/tmp/artifacts',
             experiment_id='871196379', roi_id='1')]
