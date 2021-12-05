@@ -22,7 +22,7 @@ class RoiDataset(Dataset):
                  exclude_mask=False,
                  mask_out_projections=False,
                  use_correlation_projection=False,
-                 center_soma_in_disjoint_mask=False):
+                 try_center_cell_in_frame=False):
         """
 
         Args:
@@ -44,9 +44,12 @@ class RoiDataset(Dataset):
                 the mask
             use_correlation_projection
                 Whether to use correlation projection instead of avg projection
-            center_soma_in_disjoint_mask
-                If the segmentation mask contains disjoint regions, take the
-                largest, which is usually the soma, and center it.
+            try_center_cell_in_frame
+                The classifier has poor performance with a cell that is not
+                centered in frame. Find the mask centroid and use that to
+                center in the frame. Note: does not guarantee that the cell
+                is perfectly centered as a cell with a long dendrite will
+                have the centroid shifted.
         """
         super().__init__()
 
@@ -57,7 +60,7 @@ class RoiDataset(Dataset):
         self._mask_out_projections = mask_out_projections
         self._y = np.array([int(x.label == 'cell') for x in self._model_inputs])
         self._use_correlation_projection = use_correlation_projection
-        self._center_soma_in_disjoint_mask = center_soma_in_disjoint_mask
+        self._try_center_cell_in_frame = try_center_cell_in_frame
 
         if cre_line:
             experiment_genotype_map = get_experiment_genotype_map()
@@ -117,17 +120,23 @@ class RoiDataset(Dataset):
         """
         def find_translation_px(mask: np.ndarray) -> np.ndarray:
             """
-            The segmentation mask can be disjoint. This can make the
-            segmentation mask not centered in frame, which hurts
-            performance. Select the disjoint
-            region with the largest area (assumes this is the soma) and find
-            translation amount in pixels to make it centered
+            A cell might not be centered in frame, which hurts
+            performance. Find translation pixels to center cell.
+
+            Note: this does not guarantee the cell is
+            perfectly centered due to long dendrites which shift the
+            centroid away from the soma.
+
+            1. Find the largest disjoint mask (which presumably contains the
+            soma)
+            2. Find centroid of mask found in (1)
+            3. Find translation pixels to center centroid in (2) in frame
             Args:
                 mask:
                     Segmentation mask
             Returns:
-                Returns the translation amount in pixels to center a soma (
-                assuming the soma has the largest area in a disjoint mask)
+                Returns the translation amount in pixels to center a cell in
+                frame
             """
             def calc_contour_centroid(contour) -> np.ndarray:
                 M = cv2.moments(contour)
@@ -137,20 +146,18 @@ class RoiDataset(Dataset):
 
             contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
                                            cv2.CHAIN_APPROX_SIMPLE)
-            if len(contours) > 1:
-                mask_areas = np.array([cv2.contourArea(x) for x in contours])
-                largest_mask_idx = np.argmax(mask_areas)
-                largest_contour = contours[largest_mask_idx]
-                largest_mask_centroid = calc_contour_centroid(
-                    contour=largest_contour)
-                frame_center = np.array(self._image_dim) / 2
-                diff_from_center = frame_center - largest_mask_centroid
-                return diff_from_center
-            return np.array([0, 0])
+            mask_areas = np.array([cv2.contourArea(x) for x in contours])
+            largest_mask_idx = np.argmax(mask_areas)
+            largest_contour = contours[largest_mask_idx]
+            largest_mask_centroid = calc_contour_centroid(
+                contour=largest_contour)
+            frame_center = np.array(self._image_dim) / 2
+            diff_from_center = frame_center - largest_mask_centroid
+            return diff_from_center
 
-        def center_soma(x: np.ndarray, translate_px: np.ndarray):
+        def center_cell(x: np.ndarray, translate_px: np.ndarray):
             """
-            Centers a soma in frame
+            Centers a cell in frame
             Args:
                 x: input
                 translate_px: amount to translate the input in frame
@@ -208,9 +215,9 @@ class RoiDataset(Dataset):
             res[:, :, 0][np.where(mask == 0)] = 0
             res[:, :, 1][np.where(mask == 0)] = 0
 
-        if self._center_soma_in_disjoint_mask:
+        if self._try_center_cell_in_frame:
             translation_px = find_translation_px(mask=mask)
-            res = center_soma(x=res, translate_px=translation_px)
+            res = center_cell(x=res, translate_px=translation_px)
 
         return res
 

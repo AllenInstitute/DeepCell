@@ -15,7 +15,7 @@ class DataSplitter:
                  cre_line=None, exclude_mask=False,
                  mask_out_projections=False, image_dim=(128, 128),
                  use_correlation_projection=False,
-                 center_soma_in_disjoint_mask=False):
+                 center_cell=False):
         """
 
         Args:
@@ -37,10 +37,8 @@ class DataSplitter:
                 Input image dimension
             use_correlation_projection:
                 Whether to use correlation projection instead of avg
-            center_soma_in_disjoint_mask
-                If the segmentation mask contains disjoint regions, take the
-                largest, which is usually the soma and center it. Only applied
-                on the validation/test set
+            center_cell
+                Try to center the cell. Only applied on validation/test
         """
         self._model_inputs = model_inputs
         self.train_transform = train_transform
@@ -51,8 +49,7 @@ class DataSplitter:
         self.mask_out_projections = mask_out_projections
         self.image_dim = image_dim
         self._use_correlation_projection = use_correlation_projection
-        self._center_soma_in_disjoint_mask = \
-            center_soma_in_disjoint_mask
+        self._center_cell = center_cell
 
     def get_train_test_split(self, test_size):
         full_dataset = RoiDataset(
@@ -74,8 +71,7 @@ class DataSplitter:
             dataset=full_dataset.model_inputs,
             index=test_index,
             transform=self.test_transform,
-            center_soma_in_disjoint_mask=
-            self._center_soma_in_disjoint_mask)
+            center_cell=self._center_cell)
 
         return train_dataset, test_dataset
 
@@ -92,14 +88,13 @@ class DataSplitter:
                 dataset=train_dataset.model_inputs,
                 index=test_index,
                 transform=self.test_transform,
-                center_soma_in_disjoint_mask=
-                self._center_soma_in_disjoint_mask)
+                center_cell=self._center_cell)
             yield train, valid
 
     def _sample_dataset(self, dataset: List[ModelInput],
                         index: List[int],
                         transform: Optional[Transform] = None,
-                        center_soma_in_disjoint_mask=False) -> \
+                        center_cell=False) -> \
             RoiDataset:
         """Returns RoiDataset of Artifacts at index
 
@@ -110,9 +105,8 @@ class DataSplitter:
                 List of index of artifacts to construct dataset
             transform:
                 optional transform to pass to RoiDataset
-            center_soma_in_disjoint_mask
-                If the segmentation mask contains disjoint regions, take the
-                largest, which is usually the soma, and center it.
+            center_cell
+                Try to center the cell
 
         Returns
             RoiDataset
@@ -125,5 +119,5 @@ class DataSplitter:
             mask_out_projections=self.mask_out_projections,
             image_dim=self.image_dim,
             use_correlation_projection=self._use_correlation_projection,
-            center_soma_in_disjoint_mask=center_soma_in_disjoint_mask
+            try_center_cell_in_frame=center_cell
         )
