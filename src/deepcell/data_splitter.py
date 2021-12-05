@@ -15,7 +15,7 @@ class DataSplitter:
                  cre_line=None, exclude_mask=False,
                  mask_out_projections=False, image_dim=(128, 128),
                  use_correlation_projection=False,
-                 center_cell=False):
+                 center_soma=False):
         """
 
         Args:
@@ -37,8 +37,8 @@ class DataSplitter:
                 Input image dimension
             use_correlation_projection:
                 Whether to use correlation projection instead of avg
-            center_cell
-                Try to center the cell. Valid values are "test", "all" or False
+            center_soma
+                Try to center the soma. Valid values are "test", "all" or False
         """
         self._model_inputs = model_inputs
         self.train_transform = train_transform
@@ -50,10 +50,10 @@ class DataSplitter:
         self.image_dim = image_dim
         self._use_correlation_projection = use_correlation_projection
 
-        if center_cell not in ('test', 'all', False):
+        if center_soma not in ('test', 'all', False):
             raise ValueError(f'Invalid value for center_cell. Valid '
                              f'values are "test", "all", or False')
-        self._center_cell = center_cell
+        self._center_soma = center_soma
 
     def get_train_test_split(self, test_size):
         full_dataset = RoiDataset(
@@ -72,13 +72,13 @@ class DataSplitter:
             dataset=full_dataset.model_inputs,
             index=train_index,
             transform=self.train_transform,
-            center_cell=self._center_cell == 'all')
+            center_soma=self._center_soma == 'all')
 
         test_dataset = self._sample_dataset(
             dataset=full_dataset.model_inputs,
             index=test_index,
             transform=self.test_transform,
-            center_cell=True if self._center_cell else False)
+            center_soma=True if self._center_soma else False)
 
         return train_dataset, test_dataset
 
@@ -92,19 +92,19 @@ class DataSplitter:
                 dataset=train_dataset.model_inputs,
                 index=train_index,
                 transform=self.train_transform,
-                center_cell=self._center_cell == 'all'
+                center_soma=self._center_soma == 'all'
             )
             valid = self._sample_dataset(
                 dataset=train_dataset.model_inputs,
                 index=test_index,
                 transform=self.test_transform,
-                center_cell=True if self._center_cell else False)
+                center_soma=True if self._center_soma else False)
             yield train, valid
 
     def _sample_dataset(self, dataset: List[ModelInput],
                         index: List[int],
                         transform: Optional[Transform] = None,
-                        center_cell=False) -> \
+                        center_soma=False) -> \
             RoiDataset:
         """Returns RoiDataset of Artifacts at index
 
@@ -115,8 +115,8 @@ class DataSplitter:
                 List of index of artifacts to construct dataset
             transform:
                 optional transform to pass to RoiDataset
-            center_cell
-                Try to center the cell
+            center_soma
+                Try to center the soma
 
         Returns
             RoiDataset
@@ -129,5 +129,5 @@ class DataSplitter:
             mask_out_projections=self.mask_out_projections,
             image_dim=self.image_dim,
             use_correlation_projection=self._use_correlation_projection,
-            try_center_cell_in_frame=center_cell
+            try_center_soma_in_frame=center_soma
         )

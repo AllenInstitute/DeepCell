@@ -22,7 +22,7 @@ class RoiDataset(Dataset):
                  exclude_mask=False,
                  mask_out_projections=False,
                  use_correlation_projection=False,
-                 try_center_cell_in_frame=False):
+                 try_center_soma_in_frame=False):
         """
 
         Args:
@@ -44,11 +44,11 @@ class RoiDataset(Dataset):
                 the mask
             use_correlation_projection
                 Whether to use correlation projection instead of avg projection
-            try_center_cell_in_frame
-                The classifier has poor performance with a cell that is not
+            try_center_soma_in_frame
+                The classifier has poor performance with a soma that is not
                 centered in frame. Find the mask centroid and use that to
                 center in the frame. Note: does not guarantee that the cell
-                is perfectly centered as a cell with a long dendrite will
+                is perfectly centered as a soma with a long dendrite will
                 have the centroid shifted.
         """
         super().__init__()
@@ -60,7 +60,7 @@ class RoiDataset(Dataset):
         self._mask_out_projections = mask_out_projections
         self._y = np.array([int(x.label == 'cell') for x in self._model_inputs])
         self._use_correlation_projection = use_correlation_projection
-        self._try_center_cell_in_frame = try_center_cell_in_frame
+        self._try_center_soma_in_frame = try_center_soma_in_frame
 
         if cre_line:
             experiment_genotype_map = get_experiment_genotype_map()
@@ -120,10 +120,10 @@ class RoiDataset(Dataset):
         """
         def find_translation_px(mask: np.ndarray) -> np.ndarray:
             """
-            A cell might not be centered in frame, which hurts
-            performance. Find translation pixels to center cell.
+            A soma might not be centered in frame, which hurts
+            performance. Find translation pixels to center soma.
 
-            Note: this does not guarantee the cell is
+            Note: this does not guarantee the soma is
             perfectly centered due to long dendrites which shift the
             centroid away from the soma.
 
@@ -135,7 +135,7 @@ class RoiDataset(Dataset):
                 mask:
                     Segmentation mask
             Returns:
-                Returns the translation amount in pixels to center a cell in
+                Returns the translation amount in pixels to center a soma in
                 frame
             """
             def calc_contour_centroid(contour) -> np.ndarray:
@@ -215,7 +215,7 @@ class RoiDataset(Dataset):
             res[:, :, 0][np.where(mask == 0)] = 0
             res[:, :, 1][np.where(mask == 0)] = 0
 
-        if self._try_center_cell_in_frame:
+        if self._try_center_soma_in_frame:
             translation_px = find_translation_px(mask=mask)
             res = center_cell(x=res, translate_px=translation_px)
 

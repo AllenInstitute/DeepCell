@@ -21,7 +21,8 @@ def run_inference_for_experiment(
         output_path: Path,
         center_crop_size=(60, 60),
         use_correlation_projection=False,
-        mask_projections=False
+        mask_projections=False,
+        center_soma=False
     ):
     """
     Runs inference for experiment and produces csv of predictions
@@ -44,6 +45,8 @@ def run_inference_for_experiment(
             Whether to use correlation projection instead of avg projection
         mask_projections
             Whether to mask the projections using the segmentation mask
+        center_soma
+            See RoiDataset._try_center_soma_in_frame for details
     Returns:
         None, but writes predictions csv to disk
     """
@@ -69,12 +72,13 @@ def run_inference_for_experiment(
     test = RoiDataset(model_inputs=model_inputs,
                       transform=test_transform,
                       use_correlation_projection=use_correlation_projection,
-                      mask_out_projections=mask_projections)
+                      mask_out_projections=mask_projections,
+                      try_center_soma_in_frame=center_soma)
     test_dataloader = DataLoader(dataset=test, shuffle=False, batch_size=64)
 
     cnn = torchvision.models.vgg11_bn(pretrained=True, progress=False)
     cnn = VggBackbone(model=cnn, truncate_to_layer=15,
-                      classifier_cfg=[512, 512], dropout_prob=.7)
+                      classifier_cfg=[1024, 1024], dropout_prob=.7)
     _, inference_res = inference(model=cnn, test_loader=test_dataloader,
                                  has_labels=False,
                                  checkpoint_path=str(model_weights_path))
@@ -104,6 +108,8 @@ if __name__ == '__main__':
     parser.add_argument('--mask_projections', default=False,
                         help='Whether to mask projections using the '
                              'segmentation mask')
+    parser.add_argument('--center_soma', default=False,
+                        help='Try to center the soma in frame')
     args = parser.parse_args()
 
     rois_path = Path(args.rois_path)
@@ -124,11 +130,17 @@ if __name__ == '__main__':
 
     mask_projections = args.mask_projections == 'true'
 
+    if args.center_soma not in ('true', 'false'):
+        raise ValueError('Invalid value for center_soma')
+
+    center_soma = args.center_soma == 'true'
+
     run_inference_for_experiment(
         experiment_id=args.experiment_id, rois_path=rois_path,
         data_dir=data_dir, output_path=out_path,
         model_weights_path=model_weights_path,
         center_crop_size=center_crop_size,
         use_correlation_projection=use_correlation_projection,
-        mask_projections=mask_projections
+        mask_projections=mask_projections,
+        center_soma=center_soma
     )

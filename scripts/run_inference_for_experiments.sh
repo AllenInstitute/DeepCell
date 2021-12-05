@@ -6,7 +6,7 @@
 #SBATCH --time=48:00:00
 #SBATCH --output=/allen/aibs/informatics/aamster/pure_noise/logs/%A-%a.log # Update this log path
 #SBATCH --partition braintv
-#SBATCH --array=0-0 # Update this with number of experiments
+#SBATCH --array=0-1 # Update this with number of experiments
 #SBATCH --ntasks=24
 
 experiment_ids_path=$1
@@ -19,6 +19,7 @@ conda_env=$7
 center_crop_size=$8
 use_correlation_projection=$9
 mask_projections=${10}
+center_soma=${11}
 
 conda activate "$conda_env"
 pip install git+https://github.com/AllenInstitute/segmentation-labeling-app.git
@@ -38,7 +39,7 @@ rois_path="${rois_path}/${exp_id}_suite2p_rois.json"
 manifest="{
   \"experiment_id\": ${exp_id},
   \"binarized_rois_path\": "\"${rois_path}\"",
-  \"movie_path\": \"${movie_path}/${exp_id}/${exp_id}_movie.h5\",
+  \"movie_path\": \"${movie_path}/ophys_experiment_${exp_id}/denoised.h5\",
   \"local_to_global_roi_id_map\": {}
 }"
 
@@ -66,7 +67,8 @@ $conda_env -m deepcell.modules.run_inference \
   --out_path "${predictions_out_dir}" \
   --center_crop_size "${center_crop_size}" \
   --use_correlation_projection "${use_correlation_projection}" \
-  --mask_projections "${mask_projections}"
+  --mask_projections "${mask_projections}" \
+  --center_soma "${center_soma}"
 
 echo "Removing ${artifact_out_dir}"
 
