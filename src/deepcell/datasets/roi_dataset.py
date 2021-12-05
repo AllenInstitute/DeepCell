@@ -129,9 +129,11 @@ class RoiDataset(Dataset):
                 Returns the translation amount in pixels to center a soma (
                 assuming the soma has the largest area in a disjoint mask)
             """
-            def calc_contour_center(contour) -> np.ndarray:
-                x, y, w, h = cv2.boundingRect(contour)
-                return np.array([y + h / 2, x + w / 2])
+            def calc_contour_centroid(contour) -> np.ndarray:
+                M = cv2.moments(contour)
+                centroid = np.array(
+                    [int(M['m10'] / M['m00']), int(M['m01'] / M['m00'])])
+                return centroid
 
             contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
                                            cv2.CHAIN_APPROX_SIMPLE)
@@ -139,10 +141,10 @@ class RoiDataset(Dataset):
                 mask_areas = np.array([cv2.contourArea(x) for x in contours])
                 largest_mask_idx = np.argmax(mask_areas)
                 largest_contour = contours[largest_mask_idx]
-                largest_mask_center = calc_contour_center(
+                largest_mask_centroid = calc_contour_centroid(
                     contour=largest_contour)
                 frame_center = np.array(self._image_dim) / 2
-                diff_from_center = frame_center - largest_mask_center
+                diff_from_center = frame_center - largest_mask_centroid
                 return diff_from_center
             return np.array([0, 0])
 
@@ -158,8 +160,8 @@ class RoiDataset(Dataset):
             """
             transform = transforms.Compose([
                 iaa.Sequential([
-                    iaa.Affine(translate_px={'x': int(translate_px[1]),
-                                             'y': int(translate_px[0])})
+                    iaa.Affine(translate_px={'x': int(translate_px[0]),
+                                             'y': int(translate_px[1])})
                 ]).augment_image
             ])
             x = transform(x)
