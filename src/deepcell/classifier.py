@@ -176,7 +176,6 @@ class Classifier:
                     if save_model:
                         torch.save({
                             'state_dict': self.model.state_dict(),
-                            'optimizer': self.optimizer.state_dict(),
                             'scheduler': scheduler_state_dict,
                         }, f'{self.save_path}/{eval_fold}_model.pt')
                     time_since_best_epoch = 0
@@ -228,18 +227,22 @@ class Classifier:
                                     epoch: int):
         """Writes model weights and training performance to disk"""
         save_path = Path(self.save_path)
+        is_better_model = False
         if (save_path / f'{eval_fold}_model.pt').exists():
             # If we are continuing training (adds _continue suffix to save
             # path) and a better model was found
             checkpoint_path = save_path / f'{eval_fold}_model.pt'
+            is_better_model = True
         else:
             # No better model was found. Use previously saved best model
             checkpoint_path = Path(str(save_path).replace('_continue', '')) / \
                 f'{eval_fold}_model.pt'
         checkpoint = torch.load(checkpoint_path)
+        optimizer_state_dict = self.optimizer.state_dict() if is_better_model \
+            else checkpoint['optimizer']
         torch.save({
             'state_dict': checkpoint['state_dict'],
-            'optimizer': checkpoint['optimizer'],
+            'optimizer': optimizer_state_dict,
             'scheduler': checkpoint['scheduler'],
             'performance': {
                 'train': all_train_metrics.to_dict(
