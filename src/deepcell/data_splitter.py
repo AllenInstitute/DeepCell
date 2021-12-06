@@ -17,7 +17,8 @@ class DataSplitter:
                  use_correlation_projection=False,
                  center_soma=False):
         """
-
+        Does splitting of data into train/test or train/validation
+        
         Args:
             model_inputs:
                 List of model inputs
