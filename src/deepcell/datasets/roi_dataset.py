@@ -237,23 +237,3 @@ class RoiDataset(Dataset):
         self._model_inputs = [
             x for x in self._model_inputs if experiment_genotype_map[
                 x.experiment_id].startswith(cre_line)]
-
-
-if __name__ == '__main__':
-    def main():
-        from torchvision import transforms
-        from imgaug import augmenters as iaa
-        artifacts = [ModelInput.from_data_dir(
-            data_dir='/tmp/artifacts',
-            experiment_id='871196379', roi_id='1')]
-        all_transform = transforms.Compose([
-            iaa.Sequential([
-                iaa.CenterCropToFixedSize(height=60, width=60)
-            ]).augment_image
-        ])
-
-        test_transform = Transform(all_transform=all_transform)
-        dataset = RoiDataset(model_inputs=artifacts, transform=test_transform)
-        for _ in dataset:
-            pass
-    main()
