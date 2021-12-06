@@ -24,7 +24,8 @@ class RoiDataset(Dataset):
                  use_correlation_projection=False,
                  try_center_soma_in_frame=False):
         """
-
+        A dataset of segmentation masks as identified by Suite2p with
+        binary label "cell" or "not cell"
         Args:
             model_inputs:
                 A set of records in this dataset
