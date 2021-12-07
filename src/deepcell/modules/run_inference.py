@@ -18,7 +18,12 @@ def run_inference_for_experiment(
         rois_path: Path,
         data_dir: Path,
         model_weights_path: Path,
-        output_path: Path):
+        output_path: Path,
+        center_crop_size=(60, 60),
+        use_correlation_projection=False,
+        mask_projections=False,
+        center_soma=False
+    ):
     """
     Runs inference for experiment and produces csv of predictions
 
@@ -34,14 +39,21 @@ def run_inference_for_experiment(
             Path to Pytorch model weights that were saved using torch.save
         output_path:
             Path to save predictions csv
-        use_cuda:
-            True if on GPU
+        center_crop_size:
+            Height, width to center crop inputs
+        use_correlation_projection:
+            Whether to use correlation projection instead of avg projection
+        mask_projections
+            Whether to mask the projections using the segmentation mask
+        center_soma
+            See RoiDataset._try_center_soma_in_frame for details
     Returns:
         None, but writes predictions csv to disk
     """
     all_transform = transforms.Compose([
         iaa.Sequential([
-            iaa.CenterCropToFixedSize(height=60, width=60)
+            iaa.CenterCropToFixedSize(height=center_crop_size[0],
+                                      width=center_crop_size[1])
         ]).augment_image,
         transforms.ToTensor(),
         transforms.Normalize(
@@ -58,13 +70,15 @@ def run_inference_for_experiment(
                                  experiment_id=experiment_id,
                                  roi_id=roi['id']) for roi in rois]
     test = RoiDataset(model_inputs=model_inputs,
-                      transform=test_transform)
+                      transform=test_transform,
+                      use_correlation_projection=use_correlation_projection,
+                      mask_out_projections=mask_projections,
+                      try_center_soma_in_frame=center_soma)
     test_dataloader = DataLoader(dataset=test, shuffle=False, batch_size=64)
 
     cnn = torchvision.models.vgg11_bn(pretrained=True, progress=False)
     cnn = VggBackbone(model=cnn, truncate_to_layer=15,
-                      classifier_cfg=[512, 512], dropout_prob=.7,
-                      freeze_up_to_layer=15)
+                      classifier_cfg=[1024, 1024], dropout_prob=.7)
     _, inference_res = inference(model=cnn, test_loader=test_dataloader,
                                  has_labels=False,
                                  checkpoint_path=str(model_weights_path))
@@ -85,6 +99,17 @@ if __name__ == '__main__':
                         help='Path to trained model weights')
     parser.add_argument('--out_path', required=True, help='Where to store '
                                                           'predictions')
+    parser.add_argument('--center_crop_size', default='60x60',
+                        help='Height, width to center crop inputs. '
+                             'Should be of form "60x60"')
+    parser.add_argument('--use_correlation_projection',
+                        default='false', help='Whether to use correlation '
+                                              'projection instead of avg')
+    parser.add_argument('--mask_projections', default=False,
+                        help='Whether to mask projections using the '
+                             'segmentation mask')
+    parser.add_argument('--center_soma', default=False,
+                        help='Try to center the soma in frame')
     args = parser.parse_args()
 
     rois_path = Path(args.rois_path)
@@ -92,6 +117,30 @@ if __name__ == '__main__':
     model_weights_path = Path(args.model_weights_path)
     out_path = Path(args.out_path)
 
-    run_inference_for_experiment(experiment_id=args.experiment_id, rois_path=rois_path,
-                                 data_dir=data_dir, output_path=out_path,
-                                 model_weights_path=model_weights_path)
+    center_crop_size = tuple(
+        [int(x) for x in args.center_crop_size.split('x')])
+
+    if args.use_correlation_projection not in ('true', 'false'):
+        raise ValueError('Invalid value for use_correlation_projection')
+
+    use_correlation_projection = args.use_correlation_projection == 'true'
+
+    if args.mask_projections not in ('true', 'false'):
+        raise ValueError('Invalid value for mask_projections')
+
+    mask_projections = args.mask_projections == 'true'
+
+    if args.center_soma not in ('true', 'false'):
+        raise ValueError('Invalid value for center_soma')
+
+    center_soma = args.center_soma == 'true'
+
+    run_inference_for_experiment(
+        experiment_id=args.experiment_id, rois_path=rois_path,
+        data_dir=data_dir, output_path=out_path,
+        model_weights_path=model_weights_path,
+        center_crop_size=center_crop_size,
+        use_correlation_projection=use_correlation_projection,
+        mask_projections=mask_projections,
+        center_soma=center_soma
+    )

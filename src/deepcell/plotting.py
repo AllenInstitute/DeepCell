@@ -24,16 +24,16 @@ def plot_training_performance(cv_metrics: CVMetrics,
     fig, ax = plt.subplots(nrows=num_folds, ncols=1, figsize=(5, 10))
 
     for i in range(num_folds):
-        if which_metric == 'AUPR':
-            train_metric = cv_metrics.train_metrics[i].auprs
-            val_metric = cv_metrics.valid_metrics[i].auprs
+        if which_metric == 'F1':
+            train_metric = cv_metrics.train_metrics[i].f1s
+            val_metric = cv_metrics.valid_metrics[i].f1s
         elif which_metric == 'loss':
             train_metric = cv_metrics.train_metrics[i].losses
             val_metric = cv_metrics.valid_metrics[i].losses
         else:
             raise ValueError(
                 f'metric {which_metric} not supported. Needs to be '
-                f'one of "AUPR" or "loss"')
+                f'one of "F1" or "loss"')
 
         best_epoch = cv_metrics.train_metrics[i].best_epoch
 
