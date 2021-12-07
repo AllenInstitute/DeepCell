@@ -51,9 +51,9 @@ class DataSplitter:
         self.image_dim = image_dim
         self._use_correlation_projection = use_correlation_projection
 
-        if center_soma not in ('test', 'all', False):
-            raise ValueError(f'Invalid value for center_cell. Valid '
-                             f'values are "test", "all", or False')
+        if center_soma not in ('test', True, False):
+            raise ValueError(f'Invalid value for center_soma. Valid '
+                             f'values are "test", True, or False')
         self._center_soma = center_soma
 
     def get_train_test_split(self, test_size):
