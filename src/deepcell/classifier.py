@@ -2,7 +2,7 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 import torch
 from torch.utils.data import DataLoader
@@ -37,8 +37,10 @@ class Classifier:
         self.debug = debug
         self.early_stopping = early_stopping
         self.model_load_path = model_load_path
-        self.save_path = f'{save_path}_continue' if model_load_path is not \
-            None else save_path
+        self.save_path = save_path
+        self._current_best_model_state_dict = None
+        self._current_best_scheduler_state_dict = None
+        self._current_best_optimizer_state_dict = None
 
         if not os.path.exists(f'{self.save_path}'):
             os.makedirs(f'{self.save_path}')
@@ -51,7 +53,7 @@ class Classifier:
         }, f'{self.save_path}/model_init.pt')
 
     def cross_validate(self, train_dataset: RoiDataset, data_splitter: DataSplitter, batch_size=64, sampler=None,
-                       n_splits=5, save_model=False, log_after_each_epoch=True):
+                       n_splits=5, log_after_each_epoch=True):
         cv_metrics = CVMetrics(n_splits=n_splits)
 
         for i, (train, valid) in enumerate(data_splitter.get_cross_val_split(train_dataset=train_dataset,
@@ -61,33 +63,9 @@ class Classifier:
             logger.info(f'=========')
 
             if self.model_load_path is not None:
-                x = torch.load(Path(self.model_load_path) / f'{i}_model.pt')
-                self.model.load_state_dict(x['state_dict'])
-                self.optimizer.load_state_dict(x['optimizer'])
-                if self.scheduler is not None:
-                    self.scheduler.load_state_dict(x['scheduler'])
-                train_metrics = TrainingMetrics(
-                    n_epochs=self.n_epochs,
-                    losses=x['performance']['train']['losses'],
-                    f1s=x['performance']['train']['f1s'],
-                    best_epoch=x['performance']['train']['best_epoch'],
-                    best_metric=x['performance']['train']['best_metric'],
-                    best_metric_value=x['performance']['train'][
-                        'best_metric_value'],
-                    metric_larger_is_better=x['performance']['train'][
-                        'metric_larger_is_better']
-                )
-                val_metrics = TrainingMetrics(
-                    n_epochs=self.n_epochs,
-                    losses=x['performance']['val']['losses'],
-                    f1s=x['performance']['val']['f1s'],
-                    best_epoch=x['performance']['val']['best_epoch'],
-                    best_metric=x['performance']['val']['best_metric'],
-                    best_metric_value=x['performance']['val'][
-                        'best_metric_value'],
-                    metric_larger_is_better=x['performance']['val'][
-                        'metric_larger_is_better']
-                )
+                train_metrics, val_metrics = self._load_pretrained_model(
+                    checkpoint_path=Path(
+                        self.model_load_path) / f'{i}_model.pt')
             else:
                 train_metrics = TrainingMetrics(n_epochs=self.n_epochs)
                 val_metrics = TrainingMetrics(n_epochs=self.n_epochs)
@@ -96,7 +74,7 @@ class Classifier:
             valid_loader = DataLoader(dataset=valid, shuffle=False, batch_size=batch_size)
             train_metrics, valid_metrics = self.train(
                 train_loader=train_loader, valid_loader=valid_loader,
-                save_model=save_model, eval_fold=i,
+                eval_fold=i,
                 log_after_each_epoch=log_after_each_epoch,
                 train_metrics=train_metrics, val_metrics=val_metrics)
 
@@ -107,7 +85,7 @@ class Classifier:
         return cv_metrics
 
     def train(self, train_loader: DataLoader, eval_fold=None, valid_loader: DataLoader = None,
-              log_after_each_epoch=True, save_model=False,
+              log_after_each_epoch=True,
               train_metrics: Optional[TrainingMetrics] = None,
               val_metrics: Optional[TrainingMetrics] = None):
         if train_metrics is not None:
@@ -173,11 +151,12 @@ class Classifier:
                 if all_val_metrics.best_epoch == epoch:
                     scheduler_state_dict = self.scheduler.state_dict() if \
                         self.scheduler is not None else None
-                    if save_model:
-                        torch.save({
-                            'state_dict': self.model.state_dict(),
-                            'scheduler': scheduler_state_dict,
-                        }, f'{self.save_path}/{eval_fold}_model.pt')
+                    self._current_best_model_state_dict = \
+                        self.model.state_dict()
+                    self._current_best_scheduler_state_dict = \
+                        scheduler_state_dict
+                    self._current_best_optimizer_state_dict = \
+                        self.optimizer.state_dict()
                     time_since_best_epoch = 0
                 else:
                     time_since_best_epoch += 1
@@ -226,24 +205,10 @@ class Classifier:
                                     all_val_metrics: TrainingMetrics,
                                     epoch: int):
         """Writes model weights and training performance to disk"""
-        save_path = Path(self.save_path)
-        is_better_model = False
-        if (save_path / f'{eval_fold}_model.pt').exists():
-            # If we are continuing training (adds _continue suffix to save
-            # path) and a better model was found
-            checkpoint_path = save_path / f'{eval_fold}_model.pt'
-            is_better_model = True
-        else:
-            # No better model was found. Use previously saved best model
-            checkpoint_path = Path(str(save_path).replace('_continue', '')) / \
-                f'{eval_fold}_model.pt'
-        checkpoint = torch.load(checkpoint_path)
-        optimizer_state_dict = self.optimizer.state_dict() if is_better_model \
-            else checkpoint['optimizer']
         torch.save({
-            'state_dict': checkpoint['state_dict'],
-            'optimizer': optimizer_state_dict,
-            'scheduler': checkpoint['scheduler'],
+            'state_dict': self._current_best_model_state_dict,
+            'optimizer': self._current_best_optimizer_state_dict,
+            'scheduler': self._current_best_scheduler_state_dict,
             'performance': {
                 'train': all_train_metrics.to_dict(
                     to_epoch=epoch, best_epoch=all_train_metrics.best_epoch),
@@ -251,3 +216,47 @@ class Classifier:
                     to_epoch=epoch, best_epoch=all_val_metrics.best_epoch)
             }
         }, f'{self.save_path}/{eval_fold}_model.pt')
+
+    def _load_pretrained_model(self, checkpoint_path: Path) -> \
+            Tuple[TrainingMetrics, TrainingMetrics]:
+        """Loads a pretrained model to continue training
+
+        Args:
+            checkpoint_path: checkpoint path of pretrained model
+
+        Returns:
+            Tuple of training metrics from previous training run
+        """
+        x = torch.load(checkpoint_path)
+        self.model.load_state_dict(x['state_dict'])
+        self.optimizer.load_state_dict(x['optimizer'])
+        if self.scheduler is not None:
+            self.scheduler.load_state_dict(x['scheduler'])
+        train_metrics = TrainingMetrics(
+            n_epochs=self.n_epochs,
+            losses=x['performance']['train']['losses'],
+            f1s=x['performance']['train']['f1s'],
+            best_epoch=x['performance']['train']['best_epoch'],
+            best_metric=x['performance']['train']['best_metric'],
+            best_metric_value=x['performance']['train'][
+                'best_metric_value'],
+            metric_larger_is_better=x['performance']['train'][
+                'metric_larger_is_better']
+        )
+        val_metrics = TrainingMetrics(
+            n_epochs=self.n_epochs,
+            losses=x['performance']['val']['losses'],
+            f1s=x['performance']['val']['f1s'],
+            best_epoch=x['performance']['val']['best_epoch'],
+            best_metric=x['performance']['val']['best_metric'],
+            best_metric_value=x['performance']['val'][
+                'best_metric_value'],
+            metric_larger_is_better=x['performance']['val'][
+                'metric_larger_is_better']
+        )
+
+        self._current_best_model_state_dict = x['state_dict']
+        self._current_best_optimizer_state_dict = x['optimizer']
+        self._current_best_scheduler_state_dict = x['scheduler']
+
+        return train_metrics, val_metrics
