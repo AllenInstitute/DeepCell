@@ -204,7 +204,7 @@ class Classifier:
         """Writes model weights and training performance to disk"""
         torch.save({
             'state_dict': self._current_best_state_dicts['model'],
-            'optimizer': self._current_best_state_dicts['optimizer']
+            'optimizer': self._current_best_state_dicts['optimizer'],
             'scheduler': self._current_best_state_dicts['scheduler'],
             'performance': {
                 'train': all_train_metrics.to_dict(
