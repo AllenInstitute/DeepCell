@@ -6,9 +6,9 @@ class ModelInput:
     def __init__(self,
                  roi_id: str,
                  experiment_id: str,
-                 avg_projection_path: Path,
                  mask_path: Path,
-                 max_projection_path: Optional[Path] = None,
+                 max_projection_path: Path,
+                 avg_projection_path: Optional[Path] = None,
                  correlation_projection_path: Optional[Path] = None,
                  project_name: Optional[str] = None,
                  label: Optional[str] = None):
@@ -35,8 +35,8 @@ class ModelInput:
                 optional label assigned to this example
                 will be None if at test time (not labeled)
         """
-        if max_projection_path is None and correlation_projection_path is None:
-            raise ValueError('Must supply one of max_projection_path or '
+        if avg_projection_path is None and correlation_projection_path is None:
+            raise ValueError('Must supply one of avg_projection_path or '
                              'correlation_projection_path')
         self._roi_id = roi_id
         self._experiment_id = experiment_id
@@ -56,7 +56,7 @@ class ModelInput:
         return self._experiment_id
 
     @property
-    def max_projection_path(self) -> Optional[Path]:
+    def max_projection_path(self) -> Path:
         return self._max_projection_path
 
     @property
@@ -64,7 +64,7 @@ class ModelInput:
         return self._correlation_projection_path
 
     @property
-    def avg_projection_path(self) -> Path:
+    def avg_projection_path(self) -> Optional[Path]:
         return self._avg_projection_path
 
     @property
