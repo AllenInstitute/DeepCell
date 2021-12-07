@@ -38,9 +38,7 @@ class Classifier:
         self.early_stopping = early_stopping
         self.model_load_path = model_load_path
         self.save_path = save_path
-        self._current_best_model_state_dict = None
-        self._current_best_scheduler_state_dict = None
-        self._current_best_optimizer_state_dict = None
+        self._current_best_state_dicts = {}
 
         if not os.path.exists(f'{self.save_path}'):
             os.makedirs(f'{self.save_path}')
@@ -151,12 +149,11 @@ class Classifier:
                 if all_val_metrics.best_epoch == epoch:
                     scheduler_state_dict = self.scheduler.state_dict() if \
                         self.scheduler is not None else None
-                    self._current_best_model_state_dict = \
-                        self.model.state_dict()
-                    self._current_best_scheduler_state_dict = \
-                        scheduler_state_dict
-                    self._current_best_optimizer_state_dict = \
-                        self.optimizer.state_dict()
+                    self._current_best_state_dicts = {
+                        'model': self.model.state_dict(),
+                        'optimizer': self.optimizer.state_dict(),
+                        'scheduler': scheduler_state_dict
+                    }
                     time_since_best_epoch = 0
                 else:
                     time_since_best_epoch += 1
@@ -206,9 +203,9 @@ class Classifier:
                                     epoch: int):
         """Writes model weights and training performance to disk"""
         torch.save({
-            'state_dict': self._current_best_model_state_dict,
-            'optimizer': self._current_best_optimizer_state_dict,
-            'scheduler': self._current_best_scheduler_state_dict,
+            'state_dict': self._current_best_state_dicts['model'],
+            'optimizer': self._current_best_state_dicts['optimizer']
+            'scheduler': self._current_best_state_dicts['scheduler'],
             'performance': {
                 'train': all_train_metrics.to_dict(
                     to_epoch=epoch, best_epoch=all_train_metrics.best_epoch),
@@ -255,8 +252,10 @@ class Classifier:
                 'metric_larger_is_better']
         )
 
-        self._current_best_model_state_dict = x['state_dict']
-        self._current_best_optimizer_state_dict = x['optimizer']
-        self._current_best_scheduler_state_dict = x['scheduler']
+        self._current_best_state_dicts = {
+            'model': x['state_dict'],
+            'optimizer': x['optimizer'],
+            'scheduler': x['scheduler']
+        }
 
         return train_metrics, val_metrics
