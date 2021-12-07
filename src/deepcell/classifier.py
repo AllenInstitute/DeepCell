@@ -2,7 +2,7 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union, Callable
 
 import torch
 from torch.utils.data import DataLoader
@@ -22,9 +22,42 @@ logger = logging.getLogger(__name__)
 
 
 class Classifier:
-    def __init__(self, model: torch.nn.Module, n_epochs: int, optimizer,
-                 criterion, save_path, scheduler=None, scheduler_step_after_batch=False, debug=False,
-                 early_stopping=30, model_load_path=None):
+    def __init__(
+            self,
+            model: torch.nn.Module,
+            n_epochs: int,
+            optimizer: Callable[..., torch.optim.Adam],
+            criterion: torch.nn.BCEWithLogitsLoss,
+            save_path: Union[str, Path],
+            scheduler: Optional[
+                Callable[[torch.optim.Adam],
+                         torch.optim.lr_scheduler.ReduceLROnPlateau]] = None,
+            scheduler_step_after_batch=False,
+            early_stopping=30,
+            model_load_path: Optional[Union[str, Path]] = None):
+        """
+        The driver for the training and evaluation loop
+        Args:
+            model:
+                torch.nn.Module
+            n_epochs:
+                Number of epochs to train for
+            optimizer:
+                function which returns instantiation of Adam optimizer
+            criterion:
+                loss function
+            save_path:
+                Where to save checkpoints
+            scheduler:
+                optional function which returns learning rate scheduler
+            scheduler_step_after_batch:
+                Whether the scheduler steps after each batch or epoch
+            early_stopping:
+                Number of epochs to activate early stopping
+            model_load_path:
+                Path to load a pretrained model. Activates continuation of
+                training
+        """
         self.n_epochs = n_epochs
         self.model = model
         self.optimizer_constructor = optimizer
@@ -34,7 +67,6 @@ class Classifier:
         self.scheduler_step_after_batch = scheduler_step_after_batch
         self.criterion = criterion
         self.use_cuda = torch.cuda.is_available()
-        self.debug = debug
         self.early_stopping = early_stopping
         self.model_load_path = model_load_path
         self.save_path = save_path
@@ -167,10 +199,7 @@ class Classifier:
 
             if not self.scheduler_step_after_batch:
                 if self.scheduler is not None:
-                    if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-                        self.scheduler.step(epoch_val_metrics.loss)
-                    else:
-                        self.scheduler.step()
+                    self.scheduler.step(epoch_val_metrics.loss)
 
             if log_after_each_epoch:
                 logger.info(f'Epoch: {epoch + 1} \t'
