@@ -34,12 +34,12 @@ predictions_out_dir="${out_dir}/predictions/"
 mkdir -p "${out_dir}"
 mkdir -p "${predictions_out_dir}"
 
-rois_path="${rois_path}/${exp_id}_suite2p_rois.json"
+rois_path="${rois_path}/${exp_id}_rois.json"
 
 manifest="{
   \"experiment_id\": ${exp_id},
   \"binarized_rois_path\": "\"${rois_path}\"",
-  \"movie_path\": \"${movie_path}/ophys_experiment_${exp_id}/denoised.h5\",
+  \"movie_path\": \"${movie_path}/${exp_id}_denoised_video.h5\",
   \"local_to_global_roi_id_map\": {}
 }"
 
@@ -51,7 +51,7 @@ echo "Generating artifacts for ${exp_id}"
 $conda_env -m slapp.transforms.transform_pipeline \
   --prod_segmentation_run_manifest "${manifest_path}" \
   --output_manifest "${out_dir}/manifest.json" \
-  --correlation_projection_path "${correlation_projection_path}/${exp_id}_correlation_proj.png" \
+  --correlation_projection_path "${correlation_projection_path}/${exp_id}_correlation_projection.png" \
   --artifact_basedir "${artifact_out_dir}" \
   --skip_movies True \
   --skip_traces True \
