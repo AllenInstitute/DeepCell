@@ -4,7 +4,7 @@ import torch
 from torch import nn
 
 from deepcell.models.util import truncate_model_to_layer, get_last_filter_num
-from src.deepcell.models.spatial_transformer_network import \
+from deepcell.models.spatial_transformer_network import \
     SpatialTransformerNetwork
 
 
