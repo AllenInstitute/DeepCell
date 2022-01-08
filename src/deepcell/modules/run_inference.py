@@ -78,7 +78,8 @@ def run_inference_for_experiment(
 
     cnn = torchvision.models.vgg11_bn(pretrained=True, progress=False)
     cnn = VggBackbone(model=cnn, truncate_to_layer=15,
-                      classifier_cfg=[1024, 1024], dropout_prob=.7)
+                      classifier_cfg=[1024, 1024], dropout_prob=.7,
+                      use_spatial_transformer_network=True)
     _, inference_res = inference(model=cnn, test_loader=test_dataloader,
                                  has_labels=False,
                                  checkpoint_path=str(model_weights_path))
