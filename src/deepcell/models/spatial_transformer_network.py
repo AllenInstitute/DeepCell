@@ -41,6 +41,8 @@ class SpatialTransformerNetwork(nn.Module):
             torch.tensor([1, 0, 0], dtype=torch.float))
 
     def forward(self, x):
+        input = x
+
         x = self.localization_feature_extractor(x)
         x = x.reshape(x.size(0), -1)
         x = self.localization_regressor(x)
@@ -54,6 +56,6 @@ class SpatialTransformerNetwork(nn.Module):
             [0, s, ty]
         ] for s, tx, ty in zip(s, tx, ty)], dtype=torch.float)
 
-        grid = F.affine_grid(A, x.size())
-        x = F.grid_sample(x, grid)
+        grid = F.affine_grid(A, input.size())
+        x = F.grid_sample(input, grid)
         return x
