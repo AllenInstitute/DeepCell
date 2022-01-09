@@ -32,13 +32,13 @@ class SpatialTransformerNetwork(nn.Module):
             #  [0 s ty]]
             # which has 3 parameters
             # allows cropping, translation, and isotropic scaling
-            nn.Linear(in_features=32, out_features=3)
+            nn.Linear(in_features=32, out_features=2)
         )
 
         # Initialize the weights/bias with identity transformation
         self.localization_regressor[-1].weight.data.zero_()
         self.localization_regressor[-1].bias.data.copy_(
-            torch.tensor([1, 0, 0], dtype=torch.float))
+            torch.tensor([0, 0], dtype=torch.float))
 
     def forward(self, x):
         input = x
@@ -47,10 +47,9 @@ class SpatialTransformerNetwork(nn.Module):
         x = x.reshape(x.size(0), -1)
         theta = self.localization_regressor(x)
 
-        scale = theta[:, 0].unsqueeze(1)
-        scale_mat = torch.cat((scale, scale), 1)
-        translation = theta[:, 1:].unsqueeze(2)
-        A = torch.cat((torch.diag_embed(scale_mat), translation), 2)
+        translation = theta.unsqueeze(-1)
+        A = torch.cat((torch.diag_embed(torch.ones((x.size(0), 2))),
+                       translation), -1)
 
         # s = theta[:, 0]
         # tx = theta[:, 1]
