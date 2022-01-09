@@ -20,10 +20,6 @@ class SpatialTransformerNetwork(nn.Module):
             torch.nn.AdaptiveAvgPool2d((7, 7))
         )
 
-        for layer in self.localization_feature_extractor:
-            for p in layer.parameters():
-                p.requires_grad = False
-
         last_conv_filter_num = get_last_filter_num(
             layers=self.localization_feature_extractor)
         in_features = last_conv_filter_num * 7 * 7
