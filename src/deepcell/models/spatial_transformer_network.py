@@ -49,7 +49,7 @@ class SpatialTransformerNetwork(nn.Module):
 
         scale = theta[:, 0].unsqueeze(1)
         scale_mat = torch.cat((scale, scale), 1)
-        translation = theta.unsqueeze(-1)
+        translation = theta[:, 1:].unsqueeze(-1)
         A = torch.cat((torch.diag_embed(scale_mat),
                        translation), -1)
 
