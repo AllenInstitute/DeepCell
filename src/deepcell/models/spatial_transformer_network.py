@@ -36,9 +36,9 @@ class SpatialTransformerNetwork(nn.Module):
         )
 
         # Initialize the weights/bias with identity transformation
-        self.localization_regressor[-1].weight = torch.zeros_like(
-            self.localization_regressor[-1].weight, requires_grad=True)
-        self.localization_regressor[-1].bias = torch.tensor(
+        self.localization_regressor[-1].weight = torch.nn.Parameter(
+            torch.zeros_like(self.localization_regressor[-1].weight))
+        self.localization_regressor[-1].bias = torch.nn.Parameter(
             torch.tensor([1, 0, 0], dtype=torch.float, requires_grad=True))
 
     def forward(self, x):
