@@ -45,10 +45,13 @@ class SpatialTransformerNetwork(nn.Module):
 
         x = self.localization_feature_extractor(x)
         x = x.reshape(x.size(0), -1)
+        scale = torch.ones((x.size(0), 2))
+        if torch.cuda.is_available():
+            scale = scale.cuda()
         theta = self.localization_regressor(x)
 
         translation = theta.unsqueeze(-1)
-        A = torch.cat((torch.diag_embed(torch.ones((x.size(0), 2))),
+        A = torch.cat((torch.diag_embed(scale),
                        translation), -1)
 
         # s = theta[:, 0]
