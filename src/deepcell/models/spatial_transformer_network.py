@@ -8,10 +8,15 @@ from deepcell.models.util import get_last_filter_num
 
 
 class SpatialTransformerNetwork(nn.Module):
-    def __init__(self, localization_feature_extractor: List):
+    def __init__(self):
         super().__init__()
         self.localization_feature_extractor = torch.nn.Sequential(
-            *localization_feature_extractor,
+            nn.Conv2d(3, 8, kernel_size=7),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(2, stride=2),
+            nn.Conv2d(8, 16, kernel_size=5),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(2, stride=2),
             torch.nn.AdaptiveAvgPool2d((7, 7))
         )
 
@@ -36,9 +41,9 @@ class SpatialTransformerNetwork(nn.Module):
         )
 
         # Initialize the weights/bias with identity transformation
-        # self.localization_regressor[-1].weight.data.zero_()
-        # self.localization_regressor[-1].bias.data.copy_(
-        #     torch.tensor([1, 0, 0], dtype=torch.float))
+        self.localization_regressor[-1].weight.data.zero_()
+        self.localization_regressor[-1].bias.data.copy_(
+            torch.tensor([1, 0, 0], dtype=torch.float))
 
     def forward(self, x):
         input = x
