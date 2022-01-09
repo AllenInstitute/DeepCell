@@ -29,8 +29,7 @@ class VggBackbone(torch.nn.Module):
                                                        dropout_prob=dropout_prob)
 
         if use_spatial_transformer_network:
-            self._stn = SpatialTransformerNetwork(
-                localization_feature_extractor=copy.deepcopy(conv_layers))
+            self._stn = SpatialTransformerNetwork()
         else:
             self._stn = None
 
