@@ -36,27 +36,31 @@ class SpatialTransformerNetwork(nn.Module):
         )
 
         # Initialize the weights/bias with identity transformation
-        self.localization_regressor[-1].weight = torch.nn.Parameter(
-            torch.zeros_like(self.localization_regressor[-1].weight))
-        self.localization_regressor[-1].bias = torch.nn.Parameter(
-            torch.tensor([1, 0, 0], dtype=torch.float, requires_grad=True))
+        self.localization_regressor[-1].weight.data.zero_()
+        self.localization_regressor[-1].bias.data.copy_(
+            torch.tensor([1, 0, 0], dtype=torch.float))
 
     def forward(self, x):
         input = x
 
         x = self.localization_feature_extractor(x)
         x = x.reshape(x.size(0), -1)
-        x = self.localization_regressor(x)
+        theta = self.localization_regressor(x)
 
-        s = x[:, 0]
-        tx = x[:, 1]
-        ty = x[:, 2]
+        scale = theta[:, 0].unsqueeze(1)
+        scale_mat = torch.cat((scale, scale), 1)
+        translation = theta[:, 1:].unsqueeze(2)
+        A = torch.cat((torch.diag_embed(scale_mat), translation), 2)
 
-        A = torch.tensor([[
-            [s, 0, tx],
-            [0, s, ty]
-        ] for s, tx, ty in zip(s, tx, ty)], dtype=torch.float,
-            requires_grad=True)
+        # s = theta[:, 0]
+        # tx = theta[:, 1]
+        # ty = theta[:, 2]
+        #
+        # A = torch.tensor([[
+        #     [s, 0, tx],
+        #     [0, s, ty]
+        # ] for s, tx, ty in zip(s, tx, ty)], dtype=torch.float,
+        #     requires_grad=True)
 
         grid = F.affine_grid(A, input.size(), align_corners=False)
         if torch.cuda.is_available():
