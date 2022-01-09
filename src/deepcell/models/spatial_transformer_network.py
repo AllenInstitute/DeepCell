@@ -15,9 +15,9 @@ class SpatialTransformerNetwork(nn.Module):
             torch.nn.AdaptiveAvgPool2d((7, 7))
         )
 
-        # for layer in self.localization_feature_extractor:
-        #     for p in layer.parameters():
-        #         p.requires_grad = False
+        for layer in self.localization_feature_extractor:
+            for p in layer.parameters():
+                p.requires_grad = False
 
         last_conv_filter_num = get_last_filter_num(
             layers=self.localization_feature_extractor)
@@ -37,8 +37,8 @@ class SpatialTransformerNetwork(nn.Module):
 
         # Initialize the weights/bias with identity transformation
         self.localization_regressor[-1].weight.data.zero_()
-        self.localization_regressor[-1].bias.data.copy_(
-            torch.tensor([0, 0], dtype=torch.float))
+        # self.localization_regressor[-1].bias.data.copy_(
+        #     torch.tensor([0, 0], dtype=torch.float))
 
     def forward(self, x):
         input = x
