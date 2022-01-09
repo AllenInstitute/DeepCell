@@ -8,17 +8,16 @@ from deepcell.models.util import get_last_filter_num
 
 
 class SpatialTransformerNetwork(nn.Module):
-    def __init__(self):
+    def __init__(self, localization_feature_extractor: List):
         super().__init__()
         self.localization_feature_extractor = torch.nn.Sequential(
-            nn.Conv2d(3, 8, kernel_size=7),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2, stride=2),
-            nn.Conv2d(8, 16, kernel_size=5),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2, stride=2),
+            *localization_feature_extractor,
             torch.nn.AdaptiveAvgPool2d((7, 7))
         )
+
+        for layer in self.localization_feature_extractor:
+            for p in layer.parameters():
+                p.requires_grad = False
 
         last_conv_filter_num = get_last_filter_num(
             layers=self.localization_feature_extractor)
@@ -55,7 +54,8 @@ class SpatialTransformerNetwork(nn.Module):
         A = torch.tensor([[
             [s, 0, tx],
             [0, s, ty]
-        ] for s, tx, ty in zip(s, tx, ty)], dtype=torch.float)
+        ] for s, tx, ty in zip(s, tx, ty)], dtype=torch.float,
+            requires_grad=True)
 
         grid = F.affine_grid(A, input.size(), align_corners=False)
         if torch.cuda.is_available():
