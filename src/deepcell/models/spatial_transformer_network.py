@@ -10,29 +10,38 @@ from deepcell.models.util import get_last_filter_num
 class SpatialTransformerNetwork(nn.Module):
     def __init__(self, localization_feature_extractor: List):
         super().__init__()
-        self.localization_feature_extractor = torch.nn.Sequential(
-            *localization_feature_extractor,
-            torch.nn.AdaptiveAvgPool2d((7, 7))
-        )
+        self.localization_feature_extractor = nn.Sequential(nn.Conv2d(3, 16,
+                                                                      kernel_size=7),
+                                          nn.MaxPool2d(2, stride=2),
+                                          nn.ReLU(True),
+                                          nn.Conv2d(16, 32, kernel_size=5),
+                                          nn.MaxPool2d(2, stride=2),
+                                          nn.ReLU(True),
+                                          nn.Conv2d(32, 64, kernel_size=5),
+                                          nn.MaxPool2d(2, stride=2),
+                                          nn.ReLU(True),
+                                          nn.Conv2d(64, 128, kernel_size=5),
+                                          nn.MaxPool2d(2, stride=2),
+                                          nn.ReLU(True))
 
-        for layer in self.localization_feature_extractor:
-            for p in layer.parameters():
-                p.requires_grad = False
+        # for layer in self.localization_feature_extractor:
+        #     for p in layer.parameters():
+        #         p.requires_grad = False
 
         last_conv_filter_num = get_last_filter_num(
             layers=self.localization_feature_extractor)
-        in_features = last_conv_filter_num * 7 * 7
+        in_features = last_conv_filter_num * 4 * 4
 
         self.localization_regressor = nn.Sequential(
-            nn.Linear(in_features=in_features, out_features=512),
+            nn.Linear(in_features=in_features, out_features=32),
             nn.ReLU(inplace=True),
-            nn.Dropout(p=0.5),
+            # nn.Dropout(p=0.5),
             # out_features = 3 because using this transformation matrix
             # [[s 0 tx]
             #  [0 s ty]]
             # which has 3 parameters
             # allows cropping, translation, and isotropic scaling
-            nn.Linear(in_features=512, out_features=3)
+            nn.Linear(in_features=32, out_features=3)
         )
 
         # Initialize the weights/bias with identity transformation
