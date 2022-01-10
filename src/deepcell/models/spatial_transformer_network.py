@@ -64,8 +64,8 @@ class SpatialTransformerNetwork(nn.Module):
         #     requires_grad=True)
 
         grid = F.affine_grid(A, [x.size(0), x.size(1), 60, 60],
-                             align_corners=True)
+                             align_corners=False)
         if torch.cuda.is_available():
             grid = grid.cuda()
-        x = F.grid_sample(input, grid, align_corners=True)
+        x = F.grid_sample(input, grid, align_corners=False)
         return x
