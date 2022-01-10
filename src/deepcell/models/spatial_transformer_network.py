@@ -26,7 +26,7 @@ class SpatialTransformerNetwork(nn.Module):
         self.localization_regressor = nn.Sequential(
             nn.Linear(in_features=in_features, out_features=512),
             nn.ReLU(inplace=True),
-
+            nn.Dropout(p=0.5),
             # out_features = 3 because using this transformation matrix
             # [[s 0 tx]
             #  [0 s ty]]
