@@ -24,7 +24,7 @@ class SpatialTransformerNetwork(nn.Module):
         in_features = last_conv_filter_num * 7 * 7
 
         self.localization_regressor = nn.Sequential(
-            nn.Linear(in_features=in_features, out_features=32),
+            nn.Linear(in_features=in_features, out_features=512),
             nn.ReLU(inplace=True),
 
             # out_features = 3 because using this transformation matrix
@@ -32,7 +32,7 @@ class SpatialTransformerNetwork(nn.Module):
             #  [0 s ty]]
             # which has 3 parameters
             # allows cropping, translation, and isotropic scaling
-            nn.Linear(in_features=32, out_features=3)
+            nn.Linear(in_features=512, out_features=3)
         )
 
         # Initialize the weights/bias with identity transformation
