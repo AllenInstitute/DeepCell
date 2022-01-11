@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional, Union, Dict
 
 
 class ModelInput:
@@ -11,7 +11,8 @@ class ModelInput:
                  avg_projection_path: Optional[Path] = None,
                  correlation_projection_path: Optional[Path] = None,
                  project_name: Optional[str] = None,
-                 label: Optional[str] = None):
+                 label: Optional[str] = None,
+                 bounding_box: Optional[Dict] = None):
         """
         A container for a single example given as input to the model
 
@@ -32,8 +33,11 @@ class ModelInput:
                 optional name using to indicate a unique labeling job
                 will be None if at test time (not labeled)
             label:
-                optional label assigned to this example
+                optional classification label assigned to this example
                 will be None if at test time (not labeled)
+            bounding_box
+                A bounding box around the soma if present or around the
+                mask if not present. Will be None at test time
         """
         if avg_projection_path is None and correlation_projection_path is None:
             raise ValueError('Must supply one of avg_projection_path or '
@@ -46,6 +50,7 @@ class ModelInput:
         self._mask_path = mask_path
         self._project_name = project_name
         self._label = label
+        self._bounding_box = bounding_box
 
     @property
     def roi_id(self) -> str:
@@ -74,6 +79,10 @@ class ModelInput:
     @property
     def label(self) -> Optional[str]:
         return self._label
+
+    @property
+    def bounding_box(self) -> Optional[Dict]:
+        return self._bounding_box
 
     @property
     def project_name(self) -> str:

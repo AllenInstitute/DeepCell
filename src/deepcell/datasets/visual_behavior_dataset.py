@@ -1,4 +1,5 @@
 import glob
+import json
 import logging
 import os
 import re
@@ -20,6 +21,7 @@ from deepcell.datasets.model_input import ModelInput
 logging.basicConfig(level=logging.INFO)
 
 S3_MANIFEST_PREFIX = 'visual_behavior/manifests'
+S3_BOUNDING_BOX_ANNOTATIONS_PREFIX = 'bounding_boxes/'
 
 # The minimum global ROI id that was used by SLAPP/sagemaker
 GLOBAL_ROI_ID_MIN = 1e6
@@ -35,11 +37,16 @@ EXCLUDE_PROJECTS = [
 class VisualBehaviorDataset:
     """Class representing the visual behavior dataset from AWS sagemaker
     labeling jobs"""
-    def __init__(self, artifact_destination: Path,
-                 exclude_projects: Optional[List[str]] = None,
-                 s3_manifest_prefix: str = S3_MANIFEST_PREFIX,
-                 download=True,
-                 debug=False):
+
+    def __init__(
+            self,
+            artifact_destination: Path,
+            exclude_projects: Optional[List[str]] = None,
+            s3_bucket='prod.slapp.alleninstitute.org',
+            s3_manifest_prefix: str = S3_MANIFEST_PREFIX,
+            s3_bounding_boxes_prefix: str = S3_BOUNDING_BOX_ANNOTATIONS_PREFIX,
+            download=True,
+            debug=False):
         """
         Args:
             - artifact_destination
@@ -47,8 +54,12 @@ class VisualBehaviorDataset:
             - exclude_projects:
                 an optional list of project names to exclude from being
                 included in the dataset
+            - s3_bucket
+                bucket where data is stored
             - s3_manifest_prefix
                 Prefix on s3 where labeling manifests are stored
+            - s3_bounding_boxes_prefix
+                Prefix on s3 where bounding box annotatons are stored
             - download
                 Whether to download files from S3
             - debug
@@ -60,14 +71,16 @@ class VisualBehaviorDataset:
 
         self._logger = logging.getLogger(__name__)
         self._exclude_projects = exclude_projects
+        self._s3_bucket = s3_bucket
         self._s3_manifest_prefix = s3_manifest_prefix
+        self._s3_bounding_box_prefix = s3_bounding_boxes_prefix
         self._artifact_destination = artifact_destination
 
         # Due to historic reasons, some ROI ids are stored in the manifest
         # using a globally unique ID
         # This object maps from global to an experiment-local id and vice versa
         self._global_to_local_map = json_load_local_or_s3(
-            uri='s3://prod.slapp.alleninstitute.org/visual_behavior'
+            uri=f's3://{self._s3_bucket}/visual_behavior'
                 '/global_to_local_mapping.json')
 
         self._logger.info('Reading manifests and preprocessing')
@@ -79,10 +92,10 @@ class VisualBehaviorDataset:
 
         if debug:
             not_cell_idx = np.argwhere([
-                x.label != 'cell' for x in self._dataset])[:2]\
+                x.label != 'cell' for x in self._dataset])[:2] \
                 .squeeze().tolist()
             cell_idx = np.argwhere([
-                x.label == 'cell' for x in self._dataset])[:2]\
+                x.label == 'cell' for x in self._dataset])[:2] \
                 .squeeze().tolist()
             self._dataset = [
                 x for i, x in enumerate(self._dataset)
@@ -204,6 +217,7 @@ class VisualBehaviorDataset:
             return project_name
 
         manifests = self._get_manifests()
+        bounding_box_annotations = self._get_bounding_box_annotations()
         rois = []
         artifact_dirs = set()
         seen = set()
@@ -255,7 +269,9 @@ class VisualBehaviorDataset:
                     avg_projection_path=x['avg-source-ref'],
                     mask_path=x['roi-mask-source-ref'],
                     project_name=project_name,
-                    label=label)
+                    label=label,
+                    bounding_box=bounding_box_annotations.get(roi_id, None)
+                )
                 rois.append(artifact)
                 seen.add(roi_id)
         return rois, artifact_dirs, pd.DataFrame(project_name_meta)
@@ -291,7 +307,7 @@ class VisualBehaviorDataset:
                 int(exp_id)
             except ValueError:
                 raise RuntimeError(f'Invalid exp_id: {exp_id}')
-            
+
             try:
                 int(roi_id)
             except ValueError:
@@ -342,7 +358,7 @@ class VisualBehaviorDataset:
         for obj, files in obj_files_map.items():
             for file in files:
                 cmd = f'aws s3 cp --recursive ' \
-                      f's3://prod.slapp.alleninstitute.org{obj}' \
+                      f's3://{self._s3_bucket}{obj}' \
                       f' {self._artifact_destination}' \
                       f' --exclude "*" --include "{file}"'
                 self._logger.debug(cmd)
@@ -357,17 +373,42 @@ class VisualBehaviorDataset:
             List of generator of manifest records
         """
         s3 = boto3.client('s3')
-        bucket = 'prod.slapp.alleninstitute.org'
 
         prefix = self._s3_manifest_prefix
         objs = s3.list_objects_v2(
-            Bucket=bucket,
+            Bucket=self._s3_bucket,
             Prefix=prefix)
         files = [obj['Key'] for obj in objs['Contents'] if
                  obj['Key'] != prefix]
-        manifests = {file: read_jsonlines(uri=f's3://{bucket}/{file}') for
-                     file in files}
+        manifests = {
+            file: read_jsonlines(uri=f's3://{self._s3_bucket}/{file}') for
+            file in files}
         return manifests
+
+    def _get_bounding_box_annotations(self) -> Dict[str, Dict[str, int]]:
+        """Gets bounding box annotations from S3
+
+        Returns:
+            Dict of bounding box annotations
+            key is of format exp_<experiment_id>_roi_<roi_id>
+            value is dict x, y, width, height
+        """
+        s3 = boto3.client('s3')
+        prefix = self._s3_bounding_box_prefix
+
+        objs = s3.list_objects_v2(
+            Bucket=self._s3_bucket,
+            Prefix=prefix)
+        files = [obj['Key'] for obj in objs['Contents'] if
+                 obj['Key'] != prefix]
+
+        # There should only be 1 file
+        file = files[0]
+
+        res = s3.get_object(Bucket=self._s3_bucket, Key=file)
+        text = res['Body'].read().decode('utf-8')
+        d = json.loads(text)
+        return d
 
     def _update_artifact_locations_from_s3_to_local(self):
         """Original artifact locations are s3 paths. This updates artifact
@@ -398,6 +439,7 @@ class VisualBehaviorDataset:
                 mask_path=(artifact_destination / f'mask_'
                                                   f'{artifact.roi_id}.png'),
                 label=artifact.label,
+                bounding_box=artifact.bounding_box,
                 project_name=artifact.project_name
             )
             self._dataset[i] = artifact
@@ -421,4 +463,3 @@ class VisualBehaviorDataset:
                        f'{artifact_type}_{artifact.roi_id}.png'
                 if not path.exists():
                     raise RuntimeError(f'{path} does not exist')
-
