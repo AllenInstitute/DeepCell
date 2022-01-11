@@ -5,9 +5,10 @@ from torch import nn
 
 class VggBackbone(torch.nn.Module):
     def __init__(self, model, truncate_to_layer, classifier_cfg,
-                 dropout_prob=0.5, freeze_up_to_layer=None):
+                 dropout_prob=0.5, freeze_up_to_layer=None, num_classes=1):
         super().__init__()
-        conv_layers = self._truncate_to_layer(model=model, layer=truncate_to_layer)
+        conv_layers = self._truncate_to_layer(model=model,
+                                              layer=truncate_to_layer)
         self.features = torch.nn.Sequential(*conv_layers)
 
         for layer in self.features[:freeze_up_to_layer]:
@@ -18,8 +19,9 @@ class VggBackbone(torch.nn.Module):
 
         last_conv_filter_num = self._get_last_filter_num()
         in_features = last_conv_filter_num * 7 * 7
-        self.classifier = self._make_classifier_layers(cfg=classifier_cfg, in_features=in_features,
-                                                       dropout_prob=dropout_prob)
+        self.classifier = self._make_classifier_layers(
+            cfg=classifier_cfg, in_features=in_features,
+            dropout_prob=dropout_prob, num_classes=num_classes)
 
     def forward(self, x):
         x = self.features(x)
@@ -58,10 +60,3 @@ class VggBackbone(torch.nn.Module):
 
         layers.append(nn.Linear(cfg[-1], num_classes))
         return nn.Sequential(*layers)
-
-
-if __name__ == '__main__':
-    cnn = torchvision.models.vgg11_bn(pretrained=True, progress=False)
-    cnn = VggBackbone(model=cnn, truncate_to_layer=22, classifier_cfg=[512],
-                      freeze_up_to_layer=15)
-    pass
