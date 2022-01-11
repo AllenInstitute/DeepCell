@@ -10,7 +10,7 @@ from sklearn.metrics import precision_score, recall_score, \
     average_precision_score
 from torch.utils.data import DataLoader
 
-from deepcell.metrics import Metrics
+from deepcell.metrics import ClassificationMetrics
 from deepcell.datasets.roi_dataset import RoiDataset
 from deepcell.data_splitter import DataSplitter
 
@@ -23,7 +23,7 @@ def inference(model: torch.nn.Module,
               ensemble=True,
               cv_fold=None,
               tta_num_iters=0,
-              tta_stat='avg') -> Tuple[Metrics, pd.DataFrame]:
+              tta_stat='avg') -> Tuple[ClassificationMetrics, pd.DataFrame]:
     """
     Args:
         model:
@@ -62,7 +62,7 @@ def inference(model: torch.nn.Module,
                          '1.')
 
     dataset: RoiDataset = test_loader.dataset
-    metrics = Metrics()
+    metrics = ClassificationMetrics()
 
     if ensemble:
         models = os.listdir(checkpoint_path)

@@ -6,7 +6,7 @@ import numpy as np
 import torch
 
 from deepcell.data_splitter import DataSplitter
-from deepcell.classifier import Classifier
+from deepcell.trainer import Trainer
 from deepcell.datasets.roi_dataset import RoiDataset
 
 logging.basicConfig(
@@ -99,7 +99,7 @@ class HyperparamTuner:
                 scheduler = None
 
             criterion = CRITERION(**criterion_params['params']) if criterion_params else CRITERION()
-            classifier = Classifier(
+            classifier = Trainer(
                 model=model,
                 n_epochs=n_epochs,
                 optimizer=optimizer,
