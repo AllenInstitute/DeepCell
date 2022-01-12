@@ -5,7 +5,7 @@ from PIL import Image
 import numpy as np
 from torch.utils.data import Dataset
 from torchvision import transforms
-from imgaug import augmenters as iaa
+from imgaug import augmenters as iaa, BoundingBox, BoundingBoxesOnImage
 
 from deepcell.datasets.model_input import ModelInput
 from deepcell.transform import Transform
@@ -20,9 +20,11 @@ class RoiDataset(Dataset):
                  debug=False,
                  cre_line=None,
                  exclude_mask=False,
+                 include_only_mask=False,
                  mask_out_projections=False,
                  use_correlation_projection=False,
-                 try_center_soma_in_frame=False):
+                 try_center_soma_in_frame=False,
+                 target='classification_label'):
         """
         A dataset of segmentation masks as identified by Suite2p with
         binary label "cell" or "not cell"
@@ -40,6 +42,8 @@ class RoiDataset(Dataset):
                 Whether to limit to a cre_line
             exclude_mask:
                 Whether to exclude the mask from input to the model
+            include_only_mask
+                Whether to include only the mask
             mask_out_projections:
                 Whether to mask out projections to only include pixels in
                 the mask
@@ -51,6 +55,9 @@ class RoiDataset(Dataset):
                 center in the frame. Note: does not guarantee that the cell
                 is perfectly centered as a soma with a long dendrite will
                 have the centroid shifted.
+            target
+                What target to use.
+                Can be classification_label or bounding_box
         """
         super().__init__()
 
@@ -58,10 +65,14 @@ class RoiDataset(Dataset):
         self._image_dim = image_dim
         self.transform = transform
         self._exclude_mask = exclude_mask
+        self._include_only_mask = include_only_mask
         self._mask_out_projections = mask_out_projections
-        self._y = np.array([int(x.label == 'cell') for x in self._model_inputs])
+        self._y = self._construct_target(target_name=target)
+        self._classification_label = self._construct_target(
+            target_name='classification_label')
         self._use_correlation_projection = use_correlation_projection
         self._try_center_soma_in_frame = try_center_soma_in_frame
+        self._target_name = target
 
         if cre_line:
             experiment_genotype_map = get_experiment_genotype_map()
@@ -82,30 +93,49 @@ class RoiDataset(Dataset):
     
     @property
     def y(self) -> np.ndarray:
+        """Target variable. The classification label or bounding box"""
         return self._y
+
+    @property
+    def classification_label(self) -> np.ndarray:
+        """Classification label"""
+        return self._classification_label
 
     def __getitem__(self, index):
         obs = self._model_inputs[index]
 
         input = self._construct_input(obs=obs)
+        target = self._y[index]
+
+        if self._target_name == 'bounding_box':
+            x, y, width, height = target
+            bounding_boxes = BoundingBoxesOnImage([
+                BoundingBox(
+                    x1=x,
+                    y1=y,
+                    x2=x + width,
+                    y2=y + height)
+            ], shape=self._image_dim)
+        else:
+            bounding_boxes = None
 
         if self.transform:
-            avg, max_, mask = input[:, :, 0], input[:, :, 1], input[:, :, 2]
-            if self.transform.avg_transform:
-                avg = self.transform.avg_transform(avg)
-                input[:, :, 0] = avg
-            if self.transform.max_transform:
-                max_ = self.transform.max_transform(max_)
-                input[:, :, 1] = max_
-            if self.transform.mask_transform:
-                mask = self.transform.mask_transform(mask)
-                input[:, :, 2] = mask
+            imgaug_seq = self.transform.all_transform[0]
+            torchvision_seq = \
+                transforms.Compose(self.transform.all_transform[1:])
 
-            if self.transform.all_transform:
-                input = self.transform.all_transform(input)
+            aug = imgaug_seq(image=input, bounding_boxes=bounding_boxes)
+            if bounding_boxes is not None:
+                image_aug, bbs_aug = aug
+                new_bounding_box = bbs_aug.bounding_boxes[0]
+                target = np.array([new_bounding_box.x1,
+                                   new_bounding_box.y1,
+                                   new_bounding_box.x2 - new_bounding_box.x1,
+                                   new_bounding_box.y2 - new_bounding_box.y1])
+            else:
+                image_aug = aug[0]
 
-        # TODO collate_fn should be used instead
-        target = self._y[index]
+            input = torchvision_seq(image_aug)
 
         return input, target
 
@@ -177,6 +207,18 @@ class RoiDataset(Dataset):
 
         res = np.zeros((*self._image_dim, 3), dtype=np.uint8)
 
+        with open(obs.mask_path, 'rb') as f:
+            mask = Image.open(f)
+            mask = np.array(mask)
+
+        if self._include_only_mask:
+            # Repeating mask along all 3 channels to conform with pretrained
+            # imagenet model
+            res[:, :, 0] = mask
+            res[:, :, 1] = mask
+            res[:, :, 2] = mask
+            return res
+
         if self._use_correlation_projection:
             if obs.correlation_projection_path is not None:
                 with open(obs.correlation_projection_path, 'rb') as f:
@@ -198,10 +240,6 @@ class RoiDataset(Dataset):
             max = Image.open(f)
             max = np.array(max)
             res[:, :, 1] = max
-
-        with open(obs.mask_path, 'rb') as f:
-            mask = Image.open(f)
-            mask = np.array(mask)
 
             if self._exclude_mask:
                 res[:, :, 2] = max
@@ -237,3 +275,18 @@ class RoiDataset(Dataset):
         self._model_inputs = [
             x for x in self._model_inputs if experiment_genotype_map[
                 x.experiment_id].startswith(cre_line)]
+
+    def _construct_target(self, target_name):
+        if target_name == 'classification_label':
+            target = np.array([int(x.label == 'cell') for x in
+                              self._model_inputs])
+        elif target_name == 'bounding_box':
+            target = np.array([[x.bounding_box['x'],
+                                x.bounding_box['y'],
+                                x.bounding_box['width'],
+                                x.bounding_box['height']]
+                               for x in self._model_inputs])
+
+        else:
+            raise ValueError(f'target_name {target_name} not supported')
+        return target

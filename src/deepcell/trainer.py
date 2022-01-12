@@ -41,7 +41,6 @@ class Trainer:
             task='classification',
             additional_metrics: List = None,
             early_stopping_metric: Optional[str] = None,
-            learning_rate_scheduler_metric: Optional[str] = None
     ):
         """
         The driver for the training and evaluation loop
@@ -78,9 +77,6 @@ class Trainer:
                 If regression, defaults to loss
             early_stopping_larger_is_better
                 Whether early_stopping_metric increasing is a good thing
-            learning_rate_scheduler_metric
-                The metric to use for early stopping
-                If not provided, defaults to loss
         """
         if task not in ('classification', 'regression'):
             raise ValueError('Invalid task. Valid tasks are classification '
@@ -101,7 +97,8 @@ class Trainer:
         self.save_path = save_path
         self._current_best_state_dicts = {}
         self._task = task
-        self._additional_metrics = additional_metrics
+        self._additional_metrics = \
+            additional_metrics if additional_metrics is not None else {}
 
         if early_stopping_metric is None:
             if task == 'classification':
@@ -109,10 +106,6 @@ class Trainer:
             else:
                 early_stopping_metric = 'loss'
         self._early_stopping_metric = early_stopping_metric
-
-        if learning_rate_scheduler_metric is None:
-            learning_rate_scheduler_metric = 'loss'
-        self._learning_rate_scheduler_metric = learning_rate_scheduler_metric
 
         if not os.path.exists(f'{self.save_path}'):
             os.makedirs(f'{self.save_path}')

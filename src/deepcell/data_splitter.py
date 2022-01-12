@@ -15,7 +15,8 @@ class DataSplitter:
                  cre_line=None, exclude_mask=False,
                  mask_out_projections=False, image_dim=(128, 128),
                  use_correlation_projection=False,
-                 center_soma=False):
+                 center_soma=False,
+                 target_name='classification_label'):
         """
         Does splitting of data into train/test or train/validation
 
@@ -40,6 +41,8 @@ class DataSplitter:
                 Whether to use correlation projection instead of avg
             center_soma
                 Try to center the soma. Valid values are "test", "all" or False
+            target_name
+                The target. Can be "classification_label" or "bounding_box"
         """
         self._model_inputs = model_inputs
         self.train_transform = train_transform
@@ -50,6 +53,7 @@ class DataSplitter:
         self.mask_out_projections = mask_out_projections
         self.image_dim = image_dim
         self._use_correlation_projection = use_correlation_projection
+        self._target_name = target_name
 
         if center_soma not in ('test', True, False):
             raise ValueError(f'Invalid value for center_soma. Valid '
@@ -62,12 +66,15 @@ class DataSplitter:
             cre_line=self.cre_line,
             mask_out_projections=self.mask_out_projections,
             image_dim=self.image_dim,
-            use_correlation_projection=self._use_correlation_projection
+            use_correlation_projection=self._use_correlation_projection,
+            target=self._target_name,
+            include_only_mask=self._target_name == 'bounding_box'
         )
         sss = StratifiedShuffleSplit(n_splits=2, test_size=test_size,
                                      random_state=self.seed)
-        train_index, test_index = next(sss.split(np.zeros(len(full_dataset)),
-                                                 full_dataset.y))
+        train_index, test_index = next(
+            sss.split(np.zeros(len(full_dataset)),
+                      full_dataset.classification_label))
 
         train_dataset = self._sample_dataset(
             dataset=full_dataset.model_inputs,
@@ -87,8 +94,9 @@ class DataSplitter:
                             shuffle=True):
         skf = StratifiedKFold(n_splits=n_splits, shuffle=shuffle,
                               random_state=self.seed)
-        for train_index, test_index in skf.split(np.zeros(len(train_dataset)),
-                                                 train_dataset.y):
+        for train_index, test_index in skf.split(
+                np.zeros(len(train_dataset)),
+                train_dataset.classification_label):
             train = self._sample_dataset(
                 dataset=train_dataset.model_inputs,
                 index=train_index,
@@ -130,5 +138,7 @@ class DataSplitter:
             mask_out_projections=self.mask_out_projections,
             image_dim=self.image_dim,
             use_correlation_projection=self._use_correlation_projection,
-            try_center_soma_in_frame=center_soma
+            try_center_soma_in_frame=center_soma,
+            target=self._target_name,
+            include_only_mask=self._target_name == 'bounding_box'
         )
