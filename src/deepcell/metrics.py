@@ -168,8 +168,8 @@ class LocalizationMetrics(Metrics):
             x2_1 = x1_1 + w_1
             y2_1 = y1_1 + h_1
 
-            x2_2 = x2_1 + w_2
-            y2_2 = y2_1 + h_2
+            x2_2 = x1_2 + w_2
+            y2_2 = y1_2 + h_2
 
             bb_true = torch.tensor([[x1_1, y1_1, x2_1, y2_1]])
             bb_pred = torch.tensor([[x1_2, y1_2, x2_2, y2_2]])
