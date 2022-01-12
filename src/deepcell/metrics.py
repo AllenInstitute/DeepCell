@@ -2,6 +2,7 @@ from typing import Optional, Dict
 
 import numpy as np
 import torch
+import torchvision
 from sklearn.metrics import average_precision_score, f1_score
 
 
@@ -92,6 +93,9 @@ class Metrics:
 
     def update_loss(self, loss, num_batches):
         self.loss += loss / num_batches  # loss*num_batches/N = (Sum of all l)/N
+    
+    def update_outputs(self, y_out, y_true):
+        raise NotImplementedError
 
 
 class ClassificationMetrics(Metrics):
@@ -144,6 +148,42 @@ class ClassificationMetrics(Metrics):
 
     def _increment_FN(self, y_pred, y_true):
         self.FN += ((y_true == 1) & (y_pred == 0)).sum().item()
+
+
+class LocalizationMetrics(Metrics):
+    def __init__(self):
+        super().__init__()
+        self._bounding_box_trues = []
+        self._bounding_box_preds = []
+    
+    @property
+    def IOU(self):
+        ious = np.zeros(len(self._bounding_box_trues))
+
+        for i in range(len(self._bounding_box_trues)):
+            x1_1, y1_1, w_1, h_1 = self._bounding_box_trues[i]
+            x1_2, y1_2, w_2, h_2 = self._bounding_box_preds[i]
+
+            x2_1 = x1_1 + w_1
+            y2_1 = y1_1 + h_1
+
+            x2_2 = x2_1 + w_2
+            y2_2 = y2_1 + h_2
+
+            bb_true = torch.tensor([[x1_1, y1_1, x2_1, y2_1]])
+            bb_pred = torch.tensor([[x1_2, y1_2, x2_2, y2_2]])
+
+            iou = torchvision.ops.box_iou(bb_true, bb_pred)
+            ious[i] = iou.item()
+
+        return ious.mean()
+
+    def update_outputs(self, y_out, y_true):
+        bbs_preds = y_out.detach().cpu().numpy().tolist()
+        bb_true = y_true.detach().cpu().numpy().tolist()
+        self._bounding_box_preds += bbs_preds
+        self._bounding_box_trues += bb_true
+
 
 
 class CVMetrics:

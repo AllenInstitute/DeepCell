@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 
 from deepcell.data_splitter import DataSplitter
 from deepcell.metrics import ClassificationMetrics, \
-    CVMetrics, Metrics, TrainingMetrics
+    CVMetrics, TrainingMetrics, LocalizationMetrics, Metrics
 from deepcell.datasets.roi_dataset import RoiDataset
 
 logging.basicConfig(
@@ -65,22 +65,20 @@ class Trainer:
                 Path to load a pretrained model. Activates continuation of
                 training
             task
-                classification or regression
-                classification may be used for ROI classification,
-                while regression may be used for bounding box prediction
+                classification or localization
             additional_metrics
                 In addition to the base metrics, what other metrics need to
                 be tracked
             early_stopping_metric
                 The metric to use for early stopping
                 If classification, defaults to F1
-                If regression, defaults to loss
+                If localization, defaults to loss
             early_stopping_larger_is_better
                 Whether early_stopping_metric increasing is a good thing
         """
-        if task not in ('classification', 'regression'):
+        if task not in ('classification', 'localization'):
             raise ValueError('Invalid task. Valid tasks are classification '
-                             'or regression')
+                             'or localization')
         self.n_epochs = n_epochs
         self.model = model
         self.optimizer_constructor = optimizer
@@ -180,10 +178,10 @@ class Trainer:
         for epoch in range(all_val_metrics.best_epoch + 1, self.n_epochs):
             epoch_train_metrics = \
                 ClassificationMetrics() if self._task == 'classification' \
-                else Metrics()
+                else LocalizationMetrics()
             epoch_val_metrics = \
                 ClassificationMetrics() if self._task == 'classification' \
-                else Metrics()
+                else LocalizationMetrics()
 
             self.model.train()
             for batch_idx, (data, target) in enumerate(train_loader):
@@ -200,8 +198,7 @@ class Trainer:
 
                 epoch_train_metrics.update_loss(loss=loss.item(), num_batches=len(train_loader))
 
-                if self._task == 'classification':
-                    epoch_train_metrics.update_outputs(y_true=target, y_out=output)
+                epoch_train_metrics.update_outputs(y_true=target, y_out=output)
 
                 self._update_metrics(epoch_metrics=epoch_train_metrics,
                                      history=all_train_metrics, epoch=epoch)
@@ -220,8 +217,7 @@ class Trainer:
 
                         epoch_val_metrics.update_loss(loss=loss.item(), num_batches=len(valid_loader))
 
-                        if self._task == 'classification':
-                            epoch_val_metrics.update_outputs(y_true=target, y_out=output)
+                        epoch_val_metrics.update_outputs(y_true=target, y_out=output)
 
                 self._update_metrics(epoch_metrics=epoch_val_metrics,
                                      history=all_val_metrics, epoch=epoch)
