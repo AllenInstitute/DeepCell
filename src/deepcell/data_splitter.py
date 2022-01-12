@@ -16,7 +16,8 @@ class DataSplitter:
                  mask_out_projections=False, image_dim=(128, 128),
                  use_correlation_projection=False,
                  center_soma=False,
-                 target_name='classification_label'):
+                 target_name='classification_label',
+                 include_only_mask=False):
         """
         Does splitting of data into train/test or train/validation
 
@@ -43,6 +44,8 @@ class DataSplitter:
                 Try to center the soma. Valid values are "test", "all" or False
             target_name
                 The target. Can be "classification_label" or "bounding_box"
+            include_only_mask
+                Whether to include only mask in input
         """
         self._model_inputs = model_inputs
         self.train_transform = train_transform
@@ -54,6 +57,7 @@ class DataSplitter:
         self.image_dim = image_dim
         self._use_correlation_projection = use_correlation_projection
         self._target_name = target_name
+        self._include_only_mask = include_only_mask
 
         if center_soma not in ('test', True, False):
             raise ValueError(f'Invalid value for center_soma. Valid '
@@ -68,7 +72,7 @@ class DataSplitter:
             image_dim=self.image_dim,
             use_correlation_projection=self._use_correlation_projection,
             target=self._target_name,
-            include_only_mask=self._target_name == 'bounding_box'
+            include_only_mask=self._include_only_mask
         )
         sss = StratifiedShuffleSplit(n_splits=2, test_size=test_size,
                                      random_state=self.seed)
@@ -140,5 +144,5 @@ class DataSplitter:
             use_correlation_projection=self._use_correlation_projection,
             try_center_soma_in_frame=center_soma,
             target=self._target_name,
-            include_only_mask=self._target_name == 'bounding_box'
+            include_only_mask=self._include_only_mask
         )
