@@ -158,6 +158,7 @@ class LocalizationMetrics(Metrics):
     
     @property
     def IOU(self):
+        # TODO consider making this vectorized
         ious = np.zeros(len(self._bounding_box_trues))
 
         for i in range(len(self._bounding_box_trues)):
