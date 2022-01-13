@@ -286,7 +286,7 @@ class Trainer:
         x = torch.load(f'{self.save_path}/model_init.pt', map_location='cpu')
         self.model.load_state_dict(x['state_dict'])
         if torch.cuda.is_available():
-            self.model.cuda()
+            self.model = self.model.cuda()
 
         # reset optimizer
         self.optimizer = self.optimizer_constructor()
