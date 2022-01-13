@@ -109,6 +109,7 @@ class Trainer:
             os.makedirs(f'{self.save_path}')
 
         if self.use_cuda:
+            self.model = self.model.cpu()
             self.model = self.model.cuda()
 
         torch.save({
