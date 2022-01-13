@@ -291,13 +291,11 @@ class Trainer:
             self.model = self.model.cuda()
 
         # reset optimizer
-        self.optimizer = self.optimizer.load_state_dict(
-            state_dict=x['optimizer'])
+        self.optimizer.load_state_dict(state_dict=x['optimizer'])
 
         # reset scheduler
         if self.scheduler is not None:
-            self.scheduler = self.scheduler.load_state_dict(
-                state_dict=x['scheduler'])
+            self.scheduler.load_state_dict(state_dict=x['scheduler'])
 
     def _save_model_and_performance(self, eval_fold: int,
                                     all_train_metrics: TrainingMetrics,
