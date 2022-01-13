@@ -1,7 +1,8 @@
 from typing import List, Optional
 
 import numpy as np
-from sklearn.model_selection import StratifiedShuffleSplit, StratifiedKFold
+from sklearn.model_selection import StratifiedShuffleSplit, StratifiedKFold, \
+    ShuffleSplit, KFold
 
 from deepcell.datasets.model_input import ModelInput
 from deepcell.datasets.roi_dataset import RoiDataset
@@ -17,7 +18,8 @@ class DataSplitter:
                  use_correlation_projection=False,
                  center_soma=False,
                  target_name='classification_label',
-                 include_only_mask=False):
+                 include_only_mask=False,
+                 stratified=True):
         """
         Does splitting of data into train/test or train/validation
 
@@ -46,6 +48,8 @@ class DataSplitter:
                 The target. Can be "classification_label" or "bounding_box"
             include_only_mask
                 Whether to include only mask in input
+            stratified
+                Whether to do stratified split
         """
         self._model_inputs = model_inputs
         self.train_transform = train_transform
@@ -58,6 +62,7 @@ class DataSplitter:
         self._use_correlation_projection = use_correlation_projection
         self._target_name = target_name
         self._include_only_mask = include_only_mask
+        self._stratified = stratified
 
         if center_soma not in ('test', True, False):
             raise ValueError(f'Invalid value for center_soma. Valid '
@@ -74,10 +79,14 @@ class DataSplitter:
             target=self._target_name,
             include_only_mask=self._include_only_mask
         )
-        sss = StratifiedShuffleSplit(n_splits=2, test_size=test_size,
-                                     random_state=self.seed)
+        if self._stratified:
+            ss = StratifiedShuffleSplit(n_splits=2, test_size=test_size,
+                                         random_state=self.seed)
+        else:
+            ss = ShuffleSplit(n_splits=2, test_size=test_size,
+                              random_state=self.seed)
         train_index, test_index = next(
-            sss.split(np.zeros(len(full_dataset)),
+            ss.split(np.zeros(len(full_dataset)),
                       full_dataset.classification_label))
 
         train_dataset = self._sample_dataset(
@@ -96,9 +105,13 @@ class DataSplitter:
 
     def get_cross_val_split(self, train_dataset: RoiDataset, n_splits=5,
                             shuffle=True):
-        skf = StratifiedKFold(n_splits=n_splits, shuffle=shuffle,
-                              random_state=self.seed)
-        for train_index, test_index in skf.split(
+        if self._stratified:
+            kf = StratifiedKFold(n_splits=n_splits, shuffle=shuffle,
+                                 random_state=self.seed)
+        else:
+            kf = KFold(n_splits=n_splits, shuffle=shuffle,
+                       random_state=self.seed)
+        for train_index, test_index in kf.split(
                 np.zeros(len(train_dataset)),
                 train_dataset.classification_label):
             train = self._sample_dataset(
