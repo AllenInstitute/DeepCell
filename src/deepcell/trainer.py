@@ -283,9 +283,10 @@ class Trainer:
     def _reset(self):
         # reset model weights
         x = torch.load(f'{self.save_path}/model_init.pt', map_location='cpu')
+        state_dict = x['state_dict']
         if torch.cuda.is_available():
-            x = x.cuda()
-        self.model.load_state_dict(x['state_dict'])
+            state_dict = state_dict.cuda()
+        self.model.load_state_dict(state_dict)
 
         # reset optimizer
         self.optimizer = self.optimizer_constructor()
