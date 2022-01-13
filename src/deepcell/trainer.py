@@ -28,12 +28,11 @@ class Trainer:
             self,
             model: torch.nn.Module,
             n_epochs: int,
-            optimizer: Callable[..., torch.optim.Adam],
+            optimizer: torch.optim.Adam,
             criterion: Union[torch.nn.BCEWithLogitsLoss, torch.nn.MSELoss],
             save_path: Union[str, Path],
             scheduler: Optional[
-                Callable[[torch.optim.Adam],
-                         torch.optim.lr_scheduler.ReduceLROnPlateau]] = None,
+                torch.optim.lr_scheduler.ReduceLROnPlateau] = None,
             scheduler_step_after_batch=False,
             early_stopping=30,
             early_stopping_larger_is_better=False,
@@ -81,10 +80,8 @@ class Trainer:
                              'or localization')
         self.n_epochs = n_epochs
         self.model = model
-        self.optimizer_constructor = optimizer
-        self.scheduler_contructor = scheduler
-        self.optimizer = optimizer()
-        self.scheduler = scheduler(self.optimizer) if scheduler is not None else None
+        self.optimizer = optimizer
+        self.scheduler = scheduler
         self.scheduler_step_after_batch = scheduler_step_after_batch
         self.criterion = criterion
         self.use_cuda = torch.cuda.is_available()
@@ -112,8 +109,13 @@ class Trainer:
             self.model = self.model.cpu()
             self.model = self.model.cuda()
 
+        scheduler_state_dict = self.scheduler.state_dict() if \
+            self.scheduler is not None else None
+
         torch.save({
-            'state_dict': self.model.state_dict()
+            'state_dict': self.model.state_dict(),
+            'optimizer': self.optimizer.state_dict(),
+            'scheduler': scheduler_state_dict
         }, f'{self.save_path}/model_init.pt')
 
     def cross_validate(self, train_dataset: RoiDataset, data_splitter: DataSplitter, batch_size=64, sampler=None,
@@ -289,11 +291,13 @@ class Trainer:
             self.model = self.model.cuda()
 
         # reset optimizer
-        self.optimizer = self.optimizer_constructor()
+        self.optimizer = self.optimizer.load_state_dict(
+            state_dict=x['optimizer'])
 
         # reset scheduler
         if self.scheduler is not None:
-            self.scheduler = self.scheduler_contructor(self.optimizer)
+            self.scheduler = self.scheduler.load_state_dict(
+                state_dict=x['scheduler'])
 
     def _save_model_and_performance(self, eval_fold: int,
                                     all_train_metrics: TrainingMetrics,
