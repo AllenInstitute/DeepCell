@@ -284,29 +284,16 @@ class Trainer:
                        additional_metrics=additional_metrics)
 
     def _reset(self):
-        logger.info(f'gpu mem before reset: {torch.cuda.memory_allocated()}')
-        logger.info(f'gpu mem reserved before reset: {torch.cuda.memory_reserved()}')
         # reset model weights
         x = torch.load(f'{self.save_path}/model_init.pt')
-        logger.info(f'gpu mem after loading checkpoint:'
-                    f' {torch.cuda.memory_allocated()}')
-        logger.info(f'gpu mem reserved after reset: {torch.cuda.memory_reserved()}')
-
 
         self.model.load_state_dict(x['state_dict'])
-        logger.info(f'gpu mem after loading state dict for model:'
-                    f' {torch.cuda.memory_allocated()}')
 
         # reset optimizer
         self.optimizer.load_state_dict(state_dict=x['optimizer'])
-        logger.info(f'gpu mem after loading state dict for opt:'
-                    f' {torch.cuda.memory_allocated()}')
         # reset scheduler
         if self.scheduler is not None:
             self.scheduler.load_state_dict(state_dict=x['scheduler'])
-            logger.info(f'gpu mem after loading state dict for scheduler:'
-                        f' {torch.cuda.memory_allocated()}')
-        logger.info(f'gpu mem reserved after all reset: {torch.cuda.memory_reserved()}')
 
     def _save_model_and_performance(self, eval_fold: int,
                                     all_train_metrics: TrainingMetrics,
