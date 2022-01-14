@@ -306,6 +306,7 @@ class Trainer:
             self.scheduler.load_state_dict(state_dict=x['scheduler'])
             logger.info(f'gpu mem after loading state dict for scheduler:'
                         f' {torch.cuda.memory_allocated()}')
+        logger.info(f'gpu mem reserved after all reset: {torch.cuda.memory_reserved()}')
 
     def _save_model_and_performance(self, eval_fold: int,
                                     all_train_metrics: TrainingMetrics,
