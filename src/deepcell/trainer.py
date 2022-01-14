@@ -285,10 +285,13 @@ class Trainer:
 
     def _reset(self):
         logger.info(f'gpu mem before reset: {torch.cuda.memory_allocated()}')
+        logger.info(f'gpu mem reserved before reset: {torch.cuda.memory_reserved()}')
         # reset model weights
         x = torch.load(f'{self.save_path}/model_init.pt')
         logger.info(f'gpu mem after loading checkpoint:'
                     f' {torch.cuda.memory_allocated()}')
+        logger.info(f'gpu mem reserved after reset: {torch.cuda.memory_reserved()}')
+
 
         self.model.load_state_dict(x['state_dict'])
         logger.info(f'gpu mem after loading state dict for model:'
