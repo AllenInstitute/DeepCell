@@ -8,6 +8,7 @@ from torchvision import transforms
 from imgaug import augmenters as iaa
 
 from deepcell.datasets.model_input import ModelInput
+from deepcell.datasets.util import center_roi
 from deepcell.transform import Transform
 from deepcell.util import get_experiment_genotype_map
 
@@ -119,62 +120,6 @@ class RoiDataset(Dataset):
         Returns:
             A numpy array of type uint8 and shape *dim, 3
         """
-        def find_translation_px(mask: np.ndarray) -> np.ndarray:
-            """
-            A soma might not be centered in frame, which hurts
-            performance. Find translation pixels to center soma.
-
-            Note: this does not guarantee the soma is
-            perfectly centered due to long dendrites which shift the
-            centroid away from the soma.
-
-            1. Find the largest disjoint mask (which presumably contains the
-            soma)
-            2. Find centroid of mask found in (1)
-            3. Find translation pixels to center centroid in (2) in frame
-            Args:
-                mask:
-                    Segmentation mask
-            Returns:
-                Returns the translation amount in pixels to center a soma in
-                frame
-            """
-            def calc_contour_centroid(contour) -> np.ndarray:
-                M = cv2.moments(contour)
-                centroid = np.array(
-                    [int(M['m10'] / M['m00']), int(M['m01'] / M['m00'])])
-                return centroid
-
-            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
-                                           cv2.CHAIN_APPROX_SIMPLE)
-            mask_areas = np.array([cv2.contourArea(x) for x in contours])
-            largest_mask_idx = np.argmax(mask_areas)
-            largest_contour = contours[largest_mask_idx]
-            largest_mask_centroid = calc_contour_centroid(
-                contour=largest_contour)
-            frame_center = np.array(self._image_dim) / 2
-            diff_from_center = frame_center - largest_mask_centroid
-            return diff_from_center
-
-        def center_cell(x: np.ndarray, translate_px: np.ndarray):
-            """
-            Centers a cell in frame
-            Args:
-                x: input
-                translate_px: amount to translate the input in frame
-
-            Returns:
-                input with soma centered
-            """
-            transform = transforms.Compose([
-                iaa.Sequential([
-                    iaa.Affine(translate_px={'x': int(translate_px[0]),
-                                             'y': int(translate_px[1])})
-                ]).augment_image
-            ])
-            x = transform(x)
-            return x
-
         res = np.zeros((*self._image_dim, 3), dtype=np.uint8)
 
         if self._use_correlation_projection:
@@ -217,8 +162,7 @@ class RoiDataset(Dataset):
             res[:, :, 1][np.where(mask == 0)] = 0
 
         if self._try_center_soma_in_frame:
-            translation_px = find_translation_px(mask=mask)
-            res = center_cell(x=res, translate_px=translation_px)
+            res = center_roi(x=res)
 
         return res
 
