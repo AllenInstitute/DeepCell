@@ -14,8 +14,8 @@ def calc_roi_centroid(image: np.ndarray, brightness_quantile=0.8) -> \
     rest of the ROI, this should choose a point close to the center of the
     soma.
 
-    Only pixels brighter than brightness_quantile are looked at in order to
-    better calculate a centroid of the soma.
+    Pixels brighter than brightness_quantile are given much higher
+    weight in order to better calculate a centroid of the soma.
     Args:
         image:
             Input image
