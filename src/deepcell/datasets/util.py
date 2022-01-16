@@ -55,7 +55,8 @@ def calc_roi_centroid(image: np.ndarray, brightness_quantile=0.8) -> \
     return centroid
 
 
-def center_roi(x: np.ndarray, image_dim=(128, 128)) -> np.ndarray:
+def center_roi(x: np.ndarray, image_dim=(128, 128),
+               brightness_quantile=0.8) -> np.ndarray:
     """
     Centers an ROI in frame
     Args:
@@ -63,10 +64,13 @@ def center_roi(x: np.ndarray, image_dim=(128, 128)) -> np.ndarray:
             input
         image_dim:
             image dimensions
+        brightness_quantile
+            See `calc_roi_centroid`
     Returns:
         Input translated so that centroid is in center of frame
     """
-    centroid = calc_roi_centroid(image=x)
+    centroid = calc_roi_centroid(image=x,
+                                 brightness_quantile=brightness_quantile)
 
     frame_center = np.array(image_dim) / 2
     diff_from_center = frame_center - centroid

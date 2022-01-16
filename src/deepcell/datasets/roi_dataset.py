@@ -23,7 +23,8 @@ class RoiDataset(Dataset):
                  exclude_mask=False,
                  mask_out_projections=False,
                  use_correlation_projection=False,
-                 center_roi_centroid=False):
+                 center_roi_centroid=False,
+                 centroid_brightness_quantile=0.8):
         """
         A dataset of segmentation masks as identified by Suite2p with
         binary label "cell" or "not cell"
@@ -50,6 +51,9 @@ class RoiDataset(Dataset):
                 The classifier has poor performance with a soma that is not
                 centered in frame. Find the ROI centroid and use that to
                 center in the frame.
+            centroid_brightness_quantile
+                The quantile to use when zeroing out dim pixels. Used to
+                focus centroid on soma, which is brighter.
         """
         super().__init__()
 
@@ -61,6 +65,7 @@ class RoiDataset(Dataset):
         self._y = np.array([int(x.label == 'cell') for x in self._model_inputs])
         self._use_correlation_projection = use_correlation_projection
         self._center_roi_centroid = center_roi_centroid
+        self._centroid_brightness_quantile = centroid_brightness_quantile
 
         if cre_line:
             experiment_genotype_map = get_experiment_genotype_map()
@@ -160,7 +165,8 @@ class RoiDataset(Dataset):
             res[:, :, 1][np.where(mask == 0)] = 0
 
         if self._center_roi_centroid:
-            res = center_roi(x=res)
+            res = center_roi(
+                x=res, brightness_quantile=self._centroid_brightness_quantile)
 
         return res
 
