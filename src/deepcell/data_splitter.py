@@ -78,13 +78,13 @@ class DataSplitter:
             dataset=full_dataset.model_inputs,
             index=train_index,
             transform=self.train_transform,
-            center_soma=self._center_roi_centroid == 'all')
+            center_roi_centroid=self._center_roi_centroid == 'all')
 
         test_dataset = self._sample_dataset(
             dataset=full_dataset.model_inputs,
             index=test_index,
             transform=self.test_transform,
-            center_soma=True if self._center_roi_centroid else False)
+            center_roi_centroid=True if self._center_roi_centroid else False)
 
         return train_dataset, test_dataset
 
@@ -98,19 +98,19 @@ class DataSplitter:
                 dataset=train_dataset.model_inputs,
                 index=train_index,
                 transform=self.train_transform,
-                center_soma=self._center_roi_centroid == 'all'
+                center_roi_centroid=self._center_roi_centroid == 'all'
             )
             valid = self._sample_dataset(
                 dataset=train_dataset.model_inputs,
                 index=test_index,
                 transform=self.test_transform,
-                center_soma=True if self._center_roi_centroid else False)
+                center_roi_centroid=True if self._center_roi_centroid else False)
             yield train, valid
 
     def _sample_dataset(self, dataset: List[ModelInput],
                         index: List[int],
                         transform: Optional[Transform] = None,
-                        center_soma=False) -> \
+                        center_roi_centroid=False) -> \
             RoiDataset:
         """Returns RoiDataset of Artifacts at index
 
@@ -121,8 +121,8 @@ class DataSplitter:
                 List of index of artifacts to construct dataset
             transform:
                 optional transform to pass to RoiDataset
-            center_soma
-                Try to center the soma
+            center_roi_centroid
+                See `RoiDataset.center_roi_centroid`
 
         Returns
             RoiDataset
@@ -135,6 +135,6 @@ class DataSplitter:
             mask_out_projections=self.mask_out_projections,
             image_dim=self.image_dim,
             use_correlation_projection=self._use_correlation_projection,
-            center_roi_centroid=center_soma,
+            center_roi_centroid=center_roi_centroid,
             centroid_brightness_quantile=self._centroid_brightness_quantile
         )
