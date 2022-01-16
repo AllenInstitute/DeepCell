@@ -15,7 +15,7 @@ class DataSplitter:
                  cre_line=None, exclude_mask=False,
                  mask_out_projections=False, image_dim=(128, 128),
                  use_correlation_projection=False,
-                 center_soma=False):
+                 center_roi_centroid=False):
         """
         Does splitting of data into train/test or train/validation
 
@@ -38,8 +38,9 @@ class DataSplitter:
                 Input image dimension
             use_correlation_projection:
                 Whether to use correlation projection instead of avg
-            center_soma
-                Try to center the soma. Valid values are "test", "all" or False
+            center_roi_centroid
+                See `RoiDataset.center_roi_centroid`.
+                Valid values are "test", "all" or False
         """
         self._model_inputs = model_inputs
         self.train_transform = train_transform
@@ -51,10 +52,10 @@ class DataSplitter:
         self.image_dim = image_dim
         self._use_correlation_projection = use_correlation_projection
 
-        if center_soma not in ('test', True, False):
+        if center_roi_centroid not in ('test', True, False):
             raise ValueError(f'Invalid value for center_soma. Valid '
                              f'values are "test", True, or False')
-        self._center_soma = center_soma
+        self._center_roi_centroid = center_roi_centroid
 
     def get_train_test_split(self, test_size):
         full_dataset = RoiDataset(
@@ -73,13 +74,13 @@ class DataSplitter:
             dataset=full_dataset.model_inputs,
             index=train_index,
             transform=self.train_transform,
-            center_soma=self._center_soma == 'all')
+            center_soma=self._center_roi_centroid == 'all')
 
         test_dataset = self._sample_dataset(
             dataset=full_dataset.model_inputs,
             index=test_index,
             transform=self.test_transform,
-            center_soma=True if self._center_soma else False)
+            center_soma=True if self._center_roi_centroid else False)
 
         return train_dataset, test_dataset
 
@@ -93,13 +94,13 @@ class DataSplitter:
                 dataset=train_dataset.model_inputs,
                 index=train_index,
                 transform=self.train_transform,
-                center_soma=self._center_soma == 'all'
+                center_soma=self._center_roi_centroid == 'all'
             )
             valid = self._sample_dataset(
                 dataset=train_dataset.model_inputs,
                 index=test_index,
                 transform=self.test_transform,
-                center_soma=True if self._center_soma else False)
+                center_soma=True if self._center_roi_centroid else False)
             yield train, valid
 
     def _sample_dataset(self, dataset: List[ModelInput],
