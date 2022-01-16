@@ -23,7 +23,7 @@ class RoiDataset(Dataset):
                  exclude_mask=False,
                  mask_out_projections=False,
                  use_correlation_projection=False,
-                 try_center_soma_in_frame=False):
+                 center_roi_centroid=False):
         """
         A dataset of segmentation masks as identified by Suite2p with
         binary label "cell" or "not cell"
@@ -46,12 +46,10 @@ class RoiDataset(Dataset):
                 the mask
             use_correlation_projection
                 Whether to use correlation projection instead of avg projection
-            try_center_soma_in_frame
+            center_roi_centroid
                 The classifier has poor performance with a soma that is not
-                centered in frame. Find the mask centroid and use that to
-                center in the frame. Note: does not guarantee that the cell
-                is perfectly centered as a soma with a long dendrite will
-                have the centroid shifted.
+                centered in frame. Find the ROI centroid and use that to
+                center in the frame.
         """
         super().__init__()
 
@@ -62,7 +60,7 @@ class RoiDataset(Dataset):
         self._mask_out_projections = mask_out_projections
         self._y = np.array([int(x.label == 'cell') for x in self._model_inputs])
         self._use_correlation_projection = use_correlation_projection
-        self._try_center_soma_in_frame = try_center_soma_in_frame
+        self._center_roi_centroid = center_roi_centroid
 
         if cre_line:
             experiment_genotype_map = get_experiment_genotype_map()
@@ -161,7 +159,7 @@ class RoiDataset(Dataset):
             res[:, :, 0][np.where(mask == 0)] = 0
             res[:, :, 1][np.where(mask == 0)] = 0
 
-        if self._try_center_soma_in_frame:
+        if self._center_roi_centroid:
             res = center_roi(x=res)
 
         return res

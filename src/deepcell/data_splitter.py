@@ -130,5 +130,5 @@ class DataSplitter:
             mask_out_projections=self.mask_out_projections,
             image_dim=self.image_dim,
             use_correlation_projection=self._use_correlation_projection,
-            try_center_soma_in_frame=center_soma
+            center_roi_centroid=center_soma
         )
