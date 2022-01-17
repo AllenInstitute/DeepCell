@@ -1,11 +1,14 @@
-from typing import Optional, Tuple
-
 import cv2
 import numpy as np
 import imgaug.augmenters as iaa
 
+# Found by visually inspecting distribution of manually annotated bounding
+# boxes around soma
+CENTROID_DIST_FROM_CENTER_OUTLIER = 5
 
-def calc_roi_centroid(image: np.ndarray, brightness_quantile=0.8) -> \
+
+def calc_roi_centroid(image: np.ndarray, brightness_quantile=0.8,
+                      image_dimensions=(128, 128)) -> \
         np.ndarray:
     """
     Calculates ROI centroid weighted by pixel intensity in image, or falls
@@ -22,11 +25,33 @@ def calc_roi_centroid(image: np.ndarray, brightness_quantile=0.8) -> \
         brightness_quantile:
             Pixel brightness, below which will be zeroed out in centroid
             calculation, giving higher weight to brightest pixels
+        image_dimensions
+            Image dimensions
 
     Returns:
         x, y of centroid in image coordinates
     """
-    mask = image[:, :, 2]
+    def calculate_centroid(intensities: np.ndarray,
+                           mask: np.ndarray, binary_image=False) -> np.ndarray:
+        M = cv2.moments(intensities, binaryImage=binary_image)
+        if M['m00'] == 0:
+            # Intensities are all 0. Try again using mask
+            M = cv2.moments(mask, binaryImage=True)
+        centroid = np.array(
+            [int(M['m10'] / M['m00']), int(M['m01'] / M['m00'])])
+        return centroid
+
+    def is_outlier_centroid(intensities: np.ndarray, mask: np.ndarray,
+                            binary_image=False):
+        """Returns whether the centroid is an outlier distance away from
+        center"""
+        centroid = calculate_centroid(intensities=intensities, mask=mask,
+                                      binary_image=binary_image)
+        center = np.array(image_dimensions) / 2
+        dist_from_center = np.sqrt(((centroid - center)**2).sum())
+        return dist_from_center > CENTROID_DIST_FROM_CENTER_OUTLIER
+
+    mask = image[:, :, 2].copy()
 
     # intensities are correlation projection, or max projection if not
     # available
@@ -42,16 +67,16 @@ def calc_roi_centroid(image: np.ndarray, brightness_quantile=0.8) -> \
         intensities = mask
         binary_image = True
     else:
-        low = np.quantile(intensities[intensities.nonzero()],
-                          brightness_quantile)
-        intensities[intensities <= low] = 0
-
-    M = cv2.moments(intensities, binaryImage=binary_image)
-    if M['m00'] == 0:
-        # try again using mask
-        M = cv2.moments(mask, binaryImage=True)
-    centroid = np.array(
-        [int(M['m10'] / M['m00']), int(M['m01'] / M['m00'])])
+        if is_outlier_centroid(intensities=intensities, mask=mask,
+                               binary_image=binary_image):
+            # Zeroing out pixels less than brightness quantile was found to
+            # push centroid closer to center of soma in cases where soma was
+            # connected to a long dendrite.
+            low = np.quantile(intensities[intensities.nonzero()],
+                              brightness_quantile)
+            intensities[intensities <= low] = 0
+    centroid = calculate_centroid(intensities=intensities, mask=mask,
+                                  binary_image=binary_image)
     return centroid
 
 
@@ -70,7 +95,8 @@ def center_roi(x: np.ndarray, image_dim=(128, 128),
         Input translated so that centroid is in center of frame
     """
     centroid = calc_roi_centroid(image=x,
-                                 brightness_quantile=brightness_quantile)
+                                 brightness_quantile=brightness_quantile,
+                                 image_dimensions=image_dim)
 
     frame_center = np.array(image_dim) / 2
     diff_from_center = frame_center - centroid
