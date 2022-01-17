@@ -4,12 +4,11 @@ import imgaug.augmenters as iaa
 
 # Found by visually inspecting distribution of manually annotated bounding
 # boxes around soma
-CENTROID_DIST_FROM_CENTER_OUTLIER = 5
+CENTROID_DIST_FROM_CENTER_OUTLIER = 12
 
 
 def calc_roi_centroid(image: np.ndarray, brightness_quantile=0.8,
-                      image_dimensions=(128, 128)) -> \
-        np.ndarray:
+                      image_dimensions=(128, 128)) -> np.ndarray:
     """
     Calculates ROI centroid weighted by pixel intensity in image, or falls
     back to mask if intensities are 0 in masked region. Pixel intensities
