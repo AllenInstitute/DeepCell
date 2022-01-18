@@ -8,7 +8,8 @@ CENTROID_DIST_FROM_CENTER_OUTLIER = 12
 
 
 def calc_roi_centroid(image: np.ndarray, brightness_quantile=0.8,
-                      image_dimensions=(128, 128)) -> np.ndarray:
+                      image_dimensions=(128, 128),
+                      use_mask=False) -> np.ndarray:
     """
     Calculates ROI centroid weighted by pixel intensity in image, or falls
     back to mask if intensities are 0 in masked region. Pixel intensities
@@ -26,6 +27,10 @@ def calc_roi_centroid(image: np.ndarray, brightness_quantile=0.8,
             calculation, giving higher weight to brightest pixels
         image_dimensions
             Image dimensions
+        use_mask
+            Whether to use the mask to calculate the centroid.
+            If False, then intensities will be used, but will still fall
+            back to the mask if intensities are 0 in masked region.
 
     Returns:
         x, y of centroid in image coordinates
@@ -61,7 +66,10 @@ def calc_roi_centroid(image: np.ndarray, brightness_quantile=0.8,
 
     binary_image = False
 
-    if intensities.max() == 0:
+    if use_mask:
+        intensities = mask
+        binary_image = True
+    elif intensities.max() == 0:
         # just use the mask
         intensities = mask
         binary_image = True
@@ -80,7 +88,8 @@ def calc_roi_centroid(image: np.ndarray, brightness_quantile=0.8,
 
 
 def center_roi(x: np.ndarray, image_dim=(128, 128),
-               brightness_quantile=0.8) -> np.ndarray:
+               brightness_quantile=0.8,
+               use_mask=False) -> np.ndarray:
     """
     Centers an ROI in frame
     Args:
@@ -89,13 +98,16 @@ def center_roi(x: np.ndarray, image_dim=(128, 128),
         image_dim:
             image dimensions
         brightness_quantile
-            See `calc_roi_centroid`
+            See `brightness_quantile` arg in `calc_roi_centroid`
+        use_mask
+            See `use_mask` arg in `calc_roi_centroid`
     Returns:
         Input translated so that centroid is in center of frame
     """
     centroid = calc_roi_centroid(image=x,
                                  brightness_quantile=brightness_quantile,
-                                 image_dimensions=image_dim)
+                                 image_dimensions=image_dim,
+                                 use_mask=use_mask)
 
     frame_center = np.array(image_dim) / 2
     diff_from_center = frame_center - centroid
