@@ -137,7 +137,7 @@ class DataSplitter:
             RoiDataset
         """
         if is_train:
-            center_roi_centroid = self._center_roi_centroid is True
+            center_roi_centroid = self._center_roi_centroid == True  # noqa E712
         else:
             center_roi_centroid = \
                 self._center_roi_centroid is True or \
