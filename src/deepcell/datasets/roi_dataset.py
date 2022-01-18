@@ -1,11 +1,8 @@
 from typing import List
 
-import cv2
 from PIL import Image
 import numpy as np
 from torch.utils.data import Dataset
-from torchvision import transforms
-from imgaug import augmenters as iaa
 
 from deepcell.datasets.model_input import ModelInput
 from deepcell.datasets.util import center_roi
