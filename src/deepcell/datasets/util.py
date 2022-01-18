@@ -45,7 +45,7 @@ def calc_roi_centroid(image: np.ndarray, brightness_quantile=0.8,
             [int(M['m10'] / M['m00']), int(M['m01'] / M['m00'])])
         return centroid
 
-    def is_outlier_centroid(intensities: np.ndarray, mask: np.ndarray,
+    def calc_is_outlier_centroid(intensities: np.ndarray, mask: np.ndarray,
                             binary_image=False):
         """Returns whether the centroid is an outlier distance away from
         center"""
@@ -66,7 +66,10 @@ def calc_roi_centroid(image: np.ndarray, brightness_quantile=0.8,
 
     binary_image = False
 
-    if use_mask:
+    is_outlier = calc_is_outlier_centroid(intensities=intensities, mask=mask,
+                                          binary_image=binary_image)
+
+    if use_mask or not is_outlier:
         intensities = mask
         binary_image = True
     elif intensities.max() == 0:
@@ -74,14 +77,13 @@ def calc_roi_centroid(image: np.ndarray, brightness_quantile=0.8,
         intensities = mask
         binary_image = True
     else:
-        if is_outlier_centroid(intensities=intensities, mask=mask,
-                               binary_image=binary_image):
-            # Zeroing out pixels less than brightness quantile was found to
-            # push centroid closer to center of soma in cases where soma was
-            # connected to a long dendrite.
-            low = np.quantile(intensities[intensities.nonzero()],
-                              brightness_quantile)
-            intensities[intensities <= low] = 0
+        # Centroid is an outlier distance away from center.
+        # Zeroing out pixels less than brightness quantile was found to
+        # push centroid closer to center of soma in cases where soma was
+        # connected to a long dendrite.
+        low = np.quantile(intensities[intensities.nonzero()],
+                          brightness_quantile)
+        intensities[intensities <= low] = 0
     centroid = calculate_centroid(intensities=intensities, mask=mask,
                                   binary_image=binary_image)
     return centroid

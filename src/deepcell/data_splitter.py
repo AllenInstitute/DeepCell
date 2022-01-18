@@ -16,7 +16,8 @@ class DataSplitter:
                  mask_out_projections=False, image_dim=(128, 128),
                  use_correlation_projection=False,
                  center_roi_centroid=False,
-                 centroid_brightness_quantile=0.8):
+                 centroid_brightness_quantile=0.8,
+                 centroid_use_mask=False):
         """
         Does splitting of data into train/test or train/validation
 
@@ -43,7 +44,11 @@ class DataSplitter:
                 See `RoiDataset.center_roi_centroid`.
                 Valid values are "test", "all" or False
             centroid_brightness_quantile
-                See `RoiDataset.centroid_brightness_quantile`
+                See `centroid_brightness_quantile` arg in
+                `RoiDataset.centroid_brightness_quantile`
+            centroid_use_mask
+                See `use_mask` arg in
+                `deepcell.datasets.util.calc_roi_centroid`
         """
         self._model_inputs = model_inputs
         self.train_transform = train_transform
@@ -55,6 +60,7 @@ class DataSplitter:
         self.image_dim = image_dim
         self._use_correlation_projection = use_correlation_projection
         self._centroid_brightness_quantile = centroid_brightness_quantile
+        self._centroid_use_mask = centroid_use_mask
 
         if center_roi_centroid not in ('test', True, False):
             raise ValueError(f'Invalid value for center_soma. Valid '
@@ -136,5 +142,6 @@ class DataSplitter:
             image_dim=self.image_dim,
             use_correlation_projection=self._use_correlation_projection,
             center_roi_centroid=center_roi_centroid,
-            centroid_brightness_quantile=self._centroid_brightness_quantile
+            centroid_brightness_quantile=self._centroid_brightness_quantile,
+            centroid_use_mask=self._centroid_use_mask
         )
