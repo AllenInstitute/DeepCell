@@ -169,7 +169,7 @@ class RoiDataset(Dataset):
 
         if self._center_roi_centroid:
             res = center_roi(
-                x=res, brightness_quantile=self._centroid_brightness_quantile,
+                image=res, brightness_quantile=self._centroid_brightness_quantile,
                 use_mask=self._centroid_use_mask
             )
 

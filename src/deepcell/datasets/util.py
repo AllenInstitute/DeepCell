@@ -20,7 +20,7 @@ def calc_roi_centroid(
     weight in order to better calculate a centroid of the soma.
     Args:
         image:
-            Input image
+            See `image` arg in `center_roi`
         brightness_quantile:
             Pixel brightness, below which will be zeroed out in centroid
             calculation, giving higher weight to brightest pixels
@@ -95,15 +95,20 @@ def calc_roi_centroid(
     return centroid
 
 
-def center_roi(x: np.ndarray, image_dim=(128, 128),
+def center_roi(image: np.ndarray, image_dim=(128, 128),
                brightness_quantile=0.8,
                use_mask=False,
                centroid_dist_from_center_outlier=12) -> np.ndarray:
     """
     Centers an ROI in frame
     Args:
-        x:
-            input
+        image:
+            The input image
+            The first channel is expected to be the max projection
+            The second channel is expected to be the correlation projection
+            or average projection if the correlation projection is not
+            available
+            The third channel is expected to be the segmentation mask
         image_dim:
             image dimensions
         brightness_quantile
@@ -116,7 +121,7 @@ def center_roi(x: np.ndarray, image_dim=(128, 128),
         Input translated so that centroid is in center of frame
     """
     centroid = calc_roi_centroid(
-        image=x,
+        image=image,
         brightness_quantile=brightness_quantile,
         image_dimensions=image_dim,
         use_mask=use_mask,
@@ -129,5 +134,5 @@ def center_roi(x: np.ndarray, image_dim=(128, 128),
         iaa.Affine(translate_px={'x': int(diff_from_center[0]),
                                  'y': int(diff_from_center[1])})
     ])
-    x = seq(image=x)
-    return x
+    image = seq(image=image)
+    return image
