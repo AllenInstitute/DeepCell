@@ -82,21 +82,18 @@ class DataSplitter:
         train_index, test_index = next(sss.split(np.zeros(len(full_dataset)),
                                                  full_dataset.y))
 
-        test_center_roi_centroid = \
-            self._center_roi_centroid is True or \
-            self._center_roi_centroid == 'test'
-
         train_dataset = self._sample_dataset(
             dataset=full_dataset.model_inputs,
             index=train_index,
             transform=self.train_transform,
-            center_roi_centroid=self._center_roi_centroid is True)
-        
+            is_train=True
+        )
+
         test_dataset = self._sample_dataset(
             dataset=full_dataset.model_inputs,
             index=test_index,
             transform=self.test_transform,
-            center_roi_centroid=test_center_roi_centroid)
+            is_train=False)
 
         return train_dataset, test_dataset
 
@@ -110,19 +107,19 @@ class DataSplitter:
                 dataset=train_dataset.model_inputs,
                 index=train_index,
                 transform=self.train_transform,
-                center_roi_centroid=self._center_roi_centroid == 'all'
+                is_train=True
             )
             valid = self._sample_dataset(
                 dataset=train_dataset.model_inputs,
                 index=test_index,
                 transform=self.test_transform,
-                center_roi_centroid=True if self._center_roi_centroid else False)
+                is_train=False)
             yield train, valid
 
     def _sample_dataset(self, dataset: List[ModelInput],
                         index: List[int],
-                        transform: Optional[Transform] = None,
-                        center_roi_centroid=False) -> \
+                        is_train: bool,
+                        transform: Optional[Transform] = None) -> \
             RoiDataset:
         """Returns RoiDataset of Artifacts at index
 
@@ -131,14 +128,21 @@ class DataSplitter:
                 Initial dataset to sample from
             index:
                 List of index of artifacts to construct dataset
+            is_train
+                Whether this is a train dataset or test dataset
             transform:
                 optional transform to pass to RoiDataset
-            center_roi_centroid
-                See `RoiDataset.center_roi_centroid`
 
         Returns
             RoiDataset
         """
+        if is_train:
+            center_roi_centroid = self._center_roi_centroid is True
+        else:
+            center_roi_centroid = \
+                self._center_roi_centroid is True or \
+                self._center_roi_centroid == 'test'
+
         artifacts = [dataset[i] for i in index]
         return RoiDataset(
             model_inputs=artifacts,
