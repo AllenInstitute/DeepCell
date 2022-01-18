@@ -2,8 +2,9 @@ import cv2
 import numpy as np
 import imgaug.augmenters as iaa
 
-# Found by visually inspecting distribution of manually annotated bounding
-# boxes around soma
+# Found by visually inspecting the distribution of distances from the
+# centers of manually annotated bounding boxes around soma to the center of
+# the frame
 CENTROID_DIST_FROM_CENTER_OUTLIER = 12
 
 
