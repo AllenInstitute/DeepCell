@@ -42,7 +42,9 @@ class DataSplitter:
                 Whether to use correlation projection instead of avg
             center_roi_centroid
                 See `RoiDataset.center_roi_centroid`.
-                Valid values are "test", "all" or False
+                Valid values are "test", True or False
+                "test" applies centering only at test time, True applies in
+                both train and test, and False doesn't apply it
             centroid_brightness_quantile
                 See `centroid_brightness_quantile` arg in
                 `RoiDataset.centroid_brightness_quantile`
@@ -80,17 +82,21 @@ class DataSplitter:
         train_index, test_index = next(sss.split(np.zeros(len(full_dataset)),
                                                  full_dataset.y))
 
+        test_center_roi_centroid = \
+            self._center_roi_centroid is True or \
+            self._center_roi_centroid == 'test'
+
         train_dataset = self._sample_dataset(
             dataset=full_dataset.model_inputs,
             index=train_index,
             transform=self.train_transform,
-            center_roi_centroid=self._center_roi_centroid == 'all')
-
+            center_roi_centroid=self._center_roi_centroid is True)
+        
         test_dataset = self._sample_dataset(
             dataset=full_dataset.model_inputs,
             index=test_index,
             transform=self.test_transform,
-            center_roi_centroid=True if self._center_roi_centroid else False)
+            center_roi_centroid=test_center_roi_centroid)
 
         return train_dataset, test_dataset
 
