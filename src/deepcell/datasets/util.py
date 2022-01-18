@@ -5,7 +5,6 @@ import imgaug.augmenters as iaa
 
 def calc_roi_centroid(
         image: np.ndarray, brightness_quantile=0.8,
-        image_dimensions=(128, 128),
         use_mask=False,
         centroid_dist_from_center_outlier=12) -> np.ndarray:
     """
@@ -24,8 +23,6 @@ def calc_roi_centroid(
         brightness_quantile:
             Pixel brightness, below which will be zeroed out in centroid
             calculation, giving higher weight to brightest pixels
-        image_dimensions
-            Image dimensions
         use_mask
             Whether to use the mask to calculate the centroid.
             If False, then intensities will be used, but will still fall
@@ -59,7 +56,7 @@ def calc_roi_centroid(
         center"""
         centroid = calculate_centroid(intensities=intensities, mask=mask,
                                       binary_image=binary_image)
-        center = np.array(image_dimensions) / 2
+        center = np.array(image.shape[:-1]) / 2
         dist_from_center = np.sqrt(((centroid - center)**2).sum())
         return dist_from_center > centroid_dist_from_center_outlier
 
@@ -95,7 +92,7 @@ def calc_roi_centroid(
     return centroid
 
 
-def center_roi(image: np.ndarray, image_dim=(128, 128),
+def center_roi(image: np.ndarray,
                brightness_quantile=0.8,
                use_mask=False,
                centroid_dist_from_center_outlier=12) -> np.ndarray:
@@ -109,8 +106,6 @@ def center_roi(image: np.ndarray, image_dim=(128, 128),
             or average projection if the correlation projection is not
             available
             The third channel is expected to be the segmentation mask
-        image_dim:
-            image dimensions
         brightness_quantile
             See `brightness_quantile` arg in `calc_roi_centroid`
         use_mask
@@ -123,11 +118,10 @@ def center_roi(image: np.ndarray, image_dim=(128, 128),
     centroid = calc_roi_centroid(
         image=image,
         brightness_quantile=brightness_quantile,
-        image_dimensions=image_dim,
         use_mask=use_mask,
         centroid_dist_from_center_outlier=centroid_dist_from_center_outlier)
 
-    frame_center = np.array(image_dim) / 2
+    frame_center = np.array(image.shape[:-1]) / 2
     diff_from_center = frame_center - centroid
 
     seq = iaa.Sequential([
