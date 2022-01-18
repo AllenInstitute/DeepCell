@@ -2,15 +2,12 @@ import cv2
 import numpy as np
 import imgaug.augmenters as iaa
 
-# Found by visually inspecting the distribution of distances from the
-# centers of manually annotated bounding boxes around soma to the center of
-# the frame
-CENTROID_DIST_FROM_CENTER_OUTLIER = 12
 
-
-def calc_roi_centroid(image: np.ndarray, brightness_quantile=0.8,
-                      image_dimensions=(128, 128),
-                      use_mask=False) -> np.ndarray:
+def calc_roi_centroid(
+        image: np.ndarray, brightness_quantile=0.8,
+        image_dimensions=(128, 128),
+        use_mask=False,
+        centroid_dist_from_center_outlier=12) -> np.ndarray:
     """
     Calculates ROI centroid. The pixels are weighted by pixel intensity in
     image if use_mask is False. Falls back to mask if intensities are 0 in
@@ -33,6 +30,13 @@ def calc_roi_centroid(image: np.ndarray, brightness_quantile=0.8,
             Whether to use the mask to calculate the centroid.
             If False, then intensities will be used, but will still fall
             back to the mask if intensities are 0 in masked region.
+        centroid_dist_from_center_outlier
+            The distance the centroid needs to be from the center to be
+            considered an outlier. The default of 12 was found by visually
+            inspecting the distribution of distances from the centers of
+            manually annotated bounding boxes around soma to the center of
+            the frame
+
 
     Returns:
         x, y of centroid in image coordinates
@@ -57,7 +61,7 @@ def calc_roi_centroid(image: np.ndarray, brightness_quantile=0.8,
                                       binary_image=binary_image)
         center = np.array(image_dimensions) / 2
         dist_from_center = np.sqrt(((centroid - center)**2).sum())
-        return dist_from_center > CENTROID_DIST_FROM_CENTER_OUTLIER
+        return dist_from_center > centroid_dist_from_center_outlier
 
     mask = image[:, :, 2].copy()
 
@@ -93,7 +97,8 @@ def calc_roi_centroid(image: np.ndarray, brightness_quantile=0.8,
 
 def center_roi(x: np.ndarray, image_dim=(128, 128),
                brightness_quantile=0.8,
-               use_mask=False) -> np.ndarray:
+               use_mask=False,
+               centroid_dist_from_center_outlier=12) -> np.ndarray:
     """
     Centers an ROI in frame
     Args:
@@ -105,13 +110,17 @@ def center_roi(x: np.ndarray, image_dim=(128, 128),
             See `brightness_quantile` arg in `calc_roi_centroid`
         use_mask
             See `use_mask` arg in `calc_roi_centroid`
+        centroid_dist_from_center_outlier
+            See `centroid_dist_from_center_outlier` arg in `calc_roi_centroid`
     Returns:
         Input translated so that centroid is in center of frame
     """
-    centroid = calc_roi_centroid(image=x,
-                                 brightness_quantile=brightness_quantile,
-                                 image_dimensions=image_dim,
-                                 use_mask=use_mask)
+    centroid = calc_roi_centroid(
+        image=x,
+        brightness_quantile=brightness_quantile,
+        image_dimensions=image_dim,
+        use_mask=use_mask,
+        centroid_dist_from_center_outlier=centroid_dist_from_center_outlier)
 
     frame_center = np.array(image_dim) / 2
     diff_from_center = frame_center - centroid
