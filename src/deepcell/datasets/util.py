@@ -11,11 +11,12 @@ def calc_roi_centroid(image: np.ndarray, brightness_quantile=0.8,
                       image_dimensions=(128, 128),
                       use_mask=False) -> np.ndarray:
     """
-    Calculates ROI centroid weighted by pixel intensity in image, or falls
-    back to mask if intensities are 0 in masked region. Pixel intensities
-    act as weights and since the soma should have higher intensity than the
-    rest of the ROI, this should choose a point close to the center of the
-    soma.
+    Calculates ROI centroid. The pixels are weighted by pixel intensity in
+    image if use_mask is False. Falls back to mask if intensities are 0 in
+    masked region.
+    Pixel intensities act as weights and since the soma should have higher
+    intensity than the rest of the ROI, this should choose a point close to
+    the center of the soma.
 
     Pixels brighter than brightness_quantile are given much higher
     weight in order to better calculate a centroid of the soma.
@@ -37,6 +38,8 @@ def calc_roi_centroid(image: np.ndarray, brightness_quantile=0.8,
     """
     def calculate_centroid(intensities: np.ndarray,
                            mask: np.ndarray, binary_image=False) -> np.ndarray:
+        """Calculates centroid using intensities or falls back to mask if
+        all pixels are 0 in masked region."""
         M = cv2.moments(intensities, binaryImage=binary_image)
         if M['m00'] == 0:
             # Intensities are all 0. Try again using mask
@@ -69,15 +72,13 @@ def calc_roi_centroid(image: np.ndarray, brightness_quantile=0.8,
     is_outlier = calc_is_outlier_centroid(intensities=intensities, mask=mask,
                                           binary_image=binary_image)
 
-    if use_mask or not is_outlier:
-        intensities = mask
-        binary_image = True
-    elif intensities.max() == 0:
-        # just use the mask
+    if use_mask or not is_outlier or intensities.max() == 0:
+        # Use the mask to calculate centroid
         intensities = mask
         binary_image = True
     else:
-        # Centroid is an outlier distance away from center.
+        # We are using the projection to calculate the centroid and
+        # the centroid is an outlier distance away from center.
         # Zeroing out pixels less than brightness quantile was found to
         # push centroid closer to center of soma in cases where soma was
         # connected to a long dendrite.
