@@ -15,7 +15,9 @@ class DataSplitter:
                  cre_line=None, exclude_mask=False,
                  mask_out_projections=False, image_dim=(128, 128),
                  use_correlation_projection=False,
-                 center_soma=False):
+                 center_roi_centroid=False,
+                 centroid_brightness_quantile=0.8,
+                 centroid_use_mask=False):
         """
         Does splitting of data into train/test or train/validation
 
@@ -38,8 +40,17 @@ class DataSplitter:
                 Input image dimension
             use_correlation_projection:
                 Whether to use correlation projection instead of avg
-            center_soma
-                Try to center the soma. Valid values are "test", "all" or False
+            center_roi_centroid
+                See `RoiDataset.center_roi_centroid`.
+                Valid values are "test", True or False
+                "test" applies centering only at test time, True applies in
+                both train and test, and False doesn't apply it
+            centroid_brightness_quantile
+                See `centroid_brightness_quantile` arg in
+                `RoiDataset.centroid_brightness_quantile`
+            centroid_use_mask
+                See `use_mask` arg in
+                `deepcell.datasets.util.calc_roi_centroid`
         """
         self._model_inputs = model_inputs
         self.train_transform = train_transform
@@ -50,11 +61,13 @@ class DataSplitter:
         self.mask_out_projections = mask_out_projections
         self.image_dim = image_dim
         self._use_correlation_projection = use_correlation_projection
+        self._centroid_brightness_quantile = centroid_brightness_quantile
+        self._centroid_use_mask = centroid_use_mask
 
-        if center_soma not in ('test', True, False):
+        if center_roi_centroid not in ('test', True, False):
             raise ValueError(f'Invalid value for center_soma. Valid '
                              f'values are "test", True, or False')
-        self._center_soma = center_soma
+        self._center_roi_centroid = center_roi_centroid
 
     def get_train_test_split(self, test_size):
         full_dataset = RoiDataset(
@@ -73,13 +86,14 @@ class DataSplitter:
             dataset=full_dataset.model_inputs,
             index=train_index,
             transform=self.train_transform,
-            center_soma=self._center_soma == 'all')
+            is_train=True
+        )
 
         test_dataset = self._sample_dataset(
             dataset=full_dataset.model_inputs,
             index=test_index,
             transform=self.test_transform,
-            center_soma=True if self._center_soma else False)
+            is_train=False)
 
         return train_dataset, test_dataset
 
@@ -93,19 +107,19 @@ class DataSplitter:
                 dataset=train_dataset.model_inputs,
                 index=train_index,
                 transform=self.train_transform,
-                center_soma=self._center_soma == 'all'
+                is_train=True
             )
             valid = self._sample_dataset(
                 dataset=train_dataset.model_inputs,
                 index=test_index,
                 transform=self.test_transform,
-                center_soma=True if self._center_soma else False)
+                is_train=False)
             yield train, valid
 
     def _sample_dataset(self, dataset: List[ModelInput],
                         index: List[int],
-                        transform: Optional[Transform] = None,
-                        center_soma=False) -> \
+                        is_train: bool,
+                        transform: Optional[Transform] = None) -> \
             RoiDataset:
         """Returns RoiDataset of Artifacts at index
 
@@ -114,14 +128,21 @@ class DataSplitter:
                 Initial dataset to sample from
             index:
                 List of index of artifacts to construct dataset
+            is_train
+                Whether this is a train dataset or test dataset
             transform:
                 optional transform to pass to RoiDataset
-            center_soma
-                Try to center the soma
 
         Returns
             RoiDataset
         """
+        if is_train:
+            center_roi_centroid = self._center_roi_centroid is True
+        else:
+            center_roi_centroid = \
+                self._center_roi_centroid is True or \
+                self._center_roi_centroid == 'test'
+
         artifacts = [dataset[i] for i in index]
         return RoiDataset(
             model_inputs=artifacts,
@@ -130,5 +151,7 @@ class DataSplitter:
             mask_out_projections=self.mask_out_projections,
             image_dim=self.image_dim,
             use_correlation_projection=self._use_correlation_projection,
-            try_center_soma_in_frame=center_soma
+            center_roi_centroid=center_roi_centroid,
+            centroid_brightness_quantile=self._centroid_brightness_quantile,
+            centroid_use_mask=self._centroid_use_mask
         )

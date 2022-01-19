@@ -73,7 +73,7 @@ def run_inference_for_experiment(
                       transform=test_transform,
                       use_correlation_projection=use_correlation_projection,
                       mask_out_projections=mask_projections,
-                      try_center_soma_in_frame=center_soma)
+                      center_roi_centroid=center_soma)
     test_dataloader = DataLoader(dataset=test, shuffle=False, batch_size=64)
 
     cnn = torchvision.models.vgg11_bn(pretrained=True, progress=False)
