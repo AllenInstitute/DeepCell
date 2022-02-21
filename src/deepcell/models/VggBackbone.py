@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torchvision
 from torch import nn
@@ -5,7 +6,9 @@ from torch import nn
 
 class VggBackbone(torch.nn.Module):
     def __init__(self, model, truncate_to_layer, classifier_cfg,
-                 dropout_prob=0.5, freeze_up_to_layer=None):
+                 dropout_prob=0.5, freeze_up_to_layer=None,
+                 shuffle_final_activation_map=False,
+                 final_activation_map_spatial_dimensions=(7, 7)):
         super().__init__()
         conv_layers = self._truncate_to_layer(model=model, layer=truncate_to_layer)
         self.features = torch.nn.Sequential(*conv_layers)
@@ -14,16 +17,26 @@ class VggBackbone(torch.nn.Module):
             for p in layer.parameters():
                 p.requires_grad = False
 
-        self.avgpool = torch.nn.AdaptiveAvgPool2d((7, 7))
+        self.avgpool = torch.nn.AdaptiveAvgPool2d(
+            final_activation_map_spatial_dimensions)
 
         last_conv_filter_num = self._get_last_filter_num()
-        in_features = last_conv_filter_num * 7 * 7
+        in_features = last_conv_filter_num * np.prod(
+            final_activation_map_spatial_dimensions)
         self.classifier = self._make_classifier_layers(cfg=classifier_cfg, in_features=in_features,
                                                        dropout_prob=dropout_prob)
+        self._shuffle_final_activation_map = shuffle_final_activation_map
 
     def forward(self, x):
         x = self.features(x)
         x = self.avgpool(x)
+
+        if self._shuffle_final_activation_map:
+            # Shuffle spatial dimensions of activation map
+            x = x.reshape(x.size(0), x.size(1), x.shape[-2] * x.shape[-1])
+            indexes = torch.randperm(x.shape[2])
+            x = x[:, :, indexes]
+
         x = x.reshape(x.size(0), -1)
         x = self.classifier(x)
         return x
