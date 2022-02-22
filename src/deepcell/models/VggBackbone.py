@@ -57,6 +57,11 @@ class VggBackbone(torch.nn.Module):
 
     @staticmethod
     def _make_classifier_layers(cfg, in_features, dropout_prob, num_classes=1):
+        if len(cfg) == 0:
+            return nn.Sequential(
+                nn.Linear(in_features=in_features, out_features=num_classes)
+            )
+        
         layers = [
             nn.Linear(in_features=in_features, out_features=cfg[0]),
             nn.ReLU(inplace=True),
