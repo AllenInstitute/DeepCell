@@ -2,12 +2,12 @@ from typing import List, Optional
 
 import numpy as np
 import torch
-import torchvision
 from torch import nn
 
 
 class Classifier(torch.nn.Module):
     """A classifier using a CNN backbone"""
+
     def __init__(self, model: torch.nn.Module, truncate_to_layer: int,
                  classifier_cfg: List[int],
                  dropout_prob=0.5, freeze_up_to_layer: Optional[int] = None,
@@ -39,7 +39,8 @@ class Classifier(torch.nn.Module):
                 into a vector for input into the classifier.
         """
         super().__init__()
-        conv_layers = self._truncate_to_layer(model=model, layer=truncate_to_layer)
+        conv_layers = self._truncate_to_layer(model=model,
+                                              layer=truncate_to_layer)
         self.features = torch.nn.Sequential(*conv_layers)
 
         for layer in self.features[:freeze_up_to_layer]:
@@ -52,8 +53,10 @@ class Classifier(torch.nn.Module):
         last_conv_filter_num = self._get_last_filter_num()
         in_features = last_conv_filter_num * np.prod(
             final_activation_map_spatial_dimensions)
-        self.classifier = self._make_classifier_layers(cfg=classifier_cfg, in_features=in_features,
-                                                       dropout_prob=dropout_prob)
+        self.classifier = self._make_classifier_layers(
+            cfg=classifier_cfg,
+            in_features=in_features,
+            dropout_prob=dropout_prob)
 
     def forward(self, x):
         x = self.features(x)
@@ -97,10 +100,3 @@ class Classifier(torch.nn.Module):
 
         layers.append(nn.Linear(cfg[-1], num_classes))
         return nn.Sequential(*layers)
-
-
-if __name__ == '__main__':
-    cnn = torchvision.models.vgg11_bn(pretrained=True, progress=False)
-    cnn = Classifier(model=cnn, truncate_to_layer=22, classifier_cfg=[512],
-                     freeze_up_to_layer=15)
-    pass
