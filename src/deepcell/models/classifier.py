@@ -1,13 +1,43 @@
+from typing import List, Optional
+
 import numpy as np
 import torch
 import torchvision
 from torch import nn
 
 
-class ClassifierBackbone(torch.nn.Module):
-    def __init__(self, model, truncate_to_layer, classifier_cfg,
-                 dropout_prob=0.5, freeze_up_to_layer=None,
+class Classifier(torch.nn.Module):
+    """A classifier using a CNN backbone"""
+    def __init__(self, model: torch.nn.Module, truncate_to_layer: int,
+                 classifier_cfg: List[int],
+                 dropout_prob=0.5, freeze_up_to_layer: Optional[int] = None,
                  final_activation_map_spatial_dimensions=(1, 1)):
+        """
+
+        Args:
+            model:
+                The pytorch model
+            truncate_to_layer:
+                Index of the layer of `model` to truncate to. It is possible
+                to use too big of a model. `truncate_to_layer` helps to shrink
+                the model capacity.
+            classifier_cfg:
+                A configuration of the form
+                [# neurons in first layer, ...# neurons in last layer]
+                An empty list means to use a linear classifier
+            dropout_prob:
+                Dropout probability for fully connected layers
+            freeze_up_to_layer:
+                Use for finetuning certain layers in the network. When using
+                a pretrained model, the first few layers encode fundamental
+                properties of images such as edges. The later layers encode
+                domain information. So one might want to keep the first few
+                layers but finetune the later layers. This argument controls
+                that
+            final_activation_map_spatial_dimensions:
+                The final activation map spatial dimension before flattening
+                into a vector for input into the classifier.
+        """
         super().__init__()
         conv_layers = self._truncate_to_layer(model=model, layer=truncate_to_layer)
         self.features = torch.nn.Sequential(*conv_layers)
@@ -71,6 +101,6 @@ class ClassifierBackbone(torch.nn.Module):
 
 if __name__ == '__main__':
     cnn = torchvision.models.vgg11_bn(pretrained=True, progress=False)
-    cnn = ClassifierBackbone(model=cnn, truncate_to_layer=22, classifier_cfg=[512],
-                             freeze_up_to_layer=15)
+    cnn = Classifier(model=cnn, truncate_to_layer=22, classifier_cfg=[512],
+                     freeze_up_to_layer=15)
     pass
