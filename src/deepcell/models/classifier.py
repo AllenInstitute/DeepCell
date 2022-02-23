@@ -10,20 +10,23 @@ class Classifier(torch.nn.Module):
 
     def __init__(self, model: torch.nn.Module, truncate_to_layer: int,
                  classifier_cfg: List[int],
-                 dropout_prob=0.5, freeze_up_to_layer: Optional[int] = None,
+                 dropout_prob: float = 0.5,
+                 freeze_up_to_layer: Optional[int] = None,
                  final_activation_map_spatial_dimensions=(1, 1)):
         """
 
         Args:
             model:
-                The pytorch model
+                The pytorch model. The classifier will be replaced with a new
+                one and the CNN layers may be truncated using
+                `truncate_to_layer`
             truncate_to_layer:
                 Index of the layer of `model` to truncate to. It is possible
                 to use too big of a model. `truncate_to_layer` helps to shrink
                 the model capacity.
             classifier_cfg:
                 A configuration of the form
-                [# neurons in first layer, ...# neurons in last layer]
+                [# neurons in first layer, ...# neurons in last hidden layer]
                 An empty list means to use a linear classifier
             dropout_prob:
                 Dropout probability for fully connected layers
