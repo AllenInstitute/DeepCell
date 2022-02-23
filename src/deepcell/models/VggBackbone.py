@@ -8,7 +8,7 @@ class VggBackbone(torch.nn.Module):
     def __init__(self, model, truncate_to_layer, classifier_cfg,
                  dropout_prob=0.5, freeze_up_to_layer=None,
                  shuffle_final_activation_map=False,
-                 final_activation_map_spatial_dimensions=(7, 7)):
+                 final_activation_map_spatial_dimensions=(1, 1)):
         super().__init__()
         conv_layers = self._truncate_to_layer(model=model, layer=truncate_to_layer)
         self.features = torch.nn.Sequential(*conv_layers)
@@ -61,7 +61,7 @@ class VggBackbone(torch.nn.Module):
             return nn.Sequential(
                 nn.Linear(in_features=in_features, out_features=num_classes)
             )
-        
+
         layers = [
             nn.Linear(in_features=in_features, out_features=cfg[0]),
             nn.ReLU(inplace=True),

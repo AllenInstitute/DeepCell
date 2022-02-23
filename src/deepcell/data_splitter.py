@@ -14,7 +14,7 @@ class DataSplitter:
                  test_transform=None, seed=None,
                  cre_line=None, exclude_mask=False,
                  mask_out_projections=False, image_dim=(128, 128),
-                 use_correlation_projection=False,
+                 use_correlation_projection=True,
                  center_roi_centroid=False,
                  centroid_brightness_quantile=0.8,
                  centroid_use_mask=False):
