@@ -2,13 +2,16 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import Optional, Tuple, Union, Callable
+from typing import Optional, Union, List
 
+import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
+from deepcell.callbacks.base_callback import Callback
+from deepcell.callbacks.early_stopping import EarlyStopping
 from deepcell.data_splitter import DataSplitter
-from deepcell.metrics import Metrics, TrainingMetrics, CVMetrics
+from deepcell.metrics import Metrics, CVMetrics
 from deepcell.datasets.roi_dataset import RoiDataset
 
 logging.basicConfig(
@@ -26,14 +29,11 @@ class Trainer:
             self,
             model: torch.nn.Module,
             n_epochs: int,
-            optimizer: Callable[..., torch.optim.Adam],
             criterion: torch.nn.BCEWithLogitsLoss,
+            optimizer: torch.optim.Adam,
             save_path: Union[str, Path],
-            scheduler: Optional[
-                Callable[[torch.optim.Adam],
-                         torch.optim.lr_scheduler.ReduceLROnPlateau]] = None,
-            scheduler_step_after_batch=False,
-            early_stopping=30,
+            scheduler: Optional["torch.optim.lr_scheduler._LRScheduler"] = None, # noqa E501
+            callbacks: Optional[List[Callback]] = None,
             model_load_path: Optional[Union[str, Path]] = None):
         """
         The driver for the training and evaluation loop
@@ -42,35 +42,35 @@ class Trainer:
                 torch.nn.Module
             n_epochs:
                 Number of epochs to train for
-            optimizer:
-                function which returns instantiation of Adam optimizer
+            optimizer
+                Optimizer instance.
+                See torch.optim for options
             criterion:
                 loss function
             save_path:
                 Where to save checkpoints
-            scheduler:
-                optional function which returns learning rate scheduler
-            scheduler_step_after_batch:
-                Whether the scheduler steps after each batch or epoch
-            early_stopping:
-                Number of epochs to activate early stopping
+            scheduler
+                Optional learning rate decay scheduler
+                See torch.optim.lr_scheduler package for options
             model_load_path:
                 Path to load a pretrained model. Activates continuation of
                 training
         """
         self.n_epochs = n_epochs
         self.model = model
-        self.optimizer_constructor = optimizer
-        self.scheduler_contructor = scheduler
-        self.optimizer = optimizer()
-        self.scheduler = scheduler(self.optimizer) if scheduler is not None else None
-        self.scheduler_step_after_batch = scheduler_step_after_batch
+        self.optimizer = optimizer
+        self.scheduler = scheduler
         self.criterion = criterion
         self.use_cuda = torch.cuda.is_available()
-        self.early_stopping = early_stopping
         self.model_load_path = model_load_path
         self.save_path = save_path
-        self._current_best_state_dicts = {}
+        self._current_best_state_dicts = {
+            'model': self.model.state_dict(),
+            'optimizer': self.optimizer.state_dict(),
+            'scheduler': self.scheduler.state_dict() if scheduler is not None else None # noqa E501
+        }
+        self._callback_metrics = {}
+        self._callbacks = callbacks if callbacks is not None else []
 
         if not os.path.exists(f'{self.save_path}'):
             os.makedirs(f'{self.save_path}')
@@ -78,9 +78,14 @@ class Trainer:
         if self.use_cuda:
             self.model = self.model.cuda()
 
-        torch.save({
-            'state_dict': self.model.state_dict()
-        }, f'{self.save_path}/model_init.pt')
+        self._save_model_and_performance(is_init=True)
+
+    @property
+    def early_stopping_callback(self) -> Optional[EarlyStopping]:
+        for c in self._callbacks:
+            if isinstance(c, EarlyStopping):
+                return c
+        return None
 
     def cross_validate(self, train_dataset: RoiDataset, data_splitter: DataSplitter, batch_size=64, sampler=None,
                        n_splits=5, log_after_each_epoch=True):
@@ -93,48 +98,39 @@ class Trainer:
             logger.info(f'=========')
 
             if self.model_load_path is not None:
-                train_metrics, val_metrics = self._load_pretrained_model(
+                self._load_pretrained_model(
                     checkpoint_path=Path(
                         self.model_load_path) / f'{i}_model.pt')
-            else:
-                train_metrics = TrainingMetrics(n_epochs=self.n_epochs)
-                val_metrics = TrainingMetrics(n_epochs=self.n_epochs)
 
             train_loader = DataLoader(dataset=train, shuffle=True, batch_size=batch_size, sampler=sampler)
             valid_loader = DataLoader(dataset=valid, shuffle=False, batch_size=batch_size)
-            train_metrics, valid_metrics = self.train(
+            self.train(
                 train_loader=train_loader, valid_loader=valid_loader,
                 eval_fold=i,
-                log_after_each_epoch=log_after_each_epoch,
-                train_metrics=train_metrics, val_metrics=val_metrics)
+                log_after_each_epoch=log_after_each_epoch)
 
-            cv_metrics.update(train_metrics=train_metrics, valid_metrics=valid_metrics)
+            best_epoch = self.early_stopping_callback.best_epoch if \
+                self.early_stopping_callback else None
+            cv_metrics.update(metrics=self._callback_metrics,
+                              best_epoch=best_epoch)
 
             self._reset()
 
         return cv_metrics
 
     def train(self, train_loader: DataLoader, eval_fold=None, valid_loader: DataLoader = None,
-              log_after_each_epoch=True,
-              train_metrics: Optional[TrainingMetrics] = None,
-              val_metrics: Optional[TrainingMetrics] = None):
-        if train_metrics is not None:
-            all_train_metrics = train_metrics
-        else:
-            all_train_metrics = TrainingMetrics(n_epochs=self.n_epochs,
-                                                best_metric='loss',
-                                                metric_larger_is_better=False)
+              log_after_each_epoch=True):
+        if not self._callback_metrics:
+            self._callback_metrics = {
+                'loss': np.zeros(self.n_epochs),
+                'f1': np.zeros(self.n_epochs),
+                'val_loss': np.zeros(self.n_epochs),
+                'val_f1': np.zeros(self.n_epochs)
+            }
 
-        if val_metrics is not None:
-            all_val_metrics = val_metrics
-        else:
-            all_val_metrics = TrainingMetrics(n_epochs=self.n_epochs,
-                                              best_metric='loss',
-                                              metric_larger_is_better=False)
-
-        time_since_best_epoch = 0
-
-        for epoch in range(val_metrics.best_epoch + 1, self.n_epochs):
+        start_epoch = self.early_stopping_callback.best_epoch + 1 if \
+            self.early_stopping_callback else 0
+        for epoch in range(start_epoch, self.n_epochs):
             epoch_train_metrics = Metrics()
             epoch_val_metrics = Metrics()
 
@@ -154,9 +150,8 @@ class Trainer:
                 epoch_train_metrics.update_loss(loss=loss.item(), num_batches=len(train_loader))
                 epoch_train_metrics.update_outputs(y_true=target, y_out=output)
 
-            all_train_metrics.update(epoch=epoch,
-                                     loss=epoch_train_metrics.loss,
-                                     f1=epoch_train_metrics.F1)
+            self._callback_metrics['loss'][epoch] = epoch_train_metrics.loss
+            self._callback_metrics['f1'][epoch] = epoch_train_metrics.F1
 
             if valid_loader:
                 self.model.eval()
@@ -174,32 +169,34 @@ class Trainer:
                         epoch_val_metrics.update_loss(loss=loss.item(), num_batches=len(valid_loader))
                         epoch_val_metrics.update_outputs(y_true=target, y_out=output)
 
-                all_val_metrics.update(epoch=epoch,
-                                       loss=epoch_val_metrics.loss,
-                                       f1=epoch_val_metrics.F1)
+                self._callback_metrics['val_loss'][epoch] = \
+                    epoch_val_metrics.loss
+                self._callback_metrics['val_f1'][epoch] = \
+                    epoch_val_metrics.F1
 
-                if all_val_metrics.best_epoch == epoch:
-                    scheduler_state_dict = self.scheduler.state_dict() if \
-                        self.scheduler is not None else None
-                    self._current_best_state_dicts = {
-                        'model': self.model.state_dict(),
-                        'optimizer': self.optimizer.state_dict(),
-                        'scheduler': scheduler_state_dict
-                    }
-                    time_since_best_epoch = 0
-                else:
-                    time_since_best_epoch += 1
-                    if time_since_best_epoch > self.early_stopping:
-                        logger.info('Stopping due to early stopping')
-                        self._save_model_and_performance(
-                            eval_fold=eval_fold,
-                            all_train_metrics=all_train_metrics,
-                            all_val_metrics=all_val_metrics, epoch=epoch)
-                        return all_train_metrics, all_val_metrics
+                if self.early_stopping_callback is not None:
+                    self.early_stopping_callback.on_epoch_end(
+                        epoch=epoch, metrics=self._callback_metrics)
+                    if self.early_stopping_callback.best_epoch == epoch:
+                        scheduler_state_dict = self.scheduler.state_dict() if \
+                            self.scheduler is not None else None
+                        self._current_best_state_dicts = {
+                            'model': self.model.state_dict(),
+                            'optimizer': self.optimizer.state_dict(),
+                            'scheduler': scheduler_state_dict
+                        }
+                        self.early_stopping_callback.time_since_best_epoch = 0
+                    else:
+                        self.early_stopping_callback.time_since_best_epoch += 1
+                        if self.early_stopping_callback.time_since_best_epoch \
+                                > self.early_stopping_callback.patience:
+                            logger.info('Stopping due to early stopping')
+                            self._save_model_and_performance(
+                                eval_fold=eval_fold)
+                            return
 
-            if not self.scheduler_step_after_batch:
-                if self.scheduler is not None:
-                    self.scheduler.step(epoch_val_metrics.loss)
+            if self.scheduler is not None:
+                self.scheduler.step(epoch_val_metrics.loss)
 
             if log_after_each_epoch:
                 logger.info(f'Epoch: {epoch + 1} \t'
@@ -207,44 +204,49 @@ class Trainer:
                             f'Val F1: {epoch_val_metrics.F1:.6f}\t'
                             f'Val Loss: {epoch_val_metrics.loss}'
                             )
-        self._save_model_and_performance(eval_fold=eval_fold,
-                                         all_train_metrics=all_train_metrics,
-                                         all_val_metrics=all_val_metrics,
-                                         epoch=self.n_epochs)
-
-        return all_train_metrics, all_val_metrics
+        self._save_model_and_performance(eval_fold=eval_fold)
 
     def _reset(self):
         # reset model weights
-        x = torch.load(f'{self.save_path}/model_init.pt')
+        x = torch.load(f'{self.save_path}/init_model.pt')
         self.model.load_state_dict(x['state_dict'])
 
         # reset optimizer
-        self.optimizer = self.optimizer_constructor()
+        self.optimizer.load_state_dict(x['optimizer'])
 
         # reset scheduler
         if self.scheduler is not None:
-            self.scheduler = self.scheduler_contructor(self.optimizer)
+            self.scheduler.load_state_dict(x['scheduler'])
 
-    def _save_model_and_performance(self, eval_fold: int,
-                                    all_train_metrics: TrainingMetrics,
-                                    all_val_metrics: TrainingMetrics,
-                                    epoch: int):
-        """Writes model weights and training performance to disk"""
+    def _save_model_and_performance(self, eval_fold: Optional[int] = None,
+                                    is_init=False):
+        """Writes model weights and training performance to disk
+
+        Args:
+            eval_fold:
+                The validation fold to save a checkpoint for
+            is_init:
+                Whether this is before training has started. Used to save a
+                checkpoint to reset to after training on a fold has finished
+        """
+        metrics = {
+            k: v[:self.early_stopping_callback.best_epoch] if
+            self.early_stopping_callback else v for k, v in
+            self._callback_metrics.items()}
+        if is_init:
+            checkpoint_name = 'init_model'
+        elif eval_fold is not None:
+            checkpoint_name = f'{eval_fold}_model'
+        else:
+            checkpoint_name = 'model'
         torch.save({
             'state_dict': self._current_best_state_dicts['model'],
             'optimizer': self._current_best_state_dicts['optimizer'],
             'scheduler': self._current_best_state_dicts['scheduler'],
-            'performance': {
-                'train': all_train_metrics.to_dict(
-                    to_epoch=epoch, best_epoch=all_train_metrics.best_epoch),
-                'val': all_val_metrics.to_dict(
-                    to_epoch=epoch, best_epoch=all_val_metrics.best_epoch)
-            }
-        }, f'{self.save_path}/{eval_fold}_model.pt')
+            'performance': metrics
+        }, f'{self.save_path}/{checkpoint_name}.pt')
 
-    def _load_pretrained_model(self, checkpoint_path: Path) -> \
-            Tuple[TrainingMetrics, TrainingMetrics]:
+    def _load_pretrained_model(self, checkpoint_path: Path):
         """Loads a pretrained model to continue training
 
         Args:
@@ -258,33 +260,14 @@ class Trainer:
         self.optimizer.load_state_dict(x['optimizer'])
         if self.scheduler is not None:
             self.scheduler.load_state_dict(x['scheduler'])
-        train_metrics = TrainingMetrics(
-            n_epochs=self.n_epochs,
-            losses=x['performance']['train']['losses'],
-            f1s=x['performance']['train']['f1s'],
-            best_epoch=x['performance']['train']['best_epoch'],
-            best_metric=x['performance']['train']['best_metric'],
-            best_metric_value=x['performance']['train'][
-                'best_metric_value'],
-            metric_larger_is_better=x['performance']['train'][
-                'metric_larger_is_better']
-        )
-        val_metrics = TrainingMetrics(
-            n_epochs=self.n_epochs,
-            losses=x['performance']['val']['losses'],
-            f1s=x['performance']['val']['f1s'],
-            best_epoch=x['performance']['val']['best_epoch'],
-            best_metric=x['performance']['val']['best_metric'],
-            best_metric_value=x['performance']['val'][
-                'best_metric_value'],
-            metric_larger_is_better=x['performance']['val'][
-                'metric_larger_is_better']
-        )
+
+        self._callback_metrics = {
+            k: v.tolist() + [0] * self.n_epochs for k, v in
+            x['performance'].items()
+        }
 
         self._current_best_state_dicts = {
             'model': x['state_dict'],
             'optimizer': x['optimizer'],
             'scheduler': x['scheduler']
         }
-
-        return train_metrics, val_metrics

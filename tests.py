@@ -1,14 +1,19 @@
+import tempfile
 import unittest
 from pathlib import Path
 
 import numpy as np
 import torch
+import torchvision.models
+from torch.utils.data import DataLoader, TensorDataset
+
+from deepcell.callbacks.early_stopping import EarlyStopping
 from deepcell.datasets.model_input import ModelInput
 from torchvision import transforms
 
 from deepcell.data_splitter import DataSplitter
-from deepcell.hyperparam_tuning import HyperparamTuner, ParamDistribution
 from deepcell.datasets.roi_dataset import RoiDataset
+from deepcell.trainer import Trainer
 
 # TODO test coverage will be improved and hooked up to CI in ticket #21
 
@@ -60,6 +65,36 @@ def test_dataset_is_shuffled():
     assert expected_ids == actual_ids
 
 
+def test_early_stopping():
+    """Tests that early stopping is triggered on tiny dataset before n_epochs
+    """
+    net = torchvision.models.resnet18(pretrained=True, progress=False)
+    net.fc = torch.nn.Sequential(
+        torch.nn.Linear(512, 1)
+    )
+    with tempfile.TemporaryDirectory() as f:
+        trainer = Trainer(
+            model=net,
+            n_epochs=1000,
+            criterion=torch.nn.BCEWithLogitsLoss(),
+            save_path=f,
+            callbacks=[
+                EarlyStopping(patience=0, best_metric='f1')
+            ]
+        )
+        inputs = torch.zeros((2, 3, 224, 224))
+        for i in range(2):
+            input = np.random.randn(224, 224, 3)
+            inputs[i] = torchvision.transforms.ToTensor()(input)
+        targets = torch.zeros(2)
+        dataset = TensorDataset(inputs, targets)
+        train_loader = DataLoader(dataset, batch_size=2)
+        trainer.train(train_loader=train_loader, valid_loader=train_loader)
+        assert trainer.early_stopping_callback.best_epoch < trainer.n_epochs
+        assert trainer._callback_metrics['val_f1'].argmax() == \
+               trainer.early_stopping_callback.best_epoch
+
+
 class Tests(unittest.TestCase):
     @classmethod
     def test_train_test_ids_different(self):
@@ -93,26 +128,26 @@ class Tests(unittest.TestCase):
     #                                  train_transform=transform, test_transform=transform)
     #     classifier.cross_validate(data_splitter=data_splitter, n_splits=5)
 
-    def test_hyperparam_tuner(self):
-        param_distributions = {
-            'optimizer': {
-                'optimizer': torch.optim.Adam,
-                'params': {
-                    'lr': {
-                        'distr': (-4, -2),
-                        'distr_type': 'LOG_SCALE'
-                    }
-                }
-            }
-        }
-        param_distributions = ParamDistribution(param_distribution=param_distributions)
-        transform = transforms.ToTensor()
-        train = RoiDataset(manifest_path=self.manifest_path, project_name=self.project_name, transform=transform)
-        data_splitter = DataSplitter(manifest_path=self.manifest_path, project_name=self.project_name,
-                                     train_transform=transform, test_transform=transform)
-        hp = HyperparamTuner(param_distributions=param_distributions, data_splitter=data_splitter, iters=1)
-        res = hp.search(train_dataset=train, n_epochs=1)
-        print(res)
+    # def test_hyperparam_tuner(self):
+    #     param_distributions = {
+    #         'optimizer': {
+    #             'optimizer': torch.optim.Adam,
+    #             'params': {
+    #                 'lr': {
+    #                     'distr': (-4, -2),
+    #                     'distr_type': 'LOG_SCALE'
+    #                 }
+    #             }
+    #         }
+    #     }
+    #     param_distributions = ParamDistribution(param_distribution=param_distributions)
+    #     transform = transforms.ToTensor()
+    #     train = RoiDataset(manifest_path=self.manifest_path, project_name=self.project_name, transform=transform)
+    #     data_splitter = DataSplitter(manifest_path=self.manifest_path, project_name=self.project_name,
+    #                                  train_transform=transform, test_transform=transform)
+    #     hp = HyperparamTuner(param_distributions=param_distributions, data_splitter=data_splitter, iters=1)
+    #     res = hp.search(train_dataset=train, n_epochs=1)
+    #     print(res)
 
 
 if __name__ == '__main__':
