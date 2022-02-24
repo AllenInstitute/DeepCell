@@ -76,6 +76,7 @@ def test_early_stopping():
         trainer = Trainer(
             model=net,
             n_epochs=1000,
+            optimizer=torch.optim.Adam(net.parameters(), lr=1e-4),
             criterion=torch.nn.BCEWithLogitsLoss(),
             save_path=f,
             callbacks=[

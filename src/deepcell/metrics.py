@@ -65,6 +65,7 @@ class CVMetrics:
         self._metrics = []
 
     def update(self, metrics: Dict[str, np.ndarray], best_epoch=None):
+        metrics = metrics.copy()
         if best_epoch is None:
             best_epoch = len(metrics['loss'])
 
