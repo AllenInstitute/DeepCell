@@ -11,3 +11,4 @@ jsonlines
 boto3
 tqdm
 croissant-ml
+pytest
