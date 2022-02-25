@@ -21,7 +21,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class Classifier:
+class Trainer:
     def __init__(
             self,
             model: torch.nn.Module,
