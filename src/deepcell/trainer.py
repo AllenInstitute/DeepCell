@@ -97,11 +97,6 @@ class Trainer:
             logger.info(f'Fold {i}')
             logger.info(f'=========')
 
-            if self.model_load_path is not None:
-                self._load_pretrained_model(
-                    checkpoint_path=Path(
-                        self.model_load_path) / f'{i}_model.pt')
-
             train_loader = DataLoader(dataset=train, shuffle=True, batch_size=batch_size, sampler=sampler)
             valid_loader = DataLoader(dataset=valid, shuffle=False, batch_size=batch_size)
             self.train(
@@ -120,6 +115,13 @@ class Trainer:
 
     def train(self, train_loader: DataLoader, eval_fold=None, valid_loader: DataLoader = None,
               log_after_each_epoch=True):
+        if self.model_load_path is not None:
+            self._load_pretrained_model(
+                checkpoint_path=
+                Path(self.model_load_path) / f'{eval_fold}_model.pt' if
+                eval_fold is not None else
+                Path(self.model_load_path) / 'model.pt')
+
         if not self._callback_metrics:
             self._callback_metrics = {
                 'loss': np.zeros(self.n_epochs),
@@ -230,7 +232,7 @@ class Trainer:
                 checkpoint to reset to after training on a fold has finished
         """
         metrics = {
-            k: v[:self.early_stopping_callback.best_epoch] if
+            k: v[:self.early_stopping_callback.best_epoch + 1] if
             self.early_stopping_callback else v for k, v in
             self._callback_metrics.items()}
         if is_init:
@@ -243,7 +245,9 @@ class Trainer:
             'state_dict': self._current_best_state_dicts['model'],
             'optimizer': self._current_best_state_dicts['optimizer'],
             'scheduler': self._current_best_state_dicts['scheduler'],
-            'performance': metrics
+            'performance': metrics,
+            'early_stopping': self.early_stopping_callback.to_dict()
+
         }, f'{self.save_path}/{checkpoint_name}.pt')
 
     def _load_pretrained_model(self, checkpoint_path: Path):
@@ -271,3 +275,17 @@ class Trainer:
             'optimizer': x['optimizer'],
             'scheduler': x['scheduler']
         }
+
+        if self.early_stopping_callback is not None and 'early_stopping' in x:
+            if self.early_stopping_callback.best_metric != \
+                    x['early_stopping']['best_metric']:
+                raise ValueError(
+                    f'Trying to use '
+                    f'{self.early_stopping_callback.best_metric} '
+                    f'for early stopping but '
+                    f'{x["early_stopping"]["best_metric"]} was used '
+                    f'previously')
+            self.early_stopping_callback.best_epoch = \
+                x['early_stopping']['best_epoch']
+            self.early_stopping_callback.best_metric_value = \
+                x['early_stopping']['best_metric_value']

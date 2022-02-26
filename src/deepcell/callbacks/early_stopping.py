@@ -51,6 +51,10 @@ class EarlyStopping(Callback):
         return self._best_epoch
 
     @property
+    def best_metric_value(self) -> float:
+        return self._best_metric_value
+
+    @property
     def time_since_best_epoch(self) -> int:
         return self._time_since_best_epoch
 
@@ -58,9 +62,25 @@ class EarlyStopping(Callback):
     def patience(self):
         return self._patience
 
+    @property
+    def best_metric(self):
+        return self._best_metric
+
     @time_since_best_epoch.setter
     def time_since_best_epoch(self, value):
         self._time_since_best_epoch = value
+
+    @best_metric.setter
+    def best_metric(self, value):
+        self._best_metric = value
+
+    @best_metric_value.setter
+    def best_metric_value(self, value):
+        self._best_metric_value = value
+
+    @best_epoch.setter
+    def best_epoch(self, value):
+        self._best_epoch = value
 
     def on_epoch_end(self, epoch: int, metrics: Dict[str, np.ndarray]):
         if self._best_metric == 'f1':
@@ -76,10 +96,6 @@ class EarlyStopping(Callback):
             if metric < self._best_metric_value:
                 self._best_metric_value = metric
                 self._best_epoch = epoch
-
-    @property
-    def best_metric_value(self) -> float:
-        return self._best_metric_value
 
     def to_dict(self) -> dict:
         d = {
