@@ -241,14 +241,16 @@ class Trainer:
             checkpoint_name = f'{eval_fold}_model'
         else:
             checkpoint_name = 'model'
-        torch.save({
+        d = {
             'state_dict': self._current_best_state_dicts['model'],
             'optimizer': self._current_best_state_dicts['optimizer'],
             'scheduler': self._current_best_state_dicts['scheduler'],
             'performance': metrics,
-            'early_stopping': self.early_stopping_callback.to_dict()
 
-        }, f'{self.save_path}/{checkpoint_name}.pt')
+        }
+        if self.early_stopping_callback is not None:
+            d['early_stopping'] = self.early_stopping_callback.to_dict()
+        torch.save(d, f'{self.save_path}/{checkpoint_name}.pt')
 
     def _load_pretrained_model(self, checkpoint_path: Path):
         """Loads a pretrained model to continue training
