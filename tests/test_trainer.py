@@ -41,7 +41,7 @@ class TestTrainer:
             trainer = Trainer(
                 model=self.net,
                 n_epochs=1000,
-                optimizer=torch.optim.Adam(self.net.parameters(), lr=1e-4),
+                optimizer=torch.optim.Adam(self.net.parameters(), lr=1e-2),
                 criterion=torch.nn.BCEWithLogitsLoss(),
                 save_path=f,
                 callbacks=[
