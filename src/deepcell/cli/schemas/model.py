@@ -19,6 +19,17 @@ class ModelSchema(argschema.ArgSchema):
         allow_none=True,
         description='Layer index to truncate model to'
     )
+    classifier_cfg = argschema.fields.List(
+        argschema.fields.Int,
+        default=[],
+        description='A configuration of the form '
+                    '[# neurons in first layer, '
+                    '...# neurons in last hidden layer]. An empty list means '
+                    'to use a linear classifier'
+    )
+
+
+class TrainModelSchema(ModelSchema):
     freeze_to_layer = argschema.fields.Int(
         default=None,
         allow_none=True,
@@ -30,15 +41,14 @@ class ModelSchema(argschema.ArgSchema):
                     'want to keep the first few layers but finetune the later '
                     'layers. This argument controls that'
     )
-    classifier_cfg = argschema.fields.List(
-        argschema.fields.Int,
-        default=[],
-        description='A configuration of the form '
-                    '[# neurons in first layer, '
-                    '...# neurons in last hidden layer]. An empty list means '
-                    'to use a linear classifier'
-    )
     dropout_prob = argschema.fields.Float(
         default=0.0,
         description='Dropout probability for fully connected layers'
+    )
+
+
+class InferenceModelSchema(ModelSchema):
+    checkpoint_path = argschema.fields.InputDir(
+        required=True,
+        description='Path to model checkpoint'
     )
