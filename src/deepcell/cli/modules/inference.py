@@ -52,13 +52,17 @@ class InferenceModule(argschema.ArgSchemaParser):
         test_dataloader = DataLoader(dataset=test, shuffle=False,
                                      batch_size=64)
 
-        cnn = torchvision.models.vgg11_bn(pretrained=True, progress=False)
-        cnn = Classifier(
-            model=cnn,
+        model = getattr(
+            torchvision.models,
+            self.args['model_params']['model_architecture'])(
+            pretrained=self.args['model_params']['use_pretrained_model'],
+            progress=False)
+        model = Classifier(
+            model=model,
             truncate_to_layer=self.args['model_params']['truncate_to_layer'],
             classifier_cfg=self.args['model_params']['classifier_cfg'])
         _, inference_res = inference(
-            model=cnn,
+            model=model,
             test_loader=test_dataloader,
             has_labels=False,
             checkpoint_path=str(self.args['model_params']['checkpoint_path']))
