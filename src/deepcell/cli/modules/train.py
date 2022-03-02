@@ -1,6 +1,7 @@
-from typing import Tuple
+from typing import Tuple, List
 
 import argschema
+import pandas as pd
 import torch
 import torchvision
 from torchvision.transforms import transforms
@@ -9,8 +10,6 @@ import imgaug.augmenters as iaa
 from deepcell.callbacks.early_stopping import EarlyStopping
 from deepcell.cli.schemas.train import TrainSchema
 from deepcell.data_splitter import DataSplitter
-from deepcell.datasets.visual_behavior_extended_dataset import \
-    VisualBehaviorExtendedDataset
 from deepcell.models.classifier import Classifier
 from deepcell.trainer import Trainer
 from deepcell.transform import Transform
@@ -20,11 +19,9 @@ class TrainModule(argschema.ArgSchemaParser):
     default_schema = TrainSchema
 
     def run(self):
-        dataset = VisualBehaviorExtendedDataset(
-            artifact_destination=self.args['data_params']['download_path'],
-            exclude_projects=self.args['data_params']['exclude_projects'])
+        dataset = self.args['data_params']['model_inputs']
         train_transform, test_transform = self._get_transforms()
-        data_splitter = DataSplitter(model_inputs=dataset.dataset,
+        data_splitter = DataSplitter(model_inputs=dataset,
                                      train_transform=train_transform,
                                      test_transform=test_transform, seed=1234,
                                      image_dim=(128, 128),

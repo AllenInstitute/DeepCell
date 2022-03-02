@@ -79,6 +79,25 @@ class ModelInput:
     def project_name(self) -> str:
         return self._project_name
 
+    def update_base_dir(self, new_base_dir: Path):
+        """Updates all paths to use a new base directory. Useful if moving all
+        data to a specified directory for sagemaker training
+
+        Parameters
+        ----------
+        new_base_dir
+            The new base directory
+        """
+        self._mask_path = new_base_dir / self._mask_path.name
+        self._max_projection_path = \
+            new_base_dir / self._max_projection_path.name
+        if self._correlation_projection_path is not None:
+            self._correlation_projection_path = \
+                new_base_dir / self._correlation_projection_path.name
+        if self._avg_projection_path is not None:
+            self._avg_projection_path = new_base_dir / \
+                                        self._avg_projection_path.name
+
     @classmethod
     def from_data_dir(cls, data_dir: Union[str, Path], experiment_id: str,
                       roi_id: str):

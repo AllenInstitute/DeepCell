@@ -35,14 +35,7 @@ class InferenceModule(argschema.ArgSchemaParser):
 
         test_transform = Transform(all_transform=all_transform)
 
-        with open(self.args['data_params']['rois_path']) as f:
-            rois = json.load(f)
-
-        model_inputs = [
-            ModelInput.from_data_dir(
-                data_dir=self.args['data_params']['data_dir'],
-                experiment_id=self.args['experiment_id'],
-                roi_id=roi['id']) for roi in rois]
+        model_inputs = self.args['data_params']['model_inputs']
         test = RoiDataset(
             model_inputs=model_inputs,
             transform=test_transform,

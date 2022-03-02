@@ -1,6 +1,6 @@
 import argschema
 
-from deepcell.cli.schemas.data import InferenceDataSchema
+from deepcell.cli.schemas.data import DataSchema
 from deepcell.cli.schemas.model import InferenceModelSchema
 
 
@@ -10,7 +10,7 @@ class InferenceSchema(argschema.ArgSchema):
         description='What experiment to run inference on'
     )
     data_params = argschema.fields.Nested(
-        InferenceDataSchema,
+        DataSchema,
         default={}
     )
     model_params = argschema.fields.Nested(

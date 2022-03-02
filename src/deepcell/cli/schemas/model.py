@@ -21,6 +21,7 @@ class ModelSchema(argschema.ArgSchema):
     )
     classifier_cfg = argschema.fields.List(
         argschema.fields.Int,
+        cli_as_single_argument=True,
         default=[],
         description='A configuration of the form '
                     '[# neurons in first layer, '

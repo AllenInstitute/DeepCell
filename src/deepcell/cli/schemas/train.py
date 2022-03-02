@@ -1,6 +1,6 @@
 import argschema
 
-from deepcell.cli.schemas.data import TrainDataSchema
+from deepcell.cli.schemas.data import DataSchema
 from deepcell.cli.schemas.model import TrainModelSchema
 from deepcell.cli.schemas.optimization import OptimizationSchema
 
@@ -15,11 +15,11 @@ class TrainSchema(argschema.ArgSchema):
         default={}
     )
     data_params = argschema.fields.Nested(
-        TrainDataSchema,
+        DataSchema,
         required=True
     )
     save_path = argschema.fields.OutputDir(
-        required=True,
+        default='/tmp/model',
         description='Where to save model and all outputs'
     )
     model_load_path = argschema.fields.InputDir(
