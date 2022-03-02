@@ -2,6 +2,7 @@ import json
 import tempfile
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import torch
 import torchvision
@@ -19,9 +20,7 @@ class TestInferenceCli:
         dataset = get_test_data(write_dir=data_dir.name, is_train=False)
 
         net = torchvision.models.vgg11_bn(pretrained=True, progress=False)
-        net.classifier = torch.nn.Sequential(
-            torch.nn.Linear(512, 1)
-        )
+        net.classifier = torch.nn.Sequential(torch.nn.Linear(512, 1))
         checkpoint_path = tempfile.TemporaryDirectory()
 
         for fold in range(5):

@@ -53,7 +53,9 @@ class InferenceModule(argschema.ArgSchemaParser):
         model = Classifier(
             model=model,
             truncate_to_layer=self.args['model_params']['truncate_to_layer'],
-            classifier_cfg=self.args['model_params']['classifier_cfg'])
+            classifier_cfg=self.args['model_params']['classifier_cfg'],
+            final_activation_map_spatial_dimensions=self.args['model_params']['final_activation_map_spatial_dimensions']
+            )
         _, inference_res = inference(
             model=model,
             test_loader=test_dataloader,
