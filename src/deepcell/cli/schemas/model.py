@@ -27,6 +27,12 @@ class ModelSchema(argschema.ArgSchema):
                     '...# neurons in last hidden layer]. An empty list means '
                     'to use a linear classifier'
     )
+    final_activation_map_spatial_dimensions = argschema.fields.Tuple(
+        (argschema.fields.Int, argschema.fields.Int),
+        default=(1, 1),
+        description='The final activation map spatial dimension before flattening '
+                    'into a vector for input into the classifier'
+    )
 
 
 class TrainModelSchema(ModelSchema):

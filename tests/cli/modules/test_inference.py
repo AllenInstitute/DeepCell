@@ -9,6 +9,7 @@ import torchvision
 from PIL import Image
 
 from deepcell.cli.modules.inference import InferenceModule
+from deepcell.models.classifier import Classifier
 
 
 class TestInferenceCli:
@@ -28,9 +29,10 @@ class TestInferenceCli:
             with open(Path(inputs_dir.name) / f'avg_0_{i}.png', 'wb') as f:
                 Image.fromarray(img).save(f)
 
+        final_activation_map_spatial_dimensions = (5,5)
         net = torchvision.models.vgg11_bn(pretrained=True, progress=False)
         net.classifier = torch.nn.Sequential(
-            torch.nn.Linear(512, 1)
+            torch.nn.Linear(np.prod(final_activation_map_spatial_dimensions) * 512, 1)
         )
         checkpoint_path = tempfile.TemporaryDirectory()
 
@@ -51,6 +53,7 @@ class TestInferenceCli:
         cls.rois_path = rois_path
         cls.rois = rois
         cls.experiment_id = '0'
+        cls.final_activation_map_spatial_dimensions = final_activation_map_spatial_dimensions
 
     def teardown(self):
         self.inputs_dir.cleanup()
@@ -66,7 +69,8 @@ class TestInferenceCli:
                 },
                 'model_params': {
                     'checkpoint_path': self.checkpoint_path.name,
-                    'classifier_cfg': []
+                    'classifier_cfg': [],
+                    'final_activation_map_spatial_dimensions': self.final_activation_map_spatial_dimensions
                 },
                 'out_dir': out_dir
             }
