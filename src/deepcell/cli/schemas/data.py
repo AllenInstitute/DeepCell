@@ -1,7 +1,7 @@
 import argschema
 
-
-class DataSchema(argschema.ArgSchema):
+from argschema.schemas import DefaultSchema
+class DataSchema(DefaultSchema):
     crop_size = argschema.fields.Tuple(
         (argschema.fields.Int, argschema.fields.Int),
         default=(128, 128),

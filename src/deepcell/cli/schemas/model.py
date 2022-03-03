@@ -1,8 +1,9 @@
 import argschema
 from marshmallow.validate import OneOf
 
+from argschema.schemas import DefaultSchema
 
-class ModelSchema(argschema.ArgSchema):
+class ModelSchema(DefaultSchema):
     model_architecture = argschema.fields.String(
         validation=OneOf(('vgg11_bn', )),
         default='vgg11_bn',
