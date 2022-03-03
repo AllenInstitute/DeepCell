@@ -66,3 +66,7 @@ class InferenceModule(argschema.ArgSchemaParser):
         inference_res.to_csv(Path(self.args['out_dir']) /
                              f'{self.args["experiment_id"]}_inference.csv',
                              index=False)
+
+if __name__ == "__main__":
+    inference = InferenceModule()
+    inference.run()
