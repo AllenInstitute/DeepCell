@@ -1,7 +1,10 @@
+import logging
+
 import cv2
 import numpy as np
 import imgaug.augmenters as iaa
 
+logger = logging.getLogger(__name__)
 
 def calc_roi_centroid(
         image: np.ndarray, brightness_quantile=0.8,
@@ -61,6 +64,9 @@ def calc_roi_centroid(
         return dist_from_center > centroid_dist_from_center_outlier
 
     mask = image[:, :, 2].copy()
+    if mask.sum() == 0:
+        logger.warning('Skipping calculation of centroid. All pixels are 0.')
+        return np.array([mask.shape[0] // 2, mask.shape[1] // 2])
 
     # intensities are correlation projection, or max projection if not
     # available
