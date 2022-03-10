@@ -8,11 +8,11 @@ from deepcell.callbacks.base_callback import Callback
 class EarlyStopping(Callback):
     def __init__(self,
                  time_since_best_epoch=0,
-                 best_epoch=-1,
-                 best_metric='f1',
+                 best_epoch:int = -1,
+                 best_metric: str = 'f1',
                  best_metric_value: Optional[float] = None,
-                 metric_larger_is_better=True,
-                 patience=0):
+                 metric_larger_is_better: bool = True,
+                 patience: int = 0):
         """
         Early stopping callback
         Args:
