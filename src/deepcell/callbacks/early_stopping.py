@@ -59,11 +59,11 @@ class EarlyStopping(Callback):
         return self._time_since_best_epoch
 
     @property
-    def patience(self):
+    def patience(self) -> int:
         return self._patience
 
     @property
-    def best_metric(self):
+    def best_metric(self) -> str:
         return self._best_metric
 
     @time_since_best_epoch.setter
