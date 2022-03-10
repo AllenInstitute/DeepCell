@@ -23,7 +23,8 @@ class TrainModule(argschema.ArgSchemaParser):
         train_transform, test_transform = self._get_transforms()
         data_splitter = DataSplitter(model_inputs=dataset,
                                      train_transform=train_transform,
-                                     test_transform=test_transform, seed=1234,
+                                     test_transform=test_transform,
+                                     seed=1234,
                                      image_dim=(128, 128),
                                      use_correlation_projection=True)
         train, test = data_splitter.get_train_test_split(
