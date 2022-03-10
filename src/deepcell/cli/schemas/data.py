@@ -1,7 +1,10 @@
 import argschema
 
 from argschema.schemas import DefaultSchema
+
+
 class DataSchema(DefaultSchema):
+    """Defines settings for model inputs"""
     crop_size = argschema.fields.Tuple(
         (argschema.fields.Int, argschema.fields.Int),
         default=(128, 128),
@@ -10,6 +13,7 @@ class DataSchema(DefaultSchema):
 
 
 class TrainDataSchema(DataSchema):
+    """Defines settings specific to model inputs during training"""
     download_path = argschema.fields.OutputDir(
         required=True,
         description='Where to download data from s3 to'
@@ -25,6 +29,7 @@ class TrainDataSchema(DataSchema):
 
 
 class InferenceDataSchema(DataSchema):
+    """Defines settings specific to model inputs during inference"""
     data_dir = argschema.fields.InputDir(
         required=True,
         description='Path to model inputs'
