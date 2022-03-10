@@ -65,13 +65,13 @@ class CVMetrics:
         self._metrics = []
 
     def update(self, metrics: Dict[str, np.ndarray], best_epoch=None):
-        metrics = metrics.copy()
         if best_epoch is None:
             best_epoch = len(metrics['loss'])
 
+        best_epoch_metric_vals = {}
         for k in metrics:
-            metrics[k] = metrics[k][best_epoch]
-        self._metrics.append(metrics)
+            best_epoch_metric_vals[k] = metrics[k][best_epoch]
+        self._metrics.append(best_epoch_metric_vals)
 
     @property
     def metrics(self):
