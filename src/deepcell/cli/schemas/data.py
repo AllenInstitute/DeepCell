@@ -1,7 +1,19 @@
 import argschema
 
+from argschema.schemas import DefaultSchema
 
-class DataSchema(argschema.ArgSchema):
+
+class DataSchema(DefaultSchema):
+    """Defines settings for model inputs"""
+    crop_size = argschema.fields.Tuple(
+        (argschema.fields.Int, argschema.fields.Int),
+        default=(128, 128),
+        description='Width, height center crop size to apply to all inputs'
+    )
+
+
+class TrainDataSchema(DataSchema):
+    """Defines settings specific to model inputs during training"""
     download_path = argschema.fields.OutputDir(
         required=True,
         description='Where to download data from s3 to'
@@ -14,8 +26,20 @@ class DataSchema(argschema.ArgSchema):
                     'where project names were used for the labeling jobs. '
                     'All data added to S3 is given a project name now.'
     )
-    crop_size = argschema.fields.Tuple(
-        (argschema.fields.Int, argschema.fields.Int),
-        default=(128, 128),
-        description='Width, height center crop size to apply to all inputs'
+
+
+class InferenceDataSchema(DataSchema):
+    """Defines settings specific to model inputs during inference"""
+    data_dir = argschema.fields.InputDir(
+        required=True,
+        description='Path to model inputs'
     )
+    rois_path = argschema.fields.InputFile(
+        required=True,
+        description='Path to rois'
+    )
+    center_roi_centroid = argschema.fields.Bool(
+        default=False,
+        description='Manually center input by finding centroid of soma'
+    )
+
