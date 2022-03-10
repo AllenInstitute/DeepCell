@@ -1,108 +1,8 @@
-from typing import Optional
+from typing import Dict
 
 import numpy as np
 import torch
 from sklearn.metrics import average_precision_score, f1_score
-
-
-class TrainingMetrics:
-    def __init__(self, n_epochs,
-                 losses: Optional[np.ndarray] = None,
-                 f1s: Optional[np.ndarray] = None,
-                 best_epoch=-1,
-                 best_metric='f1',
-                 best_metric_value: Optional[float] = None,
-                 metric_larger_is_better=True):
-        """
-        Container for training metrics
-        Args:
-            n_epochs:
-                Number of training epochs
-            losses:
-                If provided, will prepend these losses.
-                Useful if continuing training
-            f1s:
-                If provided, will prepend these f1s.
-                Useful if continuing training
-            best_epoch
-                If provided will set best_epoch to this
-                Useful if continuing training
-            best_metric
-                Metric to use for early stopping
-            best_metric_value
-                Best metric value so far.
-                Used for early stopping
-            metric_larger_is_better
-                Whether a larger value of the metric is better
-        """
-        if losses is not None:
-            losses = np.array(losses.tolist() + [0] * n_epochs)
-        else:
-            losses = np.zeros(n_epochs)
-
-        if f1s is not None:
-            f1s = np.array(f1s.tolist() + [0] * n_epochs)
-        else:
-            f1s = np.zeros(n_epochs)
-
-        self.losses = losses
-        self.f1s = f1s
-        self.best_epoch = best_epoch
-        self._best_metric = best_metric
-        self._metric_larger_is_better = metric_larger_is_better
-
-        if best_metric_value is None:
-            if best_metric == 'f1':
-                best_metric_value = -float('inf')
-            elif best_metric == 'loss':
-                best_metric_value = float('inf')
-            else:
-                raise ValueError(f'Unsupported best_metric. Needs to be '
-                                 f'either "f1" or "loss"')
-        self._best_metric_value = best_metric_value
-
-    def update(self, epoch, loss, f1):
-        self.losses[epoch] = loss
-        self.f1s[epoch] = f1
-
-        if self._best_metric == 'f1':
-            metric = f1
-        else:
-            metric = loss
-
-        if self._metric_larger_is_better:
-            if metric > self._best_metric_value:
-                self._best_metric_value = metric
-                self.best_epoch = epoch
-        else:
-            if metric < self._best_metric_value:
-                self._best_metric_value = metric
-                self.best_epoch = epoch
-
-    @property
-    def best_metric_value(self) -> float:
-        return self._best_metric_value
-
-    def to_dict(self, best_epoch: int, to_epoch: int) -> dict:
-        """
-
-        Args:
-            best_epoch:
-                If early stopping, indicates best epoch
-            to_epoch:
-                If early stopping, truncates performance to `to_epoch`
-        Returns:
-            Dict of performance
-        """
-        d = {
-            'f1s': self.f1s[:to_epoch + 1],
-            'losses': self.losses[:to_epoch + 1],
-            'best_epoch': best_epoch,
-            'best_metric': self._best_metric,
-            'best_metric_value': self._best_metric_value,
-            'metric_larger_is_better': self._metric_larger_is_better
-        }
-        return d
 
 
 class Metrics:
@@ -162,17 +62,24 @@ class Metrics:
 class CVMetrics:
     def __init__(self, n_splits):
         self.n_splits = n_splits
-        self.train_metrics = []
-        self.valid_metrics = []
+        self._metrics = []
 
-    def update(self, train_metrics, valid_metrics):
-        self.train_metrics.append(train_metrics)
-        self.valid_metrics.append(valid_metrics)
+    def update(self, metrics: Dict[str, np.ndarray], best_epoch=None):
+        if best_epoch is None:
+            best_epoch = len(metrics['loss'])
+
+        best_epoch_metric_vals = {}
+        for k in metrics:
+            best_epoch_metric_vals[k] = metrics[k][best_epoch]
+        self._metrics.append(best_epoch_metric_vals)
 
     @property
     def metrics(self):
-        train_loss = sum([x.losses[x.best_epoch] for x in self.train_metrics]) / self.n_splits
-        valid_loss = sum([x.losses[x.best_epoch] for x in self.valid_metrics]) / self.n_splits
+        train_loss = np.array([x['loss'] for x in self._metrics])
+        train_loss = train_loss.mean()
+
+        valid_loss = np.array([x['val_loss'] for x in self._metrics])
+        valid_loss = valid_loss.mean()
 
         return {
             'train_loss': train_loss,
