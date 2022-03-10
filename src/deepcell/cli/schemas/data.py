@@ -10,6 +10,7 @@ from deepcell.datasets.model_input import ModelInput
 
 
 class ModelInputSchema(argschema.ArgSchema):
+    """Defines settings for a single model input"""
     experiment_id = argschema.fields.String(
         required=True,
         description='experiment_id'
@@ -55,12 +56,7 @@ class ModelInputSchema(argschema.ArgSchema):
 
 
 class DataSchema(argschema.ArgSchema):
-    model_inputs_path = argschema.fields.InputFile(
-        required=True,
-        description='json file where each instance has schema '
-                    'given by ModelInputSchema'
-    )
-
+    """Defines settings for model inputs"""
     crop_size = argschema.fields.Tuple(
         (argschema.fields.Int, argschema.fields.Int),
         default=(128, 128),
@@ -71,12 +67,3 @@ class DataSchema(argschema.ArgSchema):
         default=False,
         description='Manually center input by finding centroid of soma'
     )
-
-    @marshmallow.post_load
-    def model_inputs(self, data):
-        with open(str(data['model_inputs_path']), 'r') as f:
-            model_inputs = json.load(f)
-            model_inputs = [ModelInputSchema().load(model_input)
-                            for model_input in model_inputs]
-            data['model_inputs'] = model_inputs
-        return data
