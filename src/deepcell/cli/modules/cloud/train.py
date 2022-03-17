@@ -41,6 +41,7 @@ class CloudTrainer(argschema.ArgSchemaParser):
 
         data_dir = self._get_data_dir()
 
+        hyperparams = self._construct_hyperparameters()
         runner = TrainingJobRunner(
             bucket_name=self.args['s3_params']['bucket_name'],
             image_uri=ecr_uploader.image_uri,
@@ -49,7 +50,8 @@ class CloudTrainer(argschema.ArgSchemaParser):
             instance_type=self.args['instance_type'],
             instance_count=self.args['instance_count'],
             timeout=self.args['timeout'],
-            volume_size=self.args['volume_size']
+            volume_size=self.args['volume_size'],
+            hyperparameters=hyperparams
         )
         runner.run(
             data_dir=data_dir,
@@ -68,6 +70,34 @@ class CloudTrainer(argschema.ArgSchemaParser):
         if len(data_dirs) > 1:
             raise RuntimeError('Please place all data in the same directory')
         return list(data_dirs)[0]
+
+    def _construct_hyperparameters(self) -> dict:
+        """Takes the hyperparameters given by the CLI and cleans them up for
+        storage on sagemaker"""
+        hyperparams = self.args['train_params'].copy()
+        del hyperparams['log_level']
+        hyperparams['data_params'] = {
+            k: v for k, v in hyperparams['data_params'].items()
+            if k not in ('model_inputs_path', 'log_level', 'model_inputs')}
+        if 'scheduler_params' in hyperparams['optimization_params']:
+            hyperparams['optimization_params']['scheduler_params'] = {
+                k: v for k, v in
+                hyperparams['optimization_params']['scheduler_params'].items()
+                if k not in ('log_level',)
+            }
+        hyperparams['optimization_params']['early_stopping_params'] = {
+            k: v for k, v in
+            hyperparams['optimization_params']['early_stopping_params'].items()
+            if k not in ('log_level',)
+        }
+        hyperparams['optimization_params'] = {
+            k: v for k, v in hyperparams['optimization_params'].items() if
+            k not in ('log_level',)
+        }
+        del hyperparams['save_path']
+        del hyperparams['test_fraction']
+        del hyperparams['n_folds']
+        return hyperparams
 
 
 if __name__ == "__main__":

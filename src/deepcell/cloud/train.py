@@ -15,6 +15,7 @@ class TrainingJobRunner:
     def __init__(self,
                  image_uri: str,
                  bucket_name: str,
+                 hyperparameters: dict,
                  profile_name='default',
                  region_name='us-west-2',
                  local_mode=False,
@@ -29,6 +30,8 @@ class TrainingJobRunner:
             The container image to run
         bucket_name
             The bucket to upload data to
+        hyperparameters
+            Hyperparameters to track in sagemaker
         profile_name
             AWS profile name to use
         region_name
@@ -55,6 +58,7 @@ class TrainingJobRunner:
         self._instance_count = instance_count
         self._profile_name = profile_name
         self._bucket_name = bucket_name
+        self._hyperparameters = hyperparameters
         self._timeout = timeout
         self._volume_size = volume_size
         self._logger = logging.getLogger(__name__)
@@ -96,7 +100,7 @@ class TrainingJobRunner:
             instance_type=instance_type,
             image_uri=self._image_uri,
             output_path=output_dir,
-            hyperparameters={},
+            hyperparameters=self._hyperparameters,
             volume_size=self._volume_size,
             max_run=self._timeout
         )

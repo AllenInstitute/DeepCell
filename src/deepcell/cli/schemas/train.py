@@ -20,7 +20,9 @@ class TrainSchema(argschema.ArgSchema):
     )
     save_path = argschema.fields.OutputDir(
         default='/tmp/model',
-        description='Where to save model and all outputs'
+        description='Where to save model and all outputs. Only used in '
+                    'local mode. Otherwise the model and artifacts are saved '
+                    'to the default sagemaker path on s3'
     )
     model_load_path = argschema.fields.InputDir(
         default=None,
