@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Generator, Tuple, Iterator
 
 import numpy as np
 from sklearn.model_selection import StratifiedShuffleSplit, StratifiedKFold
@@ -99,10 +99,11 @@ class DataSplitter:
 
     def get_cross_val_split(self, train_dataset: RoiDataset, n_splits=5,
                             shuffle=True):
-        skf = StratifiedKFold(n_splits=n_splits, shuffle=shuffle,
-                              random_state=self.seed)
-        for train_index, test_index in skf.split(np.zeros(len(train_dataset)),
-                                                 train_dataset.y):
+        for train_index, test_index in self.get_cross_val_split_idxs(
+                n=len(train_dataset),
+                y=train_dataset.y,
+                n_splits=n_splits,
+                shuffle=shuffle):
             train = self._sample_dataset(
                 dataset=train_dataset.model_inputs,
                 index=train_index,
@@ -116,8 +117,35 @@ class DataSplitter:
                 is_train=False)
             yield train, valid
 
+    @staticmethod
+    def get_cross_val_split_idxs(
+            n: int,
+            y: np.ndarray,
+            n_splits=5,
+            shuffle=True,
+            seed=None) -> Iterator[Tuple[np.ndarray, np.ndarray]]:
+        """
+        Gets the cross validation split indices
+
+        Parameters
+        ----------
+        n: total number of observations
+        y: labels for observations
+        n_splits: total number of cross validation splits
+        shuffle: whether to shuffle before performing the split
+        seed: seed for reproducibility of shuffling
+
+        Returns
+        -------
+        yields Tuple of np.ndarray for train and test indices
+        """
+        skf = StratifiedKFold(n_splits=n_splits, shuffle=shuffle,
+                              random_state=seed)
+        for train_index, test_index in skf.split(np.zeros(n), y):
+            yield train_index, test_index
+
     def _sample_dataset(self, dataset: List[ModelInput],
-                        index: List[int],
+                        index: np.ndarray,
                         is_train: bool,
                         transform: Optional[Transform] = None) -> \
             RoiDataset:
@@ -127,7 +155,7 @@ class DataSplitter:
             dataset:
                 Initial dataset to sample from
             index:
-                List of index of artifacts to construct dataset
+                Array of index of artifacts to construct dataset
             is_train
                 Whether this is a train dataset or test dataset
             transform:

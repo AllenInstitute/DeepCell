@@ -2,10 +2,11 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import Optional, Union, List
+from typing import Optional, Union, List, Dict
 
 import numpy as np
 import torch
+import torchvision
 from torch.utils.data import DataLoader
 
 from deepcell.callbacks.base_callback import Callback
@@ -13,6 +14,7 @@ from deepcell.callbacks.early_stopping import EarlyStopping
 from deepcell.data_splitter import DataSplitter
 from deepcell.metrics import Metrics, CVMetrics
 from deepcell.datasets.roi_dataset import RoiDataset
+from deepcell.models.classifier import Classifier
 
 logging.basicConfig(
     stream=sys.stdout,
@@ -207,6 +209,68 @@ class Trainer:
                             f'Val Loss: {epoch_val_metrics.loss}'
                             )
         self._save_model_and_performance(eval_fold=eval_fold)
+
+    @staticmethod
+    def from_model(
+            model_architecture: str,
+            use_pretrained_model: bool,
+            classifier_cfg: List[int],
+            save_path: Path,
+            n_epochs: int,
+            learning_rate: float,
+            early_stopping_params: Dict,
+            dropout_prob: float = 0.0,
+            truncate_to_layer: Optional[int] = None,
+            freeze_to_layer: Optional[int] = None,
+            model_load_path: Optional[Path] = None,
+            weight_decay: float = 0.0,
+            learning_rate_scheduler: Optional[Dict] = None,
+    ) -> "Trainer":
+        model = getattr(
+            torchvision.models,
+            model_architecture)(
+            pretrained=use_pretrained_model,
+            progress=False)
+
+        model = Classifier(
+            model=model,
+            truncate_to_layer=truncate_to_layer,
+            freeze_up_to_layer=freeze_to_layer,
+            classifier_cfg=classifier_cfg,
+            dropout_prob=dropout_prob)
+
+        optimizer = torch.optim.Adam(
+            model.parameters(),
+            lr=learning_rate,
+            weight_decay=weight_decay)
+        if learning_rate_scheduler is not None:
+            scheduler = getattr(
+                torch.optim.lr_scheduler,
+                learning_rate_scheduler['type'])(
+                optimizer=optimizer,
+                mode='min',
+                patience=learning_rate_scheduler['patience'],
+                factor=learning_rate_scheduler['factor'],
+                verbose=True
+            )
+        else:
+            scheduler = None
+        trainer = Trainer(
+            model=model,
+            n_epochs=n_epochs,
+            criterion=torch.nn.BCEWithLogitsLoss(),
+            optimizer=optimizer,
+            save_path=save_path,
+            scheduler=scheduler,
+            callbacks=[
+                EarlyStopping(
+                    best_metric=early_stopping_params['monitor'],
+                    patience=early_stopping_params['patience']
+                )
+            ],
+            model_load_path=model_load_path
+        )
+        return trainer
 
     def _reset(self):
         # reset model weights

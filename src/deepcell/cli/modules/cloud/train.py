@@ -24,11 +24,6 @@ class CloudTrainer(argschema.ArgSchemaParser):
         with open(self._container_path / 'train_input.json', 'w') as f:
             f.write(TrainSchema().dumps(self.args['train_params']))
 
-        # Write model inputs to container path
-        shutil.copy(
-            self.args['train_params']['data_params']['model_inputs_path'],
-            self._container_path / 'model_inputs.json')
-
         ecr_uploader = ECRUploader(
             repository_name=repository_name,
             image_tag=image_tag,
@@ -38,8 +33,6 @@ class CloudTrainer(argschema.ArgSchemaParser):
             entrypoint_script_path=self._container_path / 'train.py',
             dockerfile_path=self._container_path / 'Dockerfile'
         )
-
-        data_dir = self._get_data_dir()
 
         hyperparams = self._construct_hyperparameters()
         runner = TrainingJobRunner(
@@ -51,25 +44,12 @@ class CloudTrainer(argschema.ArgSchemaParser):
             instance_count=self.args['instance_count'],
             timeout=self.args['timeout'],
             volume_size=self.args['volume_size'],
-            hyperparameters=hyperparams
+            hyperparameters=hyperparams,
+            output_dir=self.args['save_path']
         )
         runner.run(
-            data_dir=data_dir,
-            output_dir=self.args['train_params']['save_path'])
-
-    def _get_data_dir(self):
-        inputs = self.args['train_params']['data_params']['model_inputs']
-        data_dirs = set()
-        for input in inputs:
-            if input.correlation_projection_path is not None:
-                data_dirs.add(input.correlation_projection_path.parent)
-            data_dirs.add(input.mask_path.parent)
-            data_dirs.add(input.max_projection_path.parent)
-            if input.avg_projection_path is not None:
-                data_dirs.add(input.avg_projection_path.parent)
-        if len(data_dirs) > 1:
-            raise RuntimeError('Please place all data in the same directory')
-        return list(data_dirs)[0]
+            model_inputs=self.args['train_params']['data_params']
+            ['model_inputs'])
 
     def _construct_hyperparameters(self) -> dict:
         """Takes the hyperparameters given by the CLI and cleans them up for

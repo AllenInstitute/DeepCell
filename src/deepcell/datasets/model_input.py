@@ -1,3 +1,4 @@
+import shutil
 from pathlib import Path
 from typing import Optional, Union
 
@@ -143,3 +144,36 @@ class ModelInput:
             max_projection_path=max_path,
             roi_id=roi_id
         )
+
+    def copy(self, destination: Path) -> None:
+        """
+        Copies to destination
+
+        Parameters
+        ----------
+        destination: where to copy
+
+        Returns
+        -------
+        None
+
+        """
+        shutil.copy(self.mask_path, destination)
+        shutil.copy(self.max_projection_path, destination)
+        if self.correlation_projection_path is not None:
+            shutil.copy(self.correlation_projection_path, destination)
+        if self.avg_projection_path is not None:
+            shutil.copy(self.avg_projection_path, destination)
+
+    def to_dict(self) -> dict:
+        return {
+            'experiment_id': self._experiment_id,
+            'roi_id': self._roi_id,
+            'mask_path': self._mask_path,
+            'max_projection_path': self._max_projection_path,
+            'avg_projection_path': self._avg_projection_path,
+            'correlation_projection_path': self._correlation_projection_path,
+            'label': self._label,
+            'project_name': self._project_name
+        }
+

@@ -1,10 +1,17 @@
+import json
 import logging
+import os
+import tempfile
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional, Union, List, Dict
 
 import boto3.session
 import sagemaker
 from sagemaker.estimator import Estimator
+
+from deepcell.data_splitter import DataSplitter
+from deepcell.datasets.model_input import ModelInput
+from deepcell.datasets.roi_dataset import RoiDataset
 
 
 class TrainingJobRunner:
@@ -22,7 +29,9 @@ class TrainingJobRunner:
                  instance_type: Optional[str] = None,
                  instance_count=1,
                  timeout=24 * 60 * 60,
-                 volume_size=30):
+                 volume_size=30,
+                 output_dir: Optional[Union[Path, str]] = None,
+                 seed=None):
         """
         Parameters
         ----------
@@ -46,11 +55,17 @@ class TrainingJobRunner:
             Training job timeout in seconds
         volume_size
             Volume size to allocate in GB
+        output_dir
+            Where to write output. Only used in local mode
+        seed
+            Seed to control reproducibility
         """
         if not local_mode:
             if instance_type is None:
                 raise ValueError('Must provide instance type if not using '
                                  'local mode')
+        if local_mode and output_dir is None:
+            raise ValueError('Must provide output_dir if in local mode')
 
         self._image_uri = image_uri
         self._local_mode = local_mode
@@ -61,6 +76,8 @@ class TrainingJobRunner:
         self._hyperparameters = hyperparameters
         self._timeout = timeout
         self._volume_size = volume_size
+        self._output_dir = output_dir
+        self._seed = seed
         self._logger = logging.getLogger(__name__)
 
         boto_session = boto3.session.Session(profile_name=profile_name,
@@ -68,52 +85,107 @@ class TrainingJobRunner:
         self._sagemaker_session = sagemaker.session.Session(
             boto_session=boto_session, default_bucket=bucket_name)
 
-    def run(self, data_dir: Union[Path, str],
-            output_dir: Optional[Union[Path, str]] = None):
+    def run(self, model_inputs: List[ModelInput]):
         """
-        Train the model using sagemaker
+        Train the model using `model_inputs` on sagemaker
 
         Parameters
         ----------
-        data_dir
-            Directory containing training data
-        output_dir
-            Where to write output. Only used in local mode
+        model_inputs: the input data
 
         Returns
         -------
         None
         """
-        if self._local_mode and output_dir is None:
-            raise ValueError('Must provide output_dir if in local mode')
-        output_dir = f'file://{output_dir}' if self._local_mode else None
+        output_dir = f'file://{self._output_dir}' if self._local_mode else None
 
         instance_type = 'local' if self._local_mode else self._instance_type
         sagemaker_session = None if self._local_mode else \
             self._sagemaker_session
         sagemaker_role_arn = self._get_sagemaker_execution_role_arn()
 
-        estimator = Estimator(
-            sagemaker_session=sagemaker_session,
-            role=sagemaker_role_arn,
-            instance_count=self._instance_count,
-            instance_type=instance_type,
-            image_uri=self._image_uri,
-            output_path=output_dir,
-            hyperparameters=self._hyperparameters,
-            volume_size=self._volume_size,
-            max_run=self._timeout
-        )
+        # TODO add train/test split before cv split
+
+        y = RoiDataset.get_numeric_labels(model_inputs=model_inputs)
+        for k, (train_idx, test_idx) in enumerate(
+                DataSplitter.get_cross_val_split_idxs(
+                    n=len(model_inputs), y=y, seed=self._seed)):
+            train = [model_inputs[i] for i in train_idx]
+            validation = [model_inputs[i] for i in test_idx]
+
+            estimator = Estimator(
+                sagemaker_session=sagemaker_session,
+                role=sagemaker_role_arn,
+                instance_count=self._instance_count,
+                instance_type=instance_type,
+                image_uri=self._image_uri,
+                output_path=output_dir,
+                hyperparameters=self._hyperparameters,
+                volume_size=self._volume_size,
+                max_run=self._timeout
+            )
+            with tempfile.TemporaryDirectory() as temp_dir:
+                data_path = self._prepare_data(
+                    destination_dir=temp_dir, k=k, train=train, test=validation)
+
+                if not self._local_mode:
+                    # TODO check if data exists on s3 or overwrite is true.
+                    #  If not then upload it.
+                    self._logger.info('Uploading input data to S3')
+                    self._create_bucket_if_not_exists()
+                    for channel in data_path:
+                        s3_path = self._sagemaker_session.upload_data(
+                            path=str(data_path[channel]),
+                            key_prefix=f'input_data/{channel}/{k}',
+                            bucket=self._bucket_name)
+                        data_path[channel] = s3_path
+                estimator.fit(inputs=data_path, wait=False)
+
+    def _prepare_data(
+            self,
+            destination_dir: str,
+            k: int,
+            train: List[ModelInput],
+            test: List[ModelInput],
+    ) -> Dict[str, Union[str, Path]]:
+        """
+        Prepares input data for training
+
+        Parameters
+        ----------
+        destination_dir: where to copy model inputs
+        k: the current fold
+        train: train dataset
+        test: test dataset
+
+        Returns
+        -------
+        """
+        train_path = Path(destination_dir) / 'train' / f'{k}'
+        test_path = Path(destination_dir) / 'validation' / f'{k}'
+        os.makedirs(train_path, exist_ok=True)
+        os.makedirs(test_path, exist_ok=True)
+
+        # Copy model inputs
+        for model_input in train:
+            model_input.copy(destination=train_path)
+        for model_input in test:
+            model_input.copy(destination=test_path)
+
+        # Copy metadata
+        with open(train_path / 'model_inputs.json', 'w') as f:
+            f.write(json.dumps([x.to_dict() for x in train], indent=2))
+        with open(test_path / 'model_inputs.json', 'w') as f:
+            f.write(json.dumps([x.to_dict() for x in test], indent=2))
+
         if self._local_mode:
-            data_path = f'file://{data_dir}'
-        else:
-            self._logger.info('Uploading input data to S3')
-            self._create_bucket_if_not_exists()
-            data_path = self._sagemaker_session.upload_data(
-                path=str(data_dir),
-                key_prefix='input_data',
-                bucket=self._bucket_name)
-        estimator.fit(data_path)
+            train_path = f'file://{train_path}'
+            test_path = f'file://{test_path}'
+
+        return {
+            'train': train_path,
+            'validation': test_path
+        }
 
     def _get_sagemaker_execution_role_arn(self) -> str:
         """
