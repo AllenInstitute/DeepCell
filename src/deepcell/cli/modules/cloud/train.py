@@ -30,7 +30,6 @@ class CloudTrainer(argschema.ArgSchemaParser):
             profile_name=self.args['profile_name']
         )
         ecr_uploader.build_and_push_container(
-            entrypoint_script_path=self._container_path / 'train.py',
             dockerfile_path=self._container_path / 'Dockerfile'
         )
 
@@ -45,7 +44,7 @@ class CloudTrainer(argschema.ArgSchemaParser):
             timeout=self.args['timeout'],
             volume_size=self.args['volume_size'],
             hyperparameters=hyperparams,
-            output_dir=self.args['save_path']
+            output_dir=self.args['train_params']['save_path']
         )
         runner.run(
             model_inputs=self.args['train_params']['data_params']

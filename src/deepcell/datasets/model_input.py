@@ -169,11 +169,14 @@ class ModelInput:
         return {
             'experiment_id': self._experiment_id,
             'roi_id': self._roi_id,
-            'mask_path': self._mask_path,
-            'max_projection_path': self._max_projection_path,
-            'avg_projection_path': self._avg_projection_path,
-            'correlation_projection_path': self._correlation_projection_path,
-            'label': self._label,
-            'project_name': self._project_name
+            'mask_path': str(self._mask_path),
+            'max_projection_path': str(self._max_projection_path),
+            'avg_projection_path':
+                str(self._avg_projection_path) if self._avg_projection_path
+                else None,
+            'correlation_projection_path':
+                str(self._correlation_projection_path) if
+                self._correlation_projection_path else None,
+            'label': self._label
         }
 

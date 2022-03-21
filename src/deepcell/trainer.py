@@ -203,6 +203,7 @@ class Trainer:
                 self.scheduler.step(epoch_val_metrics.loss)
 
             if log_after_each_epoch:
+                # TODO why isn't this getting logged in sagemaker?
                 logger.info(f'Epoch: {epoch + 1} \t'
                             f'Train F1: {epoch_train_metrics.F1:.6f} \t'
                             f'Val F1: {epoch_val_metrics.F1:.6f}\t'

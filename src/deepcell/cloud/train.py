@@ -97,8 +97,6 @@ class TrainingJobRunner:
         -------
         None
         """
-        output_dir = f'file://{self._output_dir}' if self._local_mode else None
-
         instance_type = 'local' if self._local_mode else self._instance_type
         sagemaker_session = None if self._local_mode else \
             self._sagemaker_session
@@ -113,20 +111,32 @@ class TrainingJobRunner:
             train = [model_inputs[i] for i in train_idx]
             validation = [model_inputs[i] for i in test_idx]
 
-            estimator = Estimator(
-                sagemaker_session=sagemaker_session,
-                role=sagemaker_role_arn,
-                instance_count=self._instance_count,
-                instance_type=instance_type,
-                image_uri=self._image_uri,
-                output_path=output_dir,
-                hyperparameters=self._hyperparameters,
-                volume_size=self._volume_size,
-                max_run=self._timeout
-            )
+            output_dir = f'file://{Path(self._output_dir) / str(k)}' if \
+                self._local_mode else None
+
             with tempfile.TemporaryDirectory() as temp_dir:
                 data_path = self._prepare_data(
-                    destination_dir=temp_dir, k=k, train=train, test=validation)
+                    destination_dir=temp_dir, k=k, train=train,
+                    test=validation)
+
+                if self._local_mode:
+                    # In local mode, due to a bug, environment vars. are not
+                    # passed. Pass through hyperparameters instead
+                    self._hyperparameters['fold'] = k
+                estimator = Estimator(
+                    sagemaker_session=sagemaker_session,
+                    role=sagemaker_role_arn,
+                    instance_count=self._instance_count,
+                    instance_type=instance_type,
+                    image_uri=self._image_uri,
+                    output_path=output_dir,
+                    hyperparameters=self._hyperparameters,
+                    volume_size=self._volume_size,
+                    max_run=self._timeout,
+                    environment={
+                        'fold': f'{k}'
+                    }
+                )
 
                 if not self._local_mode:
                     # TODO check if data exists on s3 or overwrite is true.
@@ -139,7 +149,10 @@ class TrainingJobRunner:
                             key_prefix=f'input_data/{channel}/{k}',
                             bucket=self._bucket_name)
                         data_path[channel] = s3_path
-                estimator.fit(inputs=data_path, wait=False)
+                estimator.fit(
+                    inputs=data_path,
+                    # TODO change this to false to enable parallel training
+                    wait=True)
 
     def _prepare_data(
             self,

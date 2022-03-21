@@ -1,13 +1,8 @@
 import base64
-import json
 import os
-import shutil
 import subprocess
-import tarfile
-import tempfile
-from distutils.dir_util import copy_tree
 from pathlib import Path
-from typing import Tuple, Optional, List
+from typing import Tuple
 
 import boto3
 import docker
@@ -51,7 +46,6 @@ class ECRUploader:
     def build_and_push_container(
             self,
             dockerfile_path: Path,
-            entrypoint_script_path: Path,
     ) -> None:
         """
         Builds docker image locally and pushes to ECR
@@ -59,8 +53,6 @@ class ECRUploader:
         ----------
         dockerfile_path
             Path to the dockerfile
-        entrypoint_script_path
-            Path to the dockerfile entrypoint script
         Notes
         ----------
         Note that if nothing changed to the Dockerfile compared with the

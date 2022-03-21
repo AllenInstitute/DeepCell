@@ -33,6 +33,8 @@ class CloudTrainSchema(argschema.ArgSchema):
         required=True
     )
 
+    # TODO just set instance_type to "local" to activate local mode
+    # to reduce the number of arguments
     local_mode = argschema.fields.Bool(
         default=False,
         description='Whether to run estimator in local mode. Useful for '

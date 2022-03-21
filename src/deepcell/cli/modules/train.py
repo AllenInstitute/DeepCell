@@ -46,7 +46,7 @@ class TrainModule(argschema.ArgSchemaParser):
             dropout_prob=model_params['dropout_prob'],
             truncate_to_layer=model_params['truncate_to_layer'],
             freeze_to_layer=model_params['freeze_to_layer'],
-            model_load_path=model_params['model_load_path'],
+            model_load_path=self.args['model_load_path'],
             learning_rate=optimization_params['learning_rate'],
             weight_decay=optimization_params['weight_decay'],
             learning_rate_scheduler=optimization_params['scheduler_params'],
