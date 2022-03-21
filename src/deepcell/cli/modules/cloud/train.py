@@ -38,7 +38,6 @@ class CloudTrainer(argschema.ArgSchemaParser):
             bucket_name=self.args['s3_params']['bucket_name'],
             image_uri=ecr_uploader.image_uri,
             profile_name=self.args['profile_name'],
-            local_mode=self.args['local_mode'],
             instance_type=self.args['instance_type'],
             instance_count=self.args['instance_count'],
             timeout=self.args['timeout'],

@@ -33,14 +33,6 @@ class CloudTrainSchema(argschema.ArgSchema):
         required=True
     )
 
-    # TODO just set instance_type to "local" to activate local mode
-    # to reduce the number of arguments
-    local_mode = argschema.fields.Bool(
-        default=False,
-        description='Whether to run estimator in local mode. Useful for '
-                    'debugging'
-    )
-
     profile_name = argschema.fields.Str(
         default='default',
         description='AWS profile name. Useful for debugging to use a sandbox '
@@ -48,10 +40,9 @@ class CloudTrainSchema(argschema.ArgSchema):
     )
 
     instance_type = argschema.fields.Str(
-        required=False,
-        default=None,
-        allow_none=True,
-        description='EC2 instance type. Required if not in local mode'
+        required=True,
+        description='EC2 instance type. For local mode '
+                    '(train locally, useful for debugging), set to "local"'
     )
 
     instance_count = argschema.fields.Int(

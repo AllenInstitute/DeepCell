@@ -25,7 +25,6 @@ class TrainingJobRunner:
                  hyperparameters: dict,
                  profile_name='default',
                  region_name='us-west-2',
-                 local_mode=False,
                  instance_type: Optional[str] = None,
                  instance_count=1,
                  timeout=24 * 60 * 60,
@@ -45,8 +44,6 @@ class TrainingJobRunner:
             AWS profile name to use
         region_name
             AWS region to use
-        local_mode
-            Whether running locally.
         instance_type
             Instance type to use
         instance_count
@@ -60,10 +57,7 @@ class TrainingJobRunner:
         seed
             Seed to control reproducibility
         """
-        if not local_mode:
-            if instance_type is None:
-                raise ValueError('Must provide instance type if not using '
-                                 'local mode')
+        local_mode = instance_type == 'local'
         if local_mode and output_dir is None:
             raise ValueError('Must provide output_dir if in local mode')
 
@@ -97,7 +91,6 @@ class TrainingJobRunner:
         -------
         None
         """
-        instance_type = 'local' if self._local_mode else self._instance_type
         sagemaker_session = None if self._local_mode else \
             self._sagemaker_session
         sagemaker_role_arn = self._get_sagemaker_execution_role_arn()
@@ -127,7 +120,7 @@ class TrainingJobRunner:
                     sagemaker_session=sagemaker_session,
                     role=sagemaker_role_arn,
                     instance_count=self._instance_count,
-                    instance_type=instance_type,
+                    instance_type=self._instance_type,
                     image_uri=self._image_uri,
                     output_path=output_dir,
                     hyperparameters=self._hyperparameters,
