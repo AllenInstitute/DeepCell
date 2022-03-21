@@ -1,6 +1,4 @@
-import logging
 import os
-import sys
 from pathlib import Path
 from typing import Optional, Union, List, Dict
 
@@ -15,15 +13,10 @@ from deepcell.data_splitter import DataSplitter
 from deepcell.metrics import Metrics, CVMetrics
 from deepcell.datasets.roi_dataset import RoiDataset
 from deepcell.models.classifier import Classifier
+from deepcell.logger import init_logger
 
-logging.basicConfig(
-    stream=sys.stdout,
-    level=logging.INFO,
-    format='%(levelname)s:\t%(asctime)s\t%(message)s',
-    datefmt='%m/%d/%Y %I:%M:%S %p'
-)
 
-logger = logging.getLogger(__name__)
+logger = init_logger(__name__)
 
 
 class Trainer:
