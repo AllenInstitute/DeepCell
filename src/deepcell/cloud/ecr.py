@@ -121,7 +121,8 @@ class ECRUploader:
         docker_client = docker.APIClient()
         image_tag = f'{self._repository_name}:{self._image_tag}'
         build_res = docker_client.build(path=str(path_to_dockerfile.parent),
-                                        tag=image_tag, rm=True, decode=True)
+                                        tag=image_tag, rm=True, decode=True,
+                                        nocache=True)
         for line in build_res:
             self._logger.info(line)
             if 'errorDetail' in line:
