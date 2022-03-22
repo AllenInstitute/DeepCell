@@ -126,6 +126,21 @@ class TrainingJobRunner:
                     hyperparameters=self._hyperparameters,
                     volume_size=self._volume_size,
                     max_run=self._timeout,
+                    metric_definitions=[
+                        {
+                            'Name': 'train loss',
+                            'Regex': r'Train Loss: (\d\.\d+)'},
+                        {
+                            'Name': 'val loss',
+                            'Regex': r'Val Loss: (\d\.\d+)'},
+                        {
+                            'Name': 'train f1',
+                            'Regex': r'Train F1: (\d\.\d+)'},
+                        {
+                            'Name': 'val f1',
+                            'Regex': r'Val F1: (\d\.\d+)'},
+                    ],
+                    enable_sagemaker_metrics=True,
                     environment={
                         'fold': f'{k}'
                     }
