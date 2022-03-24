@@ -2,19 +2,22 @@ import json
 import logging
 import os
 import tempfile
+import time
 from pathlib import Path
 from typing import Optional, Union, List, Dict
 
 import boto3.session
+import mlflow
 import sagemaker
 from sagemaker.estimator import Estimator
 
 from deepcell.data_splitter import DataSplitter
 from deepcell.datasets.model_input import ModelInput
 from deepcell.datasets.roi_dataset import RoiDataset
+from deepcell.tracking.mlflow_utils import MLFlowTrackableMixin
 
 
-class TrainingJobRunner:
+class TrainingJobRunner(MLFlowTrackableMixin):
     """
     A wrapper on sagemaker Estimator. Starts a training job using the docker
     image given by image_uri
@@ -30,7 +33,9 @@ class TrainingJobRunner:
                  timeout=24 * 60 * 60,
                  volume_size=30,
                  output_dir: Optional[Union[Path, str]] = None,
-                 seed=None):
+                 seed=None,
+                 mlflow_server_uri=None,
+                 mlflow_experiment_name: str = 'deepcell-train'):
         """
         Parameters
         ----------
@@ -56,7 +61,14 @@ class TrainingJobRunner:
             Where to write output. Only used in local mode
         seed
             Seed to control reproducibility
+        mlflow_server_uri
+            MLFlow server URI. If provided, will log to MLFlow during training
+        mlflow_experiment_name
+            MLFlow experiment name to create runs under.
+            Only used if mlflow_server_uri provided.
         """
+        super().__init__(server_uri=mlflow_server_uri,
+                         experiment_name=mlflow_experiment_name)
         local_mode = instance_type == 'local'
         if local_mode and output_dir is None:
             raise ValueError('Must provide output_dir if in local mode')
@@ -73,6 +85,9 @@ class TrainingJobRunner:
         self._output_dir = output_dir
         self._seed = seed
         self._logger = logging.getLogger(__name__)
+
+        if mlflow_server_uri is not None:
+            mlflow.set_tracking_uri(mlflow_server_uri)
 
         boto_session = boto3.session.Session(profile_name=profile_name,
                                              region_name=region_name)
@@ -97,6 +112,9 @@ class TrainingJobRunner:
 
         # TODO add train/test split before cv split
 
+        if self._is_mlflow_tracking_enabled:
+            self._create_parent_mlflow_run(run_name=f'CV-{int(time.time())}')
+
         y = RoiDataset.get_numeric_labels(model_inputs=model_inputs)
         for k, (train_idx, test_idx) in enumerate(
                 DataSplitter.get_cross_val_split_idxs(
@@ -112,10 +130,17 @@ class TrainingJobRunner:
                     destination_dir=temp_dir, k=k, train=train,
                     test=validation)
 
+                env_vars = {
+                    'fold': f'{k}',
+                    'mlflow_server_uri': self._mlflow_server_uri,
+                    'mlflow_experiment_name': self._mlflow_experiment_name
+                }
                 if self._local_mode:
                     # In local mode, due to a bug, environment vars. are not
                     # passed. Pass through hyperparameters instead
-                    self._hyperparameters['fold'] = k
+                    self._hyperparameters = {
+                        **self._hyperparameters,
+                        **env_vars}
                 estimator = Estimator(
                     sagemaker_session=sagemaker_session,
                     role=sagemaker_role_arn,
@@ -126,9 +151,7 @@ class TrainingJobRunner:
                     hyperparameters=self._hyperparameters,
                     volume_size=self._volume_size,
                     max_run=self._timeout,
-                    environment={
-                        'fold': f'{k}'
-                    }
+                    environment=env_vars
                 )
 
                 if not self._local_mode:
@@ -146,6 +169,7 @@ class TrainingJobRunner:
                     inputs=data_path,
                     # TODO change this to false to enable parallel training
                     wait=True)
+        self._end_mlflow_run()
 
     def _prepare_data(
             self,

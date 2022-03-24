@@ -1,5 +1,4 @@
 import logging
-import shutil
 from pathlib import Path
 
 import argschema
@@ -34,6 +33,7 @@ class CloudTrainer(argschema.ArgSchemaParser):
         )
 
         hyperparams = self._construct_hyperparameters()
+        tracking_params = self.args['train_params']['tracking_params']
         runner = TrainingJobRunner(
             bucket_name=self.args['s3_params']['bucket_name'],
             image_uri=ecr_uploader.image_uri,
@@ -43,7 +43,9 @@ class CloudTrainer(argschema.ArgSchemaParser):
             timeout=self.args['timeout'],
             volume_size=self.args['volume_size'],
             hyperparameters=hyperparams,
-            output_dir=self.args['train_params']['save_path']
+            output_dir=self.args['train_params']['save_path'],
+            mlflow_server_uri=tracking_params['mlflow_server_uri'],
+            mlflow_experiment_name=tracking_params['mlflow_experiment_name']
         )
         runner.run(
             model_inputs=self.args['train_params']['data_params']

@@ -1,25 +1,30 @@
-from typing import Tuple, List
+import time
+from typing import Optional
 
 import argschema
-import pandas as pd
-import torch
-import torchvision
-from torchvision.transforms import transforms
-import imgaug.augmenters as iaa
 
-from deepcell.callbacks.early_stopping import EarlyStopping
 from deepcell.cli.schemas.train import TrainSchema
 from deepcell.data_splitter import DataSplitter
 from deepcell.datasets.roi_dataset import RoiDataset
-from deepcell.models.classifier import Classifier
+from deepcell.tracking.mlflow_utils import MLFlowTrackableMixin
 from deepcell.trainer import Trainer
-from deepcell.transform import Transform
 
 
-class TrainModule(argschema.ArgSchemaParser):
-    default_schema = TrainSchema
+class TrainModule(argschema.ArgSchemaParser, MLFlowTrackableMixin):
+    def __init__(self, input_data: Optional[dict] = None,
+                 args: Optional[list] = None):
+        self.default_schema = TrainSchema
+        argschema.ArgSchemaParser().__init__(input_data=input_data, args=args)
+        MLFlowTrackableMixin().__init__(
+            server_uri=self.args['tracking_params']['mlflow_server_uri'],
+            experiment_name=
+            self.args['tracking_params']['mlflow_experiment_name']
+        )
 
     def run(self):
+        if self._is_mlflow_tracking_enabled:
+            self._create_parent_mlflow_run(run_name=f'CV-{int(time.time())}')
+
         dataset = self.args['data_params']['model_inputs']
         train_transform = RoiDataset.get_default_transforms(
             crop_size=self.args['data_params']['crop_size'], is_train=True)
@@ -36,6 +41,7 @@ class TrainModule(argschema.ArgSchemaParser):
 
         optimization_params = self.args['optimization_params']
         model_params = self.args['model_params']
+        tracking_params = self.args['tracking_params']
         trainer = Trainer.from_model(
             model_architecture=model_params['model_architecture'],
             use_pretrained_model=model_params['use_pretrained_model'],
@@ -50,6 +56,8 @@ class TrainModule(argschema.ArgSchemaParser):
             learning_rate=optimization_params['learning_rate'],
             weight_decay=optimization_params['weight_decay'],
             learning_rate_scheduler=optimization_params['scheduler_params'],
+            mlflow_server_uri=tracking_params['mlflow_server_uri'],
+            mlflow_experiment_name=tracking_params['mlflow_experiment_name']
         )
         trainer.cross_validate(
             train_dataset=train,

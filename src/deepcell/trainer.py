@@ -12,6 +12,7 @@ from deepcell.callbacks.early_stopping import EarlyStopping
 from deepcell.data_splitter import DataSplitter
 from deepcell.metrics import Metrics, CVMetrics
 from deepcell.datasets.roi_dataset import RoiDataset
+from deepcell.tracking.mlflow_utils import MLFlowTrackableMixin
 from deepcell.models.classifier import Classifier
 from deepcell.logger import init_logger
 
@@ -19,7 +20,7 @@ from deepcell.logger import init_logger
 logger = init_logger(__name__)
 
 
-class Trainer:
+class Trainer(MLFlowTrackableMixin):
     def __init__(
             self,
             model: torch.nn.Module,
@@ -29,7 +30,10 @@ class Trainer:
             save_path: Union[str, Path],
             scheduler: Optional["torch.optim.lr_scheduler._LRScheduler"] = None, # noqa E501
             callbacks: Optional[List[Callback]] = None,
-            model_load_path: Optional[Union[str, Path]] = None):
+            model_load_path: Optional[Union[str, Path]] = None,
+            mlflow_server_uri: Optional[str] = None,
+            mlflow_experiment_name: str = 'deepcell-train'
+    ):
         """
         The driver for the training and evaluation loop
         Args:
@@ -50,7 +54,15 @@ class Trainer:
             model_load_path:
                 Path to load a pretrained model. Activates continuation of
                 training
+            mlflow_server_uri
+                Optional MLFlow server URI. If provided, will log to MLFlow
+                during training
+            mlflow_experiment_name
+                Optional MLFlow experiment name. If not provided, will use the
+                default MLFlow experiment
         """
+        super().__init__(server_uri=mlflow_server_uri,
+                         experiment_name=mlflow_experiment_name)
         self.n_epochs = n_epochs
         self.model = model
         self.optimizer = optimizer
@@ -110,6 +122,9 @@ class Trainer:
 
     def train(self, train_loader: DataLoader, eval_fold=None, valid_loader: DataLoader = None,
               log_after_each_epoch=True):
+        if self._is_mlflow_tracking_enabled:
+            self._create_nested_mlflow_run(run_name=f'fold-{eval_fold}')
+
         if self.model_load_path is not None:
             self._load_pretrained_model(
                 checkpoint_path=
@@ -190,6 +205,7 @@ class Trainer:
                             logger.info('Stopping due to early stopping')
                             self._save_model_and_performance(
                                 eval_fold=eval_fold)
+                            self._end_mlflow_run()
                             return
 
             if self.scheduler is not None:
@@ -202,7 +218,13 @@ class Trainer:
                             f'Train Loss: {epoch_train_metrics.loss:.6f}    '
                             f'Val Loss: {epoch_val_metrics.loss:.6f}'
                             )
+                if self._is_mlflow_tracking_enabled:
+                    self._log_metrics_to_mlflow(
+                        train_metrics=epoch_train_metrics,
+                        val_metrics=epoch_val_metrics,
+                        epoch=epoch)
         self._save_model_and_performance(eval_fold=eval_fold)
+        self._end_mlflow_run()
 
     @staticmethod
     def from_model(
@@ -219,7 +241,13 @@ class Trainer:
             model_load_path: Optional[Path] = None,
             weight_decay: float = 0.0,
             learning_rate_scheduler: Optional[Dict] = None,
+            mlflow_server_uri: Optional[str] = None,
+            mlflow_experiment_name: str = 'deepcell-train'
     ) -> "Trainer":
+        """
+        Instantiates a Trainer. See `deepcell.trainer` constructor for
+        details on the input arguments
+        """
         model = getattr(
             torchvision.models,
             model_architecture)(
@@ -262,7 +290,9 @@ class Trainer:
                     patience=early_stopping_params['patience']
                 )
             ],
-            model_load_path=model_load_path
+            model_load_path=model_load_path,
+            mlflow_server_uri=mlflow_server_uri,
+            mlflow_experiment_name=mlflow_experiment_name
         )
         return trainer
 
