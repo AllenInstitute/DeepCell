@@ -1,6 +1,7 @@
+import json
 import shutil
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional, Union, List
 
 
 class ModelInput:
@@ -180,3 +181,14 @@ class ModelInput:
             'label': self._label
         }
 
+
+def write_model_inputs_to_disk(model_inputs: List[ModelInput],
+                               path: Union[str, Path]) -> None:
+    """
+    Writes a list of ModelInput to disk
+    @param model_inputs: list of model inputs
+    @param path: Where to write
+    @return: None
+    """
+    with open(path, 'w') as f:
+        f.write(json.dumps([x.to_dict() for x in model_inputs], indent=2))
