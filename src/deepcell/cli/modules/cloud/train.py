@@ -3,14 +3,14 @@ from pathlib import Path
 
 import argschema
 
-from deepcell.cli.schemas.cloud.train import CloudTrainSchema
+from deepcell.cli.schemas.cloud.train import CloudKFoldTrainSchema
 from deepcell.cli.schemas.train import TrainSchema
 from deepcell.cloud.ecr import ECRUploader
-from deepcell.cloud.train import TrainingJobRunner
+from deepcell.cloud.train import KFoldTrainingJobRunner
 
 
-class CloudTrainer(argschema.ArgSchemaParser):
-    default_schema = CloudTrainSchema
+class CloudKFoldTrainRunner(argschema.ArgSchemaParser):
+    default_schema = CloudKFoldTrainSchema
     _logger = logging.getLogger(__name__)
     _container_path = \
         Path(__file__).parent.parent.parent.parent / 'cloud' / 'container'
@@ -32,9 +32,8 @@ class CloudTrainer(argschema.ArgSchemaParser):
             dockerfile_path=self._container_path / 'Dockerfile'
         )
 
-        hyperparams = self._construct_hyperparameters()
         tracking_params = self.args['train_params']['tracking_params']
-        runner = TrainingJobRunner(
+        runner = KFoldTrainingJobRunner(
             bucket_name=self.args['s3_params']['bucket_name'],
             image_uri=ecr_uploader.image_uri,
             profile_name=self.args['profile_name'],
@@ -42,44 +41,15 @@ class CloudTrainer(argschema.ArgSchemaParser):
             instance_count=self.args['instance_count'],
             timeout=self.args['timeout'],
             volume_size=self.args['volume_size'],
-            hyperparameters=hyperparams,
             output_dir=self.args['train_params']['save_path'],
             mlflow_server_uri=tracking_params['mlflow_server_uri'],
             mlflow_experiment_name=tracking_params['mlflow_experiment_name']
         )
         runner.run(
-            model_inputs=self.args['train_params']['data_params']
-            ['model_inputs'])
-
-    def _construct_hyperparameters(self) -> dict:
-        """Takes the hyperparameters given by the CLI and cleans them up for
-        storage on sagemaker"""
-        hyperparams = self.args['train_params'].copy()
-        del hyperparams['log_level']
-        hyperparams['data_params'] = {
-            k: v for k, v in hyperparams['data_params'].items()
-            if k not in ('model_inputs_path', 'log_level', 'model_inputs')}
-        if 'scheduler_params' in hyperparams['optimization_params']:
-            hyperparams['optimization_params']['scheduler_params'] = {
-                k: v for k, v in
-                hyperparams['optimization_params']['scheduler_params'].items()
-                if k not in ('log_level',)
-            }
-        hyperparams['optimization_params']['early_stopping_params'] = {
-            k: v for k, v in
-            hyperparams['optimization_params']['early_stopping_params'].items()
-            if k not in ('log_level',)
-        }
-        hyperparams['optimization_params'] = {
-            k: v for k, v in hyperparams['optimization_params'].items() if
-            k not in ('log_level',)
-        }
-        del hyperparams['save_path']
-        del hyperparams['test_fraction']
-        del hyperparams['n_folds']
-        return hyperparams
+            model_inputs=self.args['train_params']['model_inputs'],
+            k_folds=self.args['train_params']['n_folds'])
 
 
 if __name__ == "__main__":
-    train_cli = CloudTrainer()
+    train_cli = CloudKFoldTrainRunner()
     train_cli.run()

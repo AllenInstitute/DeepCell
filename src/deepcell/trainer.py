@@ -1,4 +1,5 @@
 import os
+import time
 from pathlib import Path
 from typing import Optional, Union, List, Dict
 
@@ -123,7 +124,11 @@ class Trainer(MLFlowTrackableMixin):
     def train(self, train_loader: DataLoader, eval_fold=None, valid_loader: DataLoader = None,
               log_after_each_epoch=True):
         if self._is_mlflow_tracking_enabled:
-            self._create_nested_mlflow_run(run_name=f'fold-{eval_fold}')
+            if eval_fold is not None:
+                self._create_nested_mlflow_run(run_name=f'fold-{eval_fold}')
+            else:
+                self._create_parent_mlflow_run(
+                    run_name=f'train-{int(time.time())}')
 
         if self.model_load_path is not None:
             self._load_pretrained_model(

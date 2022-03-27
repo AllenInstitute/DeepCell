@@ -1,6 +1,6 @@
 import argschema
 
-from deepcell.cli.schemas.train import TrainSchema
+from deepcell.cli.schemas.train import KFoldCrossValidationSchema
 
 
 class DockerSchema(argschema.ArgSchema):
@@ -27,9 +27,9 @@ class S3ParamsSchema(argschema.ArgSchema):
     )
 
 
-class CloudTrainSchema(argschema.ArgSchema):
+class CloudKFoldTrainSchema(argschema.ArgSchema):
     train_params = argschema.fields.Nested(
-        TrainSchema,
+        KFoldCrossValidationSchema,
         required=True
     )
 

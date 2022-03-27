@@ -6,9 +6,9 @@ from unittest.mock import patch
 import pytest
 import sagemaker
 
-from deepcell.cli.modules.cloud.train import CloudTrainer
+from deepcell.cli.modules.cloud.train import CloudKFoldTrainRunner
 from deepcell.cloud.ecr import ECRUploader
-from deepcell.cloud.train import TrainingJobRunner
+from deepcell.cloud.train import KFoldTrainingJobRunner
 from tests.util.util import get_test_data
 
 
@@ -25,7 +25,7 @@ class TestTrainCLI:
 
     @patch("boto3.session")
     @patch('docker.APIClient')
-    @patch.object(TrainingJobRunner, '_get_sagemaker_execution_role_arn',
+    @patch.object(KFoldTrainingJobRunner, '_get_sagemaker_execution_role_arn',
                   return_value='')
     @patch.object(sagemaker.estimator.Estimator, '__init__', return_value=None)
     @patch.object(sagemaker.estimator.Estimator, 'fit')
@@ -60,6 +60,6 @@ class TestTrainCLI:
                     'train_params': train_params,
                     'instance_type': instance_type
                 }
-                trainer = CloudTrainer(
+                trainer = CloudKFoldTrainRunner(
                     input_data=input_data, args=[])
                 trainer.run()

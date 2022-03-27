@@ -5,15 +5,14 @@ import json
 import logging
 import argparse
 import os
+import sys
 from pathlib import Path
 from typing import List
 
-from torch.utils.data import DataLoader
-
+from deepcell.cli.modules.train import TrainRunner
 from deepcell.cli.schemas.data import ModelInputSchema
-from deepcell.datasets.model_input import ModelInput
-from deepcell.datasets.roi_dataset import RoiDataset
-from deepcell.trainer import Trainer
+from deepcell.datasets.model_input import ModelInput, \
+    write_model_inputs_to_disk
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -27,6 +26,7 @@ INPUT_JSON_PATH = '/opt/ml/train_input.json'
 
 class TrainingRunner:
     """Training Runner"""
+
     def __init__(self):
         with open(HYPERPARAMS_PATH) as f:
             hyperparams = json.load(f)
@@ -42,58 +42,21 @@ class TrainingRunner:
             raise ValueError('Could not get fold from hyperparams or env.')
 
     def run(self):
-        self._update_train_cfg_paths()
+        self._update_train_cfg()
         train = self._update_model_inputs_paths(
             data_dir=TRAINING_DATA_DIR)
         validation = self._update_model_inputs_paths(
             data_dir=VALIDATION_DATA_DIR)
 
-        train_transform = RoiDataset.get_default_transforms(
-            crop_size=self._train_cfg['data_params']['crop_size'],
-            is_train=True)
-        test_transform = RoiDataset.get_default_transforms(
-            crop_size=self._train_cfg['data_params']['crop_size'],
-            is_train=False)
-
-        train = RoiDataset(
+        write_model_inputs_to_disk(
             model_inputs=train,
-            transform=train_transform
-        )
-        validation = RoiDataset(
+            path=TRAINING_DATA_DIR / 'model_inputs.json')
+        write_model_inputs_to_disk(
             model_inputs=validation,
-            transform=test_transform
-        )
-
-        optimization_params = self._train_cfg['optimization_params']
-        model_params = self._train_cfg['model_params']
-        trainer = Trainer.from_model(
-            model_architecture=model_params['model_architecture'],
-            use_pretrained_model=model_params['use_pretrained_model'],
-            classifier_cfg=model_params['classifier_cfg'],
-            save_path=self._train_cfg['save_path'],
-            n_epochs=optimization_params['n_epochs'],
-            early_stopping_params=optimization_params['early_stopping_params'],
-            dropout_prob=model_params['dropout_prob'],
-            truncate_to_layer=model_params['truncate_to_layer'],
-            freeze_to_layer=model_params['freeze_to_layer'],
-            model_load_path=self._train_cfg['model_load_path'],
-            learning_rate=optimization_params['learning_rate'],
-            weight_decay=optimization_params['weight_decay'],
-            learning_rate_scheduler=optimization_params['scheduler_params'],
-            mlflow_server_uri=self._get_input_argument(
-                name='mlflow_server_uri'),
-            mlflow_experiment_name=self._get_input_argument(
-                name='mlflow_experiment_name')
-        )
-
-        train_loader = DataLoader(dataset=train, shuffle=True,
-                                  batch_size=self._train_cfg['batch_size'])
-        valid_loader = DataLoader(dataset=validation, shuffle=False,
-                                  batch_size=self._train_cfg['batch_size'])
-
-        trainer.train(
-            train_loader=train_loader, valid_loader=valid_loader,
-            eval_fold=self._fold)
+            path=VALIDATION_DATA_DIR / 'model_inputs.json')
+        sys.argv = sys.argv[:-1]
+        train_runner = TrainRunner(input_data=self._train_cfg, args=[])
+        train_runner.run()
 
     @staticmethod
     def _update_model_inputs_paths(
@@ -126,18 +89,23 @@ class TrainingRunner:
                     str(data_dir /
                         Path(model_input['correlation_projection_path']).name))
         model_inputs_serialized: List[ModelInput] = \
-            ModelInputSchema().load(model_inputs, many=True)    # noqa
+            ModelInputSchema().load(model_inputs, many=True)  # noqa
 
         return model_inputs_serialized
 
-    def _update_train_cfg_paths(self) -> None:
-        """Update paths from local paths to container paths.
+    def _update_train_cfg(self) -> None:
+        """Update train cfg
 
         Returns
         --------
         None, updates train_cfg in place
         """
-        self._train_cfg['save_path'] = OUTPUT_PATH / f'{self._fold}'
+        self._train_cfg['save_path'] = str(OUTPUT_PATH / f'{self._fold}')
+        self._train_cfg['train_model_inputs_path'] = \
+            str(TRAINING_DATA_DIR / 'model_inputs.json')
+        self._train_cfg['validation_model_inputs_path'] = \
+            str(VALIDATION_DATA_DIR / 'model_inputs.json')
+        self._train_cfg['fold'] = self._fold
 
     def _get_input_argument(self, name):
         """

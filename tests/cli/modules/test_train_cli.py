@@ -3,7 +3,7 @@ import tempfile
 from pathlib import Path
 
 
-from deepcell.cli.modules.train import TrainModule
+from deepcell.cli.modules.train import TrainRunner
 from tests.util.util import get_test_data
 
 
@@ -27,7 +27,7 @@ def test_train_cli(monkeypatch):
                     'test_fraction': 0.5,
                     'n_folds': 2
                 }
-                train_mod = TrainModule(input_data=input_json, args=[])
+                train_mod = TrainRunner(input_data=input_json, args=[])
                 train_mod.run()
 
                 for fold in (0, 1):

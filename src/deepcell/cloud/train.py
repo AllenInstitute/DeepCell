@@ -12,12 +12,12 @@ import sagemaker
 from sagemaker.estimator import Estimator
 
 from deepcell.data_splitter import DataSplitter
-from deepcell.datasets.model_input import ModelInput
+from deepcell.datasets.model_input import ModelInput, write_model_inputs_to_disk
 from deepcell.datasets.roi_dataset import RoiDataset
 from deepcell.tracking.mlflow_utils import MLFlowTrackableMixin
 
 
-class TrainingJobRunner(MLFlowTrackableMixin):
+class KFoldTrainingJobRunner(MLFlowTrackableMixin):
     """
     A wrapper on sagemaker Estimator. Starts a training job using the docker
     image given by image_uri
@@ -25,7 +25,6 @@ class TrainingJobRunner(MLFlowTrackableMixin):
     def __init__(self,
                  image_uri: str,
                  bucket_name: str,
-                 hyperparameters: dict,
                  profile_name='default',
                  region_name='us-west-2',
                  instance_type: Optional[str] = None,
@@ -43,8 +42,6 @@ class TrainingJobRunner(MLFlowTrackableMixin):
             The container image to run
         bucket_name
             The bucket to upload data to
-        hyperparameters
-            Hyperparameters to track in sagemaker
         profile_name
             AWS profile name to use
         region_name
@@ -79,7 +76,6 @@ class TrainingJobRunner(MLFlowTrackableMixin):
         self._instance_count = instance_count
         self._profile_name = profile_name
         self._bucket_name = bucket_name
-        self._hyperparameters = hyperparameters
         self._timeout = timeout
         self._volume_size = volume_size
         self._output_dir = output_dir
@@ -94,13 +90,14 @@ class TrainingJobRunner(MLFlowTrackableMixin):
         self._sagemaker_session = sagemaker.session.Session(
             boto_session=boto_session, default_bucket=bucket_name)
 
-    def run(self, model_inputs: List[ModelInput]):
+    def run(self, model_inputs: List[ModelInput], k_folds=5):
         """
         Train the model using `model_inputs` on sagemaker
 
         Parameters
         ----------
         model_inputs: the input data
+        k_folds: The number of CV splits
 
         Returns
         -------
@@ -110,15 +107,14 @@ class TrainingJobRunner(MLFlowTrackableMixin):
             self._sagemaker_session
         sagemaker_role_arn = self._get_sagemaker_execution_role_arn()
 
-        # TODO add train/test split before cv split
-
         if self._is_mlflow_tracking_enabled:
             self._create_parent_mlflow_run(run_name=f'CV-{int(time.time())}')
 
         y = RoiDataset.get_numeric_labels(model_inputs=model_inputs)
         for k, (train_idx, test_idx) in enumerate(
                 DataSplitter.get_cross_val_split_idxs(
-                    n=len(model_inputs), y=y, seed=self._seed)):
+                    n=len(model_inputs), y=y, seed=self._seed,
+                    n_splits=k_folds)):
             train = [model_inputs[i] for i in train_idx]
             validation = [model_inputs[i] for i in test_idx]
 
@@ -135,12 +131,10 @@ class TrainingJobRunner(MLFlowTrackableMixin):
                     'mlflow_server_uri': self._mlflow_server_uri,
                     'mlflow_experiment_name': self._mlflow_experiment_name
                 }
-                if self._local_mode:
-                    # In local mode, due to a bug, environment vars. are not
-                    # passed. Pass through hyperparameters instead
-                    self._hyperparameters = {
-                        **self._hyperparameters,
-                        **env_vars}
+                # In local mode, due to a bug, environment vars. are not
+                # passed. Pass through hyperparameters instead
+                hyperparameters = env_vars if self._local_mode else {}
+
                 estimator = Estimator(
                     sagemaker_session=sagemaker_session,
                     role=sagemaker_role_arn,
@@ -148,7 +142,7 @@ class TrainingJobRunner(MLFlowTrackableMixin):
                     instance_type=self._instance_type,
                     image_uri=self._image_uri,
                     output_path=output_dir,
-                    hyperparameters=self._hyperparameters,
+                    hyperparameters=hyperparameters,
                     volume_size=self._volume_size,
                     max_run=self._timeout,
                     environment=env_vars
@@ -203,10 +197,10 @@ class TrainingJobRunner(MLFlowTrackableMixin):
             model_input.copy(destination=test_path)
 
         # Copy metadata
-        with open(train_path / 'model_inputs.json', 'w') as f:
-            f.write(json.dumps([x.to_dict() for x in train], indent=2))
-        with open(test_path / 'model_inputs.json', 'w') as f:
-            f.write(json.dumps([x.to_dict() for x in test], indent=2))
+        write_model_inputs_to_disk(model_inputs=train,
+                                   path=train_path / 'model_inputs.json')
+        write_model_inputs_to_disk(model_inputs=test,
+                                   path=test_path / 'model_inputs.json')
 
         if self._local_mode:
             train_path = f'file://{train_path}'

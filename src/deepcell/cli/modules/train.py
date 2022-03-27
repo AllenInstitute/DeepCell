@@ -1,43 +1,36 @@
-import time
-from typing import Optional
-
 import argschema
+from torch.utils.data import DataLoader
 
 from deepcell.cli.schemas.train import TrainSchema
-from deepcell.data_splitter import DataSplitter
 from deepcell.datasets.roi_dataset import RoiDataset
-from deepcell.tracking.mlflow_utils import MLFlowTrackableMixin
 from deepcell.trainer import Trainer
 
 
-class TrainModule(argschema.ArgSchemaParser, MLFlowTrackableMixin):
-    def __init__(self, input_data: Optional[dict] = None,
-                 args: Optional[list] = None):
-        self.default_schema = TrainSchema
-        argschema.ArgSchemaParser().__init__(input_data=input_data, args=args)
-        MLFlowTrackableMixin().__init__(
-            server_uri=self.args['tracking_params']['mlflow_server_uri'],
-            experiment_name=
-            self.args['tracking_params']['mlflow_experiment_name']
-        )
+class TrainRunner(argschema.ArgSchemaParser):
+    default_schema = TrainSchema
 
     def run(self):
-        if self._is_mlflow_tracking_enabled:
-            self._create_parent_mlflow_run(run_name=f'CV-{int(time.time())}')
+        train = self.args['train_model_inputs']
+        validation = self.args['validation_model_inputs']
 
-        dataset = self.args['data_params']['model_inputs']
         train_transform = RoiDataset.get_default_transforms(
             crop_size=self.args['data_params']['crop_size'], is_train=True)
         test_transform = RoiDataset.get_default_transforms(
             crop_size=self.args['data_params']['crop_size'], is_train=False)
-        data_splitter = DataSplitter(model_inputs=dataset,
-                                     train_transform=train_transform,
-                                     test_transform=test_transform,
-                                     seed=1234,
-                                     image_dim=(128, 128),
-                                     use_correlation_projection=True)
-        train, test = data_splitter.get_train_test_split(
-            test_size=self.args['test_fraction'])
+
+        train = RoiDataset(
+            model_inputs=train,
+            transform=train_transform
+        )
+        validation = RoiDataset(
+            model_inputs=validation,
+            transform=test_transform
+        )
+
+        train_loader = DataLoader(dataset=train, shuffle=True,
+                                  batch_size=self.args['batch_size'])
+        valid_loader = DataLoader(dataset=validation, shuffle=False,
+                                  batch_size=self.args['batch_size'])
 
         optimization_params = self.args['optimization_params']
         model_params = self.args['model_params']
@@ -59,9 +52,11 @@ class TrainModule(argschema.ArgSchemaParser, MLFlowTrackableMixin):
             mlflow_server_uri=tracking_params['mlflow_server_uri'],
             mlflow_experiment_name=tracking_params['mlflow_experiment_name']
         )
-        trainer.cross_validate(
-            train_dataset=train,
-            data_splitter=data_splitter,
-            batch_size=self.args['batch_size'],
-            n_splits=self.args['n_folds']
-        )
+        trainer.train(
+            train_loader=train_loader, valid_loader=valid_loader,
+            eval_fold=self.args['fold'])
+
+
+if __name__ == '__main__':
+    train_runner = TrainRunner()
+    train_runner.run()
