@@ -165,6 +165,7 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
                     wait=True,
                     job_name=job_name
                 )
+        self._log_cross_validation_end_metrics_to_mlflow()
         self._end_mlflow_run()
 
     def _prepare_data(

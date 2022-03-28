@@ -1,6 +1,10 @@
+import json
+from collections import defaultdict
 from typing import Optional
 
 import mlflow
+import numpy as np
+import requests
 from mlflow.entities import ViewType
 
 from deepcell.metrics import Metrics
@@ -19,6 +23,7 @@ class MLFlowTrackableMixin:
         self._mlflow_server_uri = server_uri
         self._mlflow_experiment_name = experiment_name
         self._is_mlflow_tracking_enabled = server_uri is not None
+        self._parent_run: Optional[mlflow.entities.Run] = None
         if self._is_mlflow_tracking_enabled:
             mlflow.set_tracking_uri(server_uri)
             self._experiment_id = mlflow.get_experiment_by_name(
@@ -39,9 +44,11 @@ class MLFlowTrackableMixin:
         }
         if sagemaker_job_name is not None:
             tags['sagemaker_job_name'] = sagemaker_job_name
-        mlflow.start_run(experiment_id=self._experiment_id,
-                         run_name=run_name,
-                         tags=tags)
+        run = mlflow.start_run(
+            experiment_id=self._experiment_id,
+            run_name=run_name,
+            tags=tags)
+        self._parent_run = run
 
     def _resume_active_parent_mlflow_run(self) -> None:
         """
@@ -87,9 +94,9 @@ class MLFlowTrackableMixin:
         mlflow.end_run()
 
     @staticmethod
-    def _log_metrics_to_mlflow(train_metrics: Metrics,
-                               val_metrics: Metrics,
-                               epoch: int):
+    def _log_epoch_end_metrics_to_mlflow(train_metrics: Metrics,
+                                         val_metrics: Metrics,
+                                         epoch: int):
         """
         Logs metrics
         """
@@ -101,3 +108,34 @@ class MLFlowTrackableMixin:
                           step=epoch)
         mlflow.log_metric(key='val_loss', value=val_metrics.loss,
                           step=epoch)
+
+    @staticmethod
+    def _log_early_stopping_metrics(best_epoch: int):
+        """
+        Logs metrics when early stopping is triggered
+        @param best_epoch: The best epoch, as identified by
+            `deepcell.callbacks.EarlyStopping`
+        @return: None
+        """
+        mlflow.set_tag(key='best_epoch', value=best_epoch)
+
+    def _log_cross_validation_end_metrics_to_mlflow(self):
+        query = f"tags.mlflow.parentRunId = '{self._parent_run.info.run_id}'"
+        results = mlflow.search_runs(filter_string=query,
+                                     experiment_ids=[self._experiment_id])
+        child_run_ids = results['run_id']
+        cv_metrics = defaultdict(list)
+        for run_id in child_run_ids:
+            run = mlflow.get_run(run_id=run_id)
+            best_epoch = int(run.data.tags['best_epoch'])
+            for metric in run.data.metrics:
+                res = requests.get(url=f'{self._mlflow_server_uri}/'
+                                       f'api/2.0/mlflow/metrics/get-history',
+                                   params={
+                                       'run_id': run_id,
+                                       'metric_key': metric})
+                res = json.loads(res.text)
+
+                cv_metrics[metric].append(res['metrics'][best_epoch]['value'])
+        avg_metrics = {k: np.array(v).mean() for k, v in cv_metrics.items()}
+        mlflow.log_metrics(avg_metrics)

@@ -228,6 +228,10 @@ class Trainer(MLFlowTrackableMixin):
                             logger.info('Stopping due to early stopping')
                             self._save_model_and_performance(
                                 eval_fold=eval_fold)
+                            if self._is_mlflow_tracking_enabled:
+                                self._log_early_stopping_metrics(
+                                    best_epoch=self.early_stopping_callback.
+                                    best_epoch)
                             self._end_mlflow_run()
                             return
 
@@ -242,7 +246,7 @@ class Trainer(MLFlowTrackableMixin):
                             f'Val Loss: {epoch_val_metrics.loss:.6f}'
                             )
                 if self._is_mlflow_tracking_enabled:
-                    self._log_metrics_to_mlflow(
+                    self._log_epoch_end_metrics_to_mlflow(
                         train_metrics=epoch_train_metrics,
                         val_metrics=epoch_val_metrics,
                         epoch=epoch)
