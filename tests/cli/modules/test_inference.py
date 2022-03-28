@@ -1,8 +1,6 @@
 import json
 import tempfile
 from pathlib import Path
-
-import numpy as np
 import pandas as pd
 import torch
 import torchvision
@@ -44,14 +42,12 @@ class TestInferenceCli:
             with open(Path(out_dir) / 'model_inputs.json', 'r') as f:
                 input_json = {
                     'experiment_id': self.experiment_id,
-                    'data_params': {
-                        'model_inputs_path': f.name
-                    },
+                    'model_inputs_path': f.name,
+                    'model_load_path': self.checkpoint_path.name,
                     'model_params': {
-                        'checkpoint_path': self.checkpoint_path.name,
                         'classifier_cfg': []
                     },
-                    'out_dir': out_dir
+                    'save_path': out_dir
                 }
                 inference_mod = InferenceModule(input_data=input_json, args=[])
                 inference_mod.run()

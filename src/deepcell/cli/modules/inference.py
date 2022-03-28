@@ -22,28 +22,16 @@ class InferenceModule(argschema.ArgSchemaParser):
     default_schema = InferenceSchema
 
     def run(self):
-        all_transform = transforms.Compose([
-            iaa.Sequential([
-                iaa.CenterCropToFixedSize(
-                    width=self.args['data_params']['crop_size'][0],
-                    height=self.args['data_params']['crop_size'][1]),
-            ]).augment_image,
-            transforms.ToTensor(),
-            transforms.Normalize(
-                mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        ])
+        test_transform = RoiDataset.get_default_transforms(
+            crop_size=self.args['data_params']['crop_size'], is_train=False)
 
-        test_transform = Transform(all_transform=all_transform)
-
-        model_inputs = self.args['data_params']['model_inputs']
+        model_inputs = self.args['model_inputs']
         test = RoiDataset(
             model_inputs=model_inputs,
-            transform=test_transform,
-            use_correlation_projection=True,
-            center_roi_centroid=self.args['data_params']['center_roi_centroid']
+            transform=test_transform
         )
         test_dataloader = DataLoader(dataset=test, shuffle=False,
-                                     batch_size=64)
+                                     batch_size=self.args['batch_size'])
 
         model = getattr(
             torchvision.models,
@@ -53,19 +41,18 @@ class InferenceModule(argschema.ArgSchemaParser):
         model = Classifier(
             model=model,
             truncate_to_layer=self.args['model_params']['truncate_to_layer'],
-            classifier_cfg=self.args['model_params']['classifier_cfg'],
-            final_activation_map_spatial_dimensions=self.args['model_params']['final_activation_map_spatial_dimensions']
-            )
+            classifier_cfg=self.args['model_params']['classifier_cfg'])
         _, inference_res = inference(
             model=model,
             test_loader=test_dataloader,
             has_labels=False,
-            checkpoint_path=str(self.args['model_params']['checkpoint_path']))
+            checkpoint_path=str(self.args['model_load_path']))
         inference_res['experiment_id'] = self.args['experiment_id']
 
-        inference_res.to_csv(Path(self.args['out_dir']) /
+        inference_res.to_csv(Path(self.args['save_path']) /
                              f'{self.args["experiment_id"]}_inference.csv',
                              index=False)
+
 
 if __name__ == "__main__":
     inference = InferenceModule()

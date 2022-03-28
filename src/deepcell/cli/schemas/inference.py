@@ -1,23 +1,15 @@
 import argschema
 
-from deepcell.cli.schemas.data import DataSchema
-from deepcell.cli.schemas.model import InferenceModelSchema
+from deepcell.cli.schemas.base import UnsplitBaseSchema
+from deepcell.cli.schemas.model import ModelSchema
 
 
-class InferenceSchema(argschema.ArgSchema):
+class InferenceSchema(UnsplitBaseSchema):
     experiment_id = argschema.fields.String(
         required=True,
         description='What experiment to run inference on'
     )
-    data_params = argschema.fields.Nested(
-        DataSchema,
-        default={}
-    )
     model_params = argschema.fields.Nested(
-        InferenceModelSchema,
+        ModelSchema,
         default={}
-    )
-    out_dir = argschema.fields.OutputDir(
-        required=True,
-        description='Where to save predictions'
     )
