@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 import tempfile
@@ -125,11 +124,12 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
                 data_path = self._prepare_data(
                     destination_dir=temp_dir, k=k, train=train,
                     test=validation)
-
+                job_name = f'deepcell-train-fold-{k}-{int(time.time())}'
                 env_vars = {
                     'fold': f'{k}',
                     'mlflow_server_uri': self._mlflow_server_uri,
-                    'mlflow_experiment_name': self._mlflow_experiment_name
+                    'mlflow_experiment_name': self._mlflow_experiment_name,
+                    'sagemaker_job_name': job_name
                 }
                 # In local mode, due to a bug, environment vars. are not
                 # passed. Pass through hyperparameters instead
@@ -162,7 +162,9 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
                 estimator.fit(
                     inputs=data_path,
                     # TODO change this to false to enable parallel training
-                    wait=True)
+                    wait=True,
+                    job_name=job_name
+                )
         self._end_mlflow_run()
 
     def _prepare_data(

@@ -121,14 +121,32 @@ class Trainer(MLFlowTrackableMixin):
 
         return cv_metrics
 
-    def train(self, train_loader: DataLoader, eval_fold=None, valid_loader: DataLoader = None,
-              log_after_each_epoch=True):
+    def train(self,
+              train_loader: DataLoader,
+              eval_fold=None,
+              valid_loader: DataLoader = None,
+              log_after_each_epoch=True,
+              sagemaker_job_name: Optional[str] = None) -> None:
+        """
+        Runs the training loop
+        @param train_loader: train dataloader
+        @param eval_fold: If using kfold, which fold is this
+        @param valid_loader: validation dataloader
+        @param log_after_each_epoch: Whether to log after each epoch.
+            False disables this logging
+        @param sagemaker_job_name: If running via sagemaker, pass a job name
+            to log
+        @return: None
+        """
         if self._is_mlflow_tracking_enabled:
             if eval_fold is not None:
-                self._create_nested_mlflow_run(run_name=f'fold-{eval_fold}')
+                self._create_nested_mlflow_run(
+                    run_name=f'fold-{eval_fold}',
+                    sagemaker_job_name=sagemaker_job_name)
             else:
                 self._create_parent_mlflow_run(
-                    run_name=f'train-{int(time.time())}')
+                    run_name=f'train-{int(time.time())}',
+                    sagemaker_job_name=sagemaker_job_name)
 
         if self.model_load_path is not None:
             self._load_pretrained_model(

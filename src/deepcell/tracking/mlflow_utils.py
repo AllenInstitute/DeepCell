@@ -25,10 +25,23 @@ class MLFlowTrackableMixin:
                 name=experiment_name).experiment_id
             self._resume_active_parent_mlflow_run()
 
-    def _create_parent_mlflow_run(self, run_name: str):
+    def _create_parent_mlflow_run(self, run_name: str,
+                                  sagemaker_job_name: Optional[str] = None):
+        """
+        Creates a parent MLFlow run under self._experiment_id
+        @param run_name: Run name
+        @param sagemaker_job_name:  An optional sagemaker job name to tag, in
+            order to link to the sagemaker job if running on sagemaker
+        @return:
+        """
+        tags = {
+            'is_parent': 'true'
+        }
+        if sagemaker_job_name is not None:
+            tags['sagemaker_job_name'] = sagemaker_job_name
         mlflow.start_run(experiment_id=self._experiment_id,
                          run_name=run_name,
-                         tags={'is_parent': 'true'})
+                         tags=tags)
 
     def _resume_active_parent_mlflow_run(self) -> None:
         """
@@ -50,11 +63,23 @@ class MLFlowTrackableMixin:
             parent_run = parent_runs[0]
             mlflow.start_run(run_id=parent_run.info.run_id)
 
-    def _create_nested_mlflow_run(self, run_name: str):
+    def _create_nested_mlflow_run(self, run_name: str,
+                                  sagemaker_job_name: Optional[str] = None):
+        """
+        Creates an MLFlow run nested under the current parent
+        @param run_name: Run name
+        @param sagemaker_job_name:  An optional sagemaker job name to tag, in
+            order to link to the sagemaker job if running on sagemaker
+        @return:
+        """
+        tags = {}
+        if sagemaker_job_name is not None:
+            tags['sagemaker_job'] = sagemaker_job_name
         mlflow.start_run(
             experiment_id=self._experiment_id,
             run_name=run_name,
-            nested=True
+            nested=True,
+            tags=tags
         )
 
     @staticmethod

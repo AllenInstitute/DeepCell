@@ -54,7 +54,9 @@ class TrainRunner(argschema.ArgSchemaParser):
         )
         trainer.train(
             train_loader=train_loader, valid_loader=valid_loader,
-            eval_fold=self.args['fold'])
+            eval_fold=self.args['fold'],
+            sagemaker_job_name=tracking_params['sagemaker_job_name']
+        )
 
 
 if __name__ == '__main__':
