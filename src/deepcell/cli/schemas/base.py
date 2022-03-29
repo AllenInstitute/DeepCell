@@ -25,7 +25,7 @@ class BaseSchema(argschema.ArgSchema):
         allow_none=True,
         description='Path to load a model checkpoint. If training, this will '
                     'continue training using this checkpoint. If inference, '
-                    'will use this checkpoint for infernece'
+                    'will use this checkpoint for inference'
     )
 
     @marshmallow.post_load

@@ -47,7 +47,9 @@ class CloudKFoldTrainRunner(argschema.ArgSchemaParser):
         )
         runner.run(
             model_inputs=self.args['train_params']['model_inputs'],
-            k_folds=self.args['train_params']['n_folds'])
+            k_folds=self.args['train_params']['n_folds'],
+            train_params=self.args['train_params']
+        )
 
 
 if __name__ == "__main__":

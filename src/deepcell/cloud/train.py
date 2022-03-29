@@ -89,13 +89,17 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
         self._sagemaker_session = sagemaker.session.Session(
             boto_session=boto_session, default_bucket=bucket_name)
 
-    def run(self, model_inputs: List[ModelInput], k_folds=5):
+    def run(self,
+            model_inputs: List[ModelInput],
+            train_params: dict,
+            k_folds=5):
         """
         Train the model using `model_inputs` on sagemaker
 
         Parameters
         ----------
         model_inputs: the input data
+        train_params: Training parameters to log to MLFlow
         k_folds: The number of CV splits
 
         Returns
@@ -107,7 +111,13 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
         sagemaker_role_arn = self._get_sagemaker_execution_role_arn()
 
         if self._is_mlflow_tracking_enabled:
-            self._create_parent_mlflow_run(run_name=f'CV-{int(time.time())}')
+            self._create_parent_mlflow_run(
+                run_name=f'CV-{int(time.time())}',
+                hyperparameters=train_params,
+                hyperparameters_exclude_keys=['tracking_params', 'save_path',
+                                              'model_load_path',
+                                              'model_inputs_path',
+                                              'model_inputs', 'n_folds'])
 
         y = RoiDataset.get_numeric_labels(model_inputs=model_inputs)
         for k, (train_idx, test_idx) in enumerate(

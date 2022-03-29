@@ -146,7 +146,11 @@ class Trainer(MLFlowTrackableMixin):
             else:
                 self._create_parent_mlflow_run(
                     run_name=f'train-{int(time.time())}',
-                    sagemaker_job_name=sagemaker_job_name)
+                    sagemaker_job_name=sagemaker_job_name,
+                    # TODO this use case is not fully supported.
+                    # Need to construct hyperparams
+                    hyperparameters={}
+                )
 
         if self.model_load_path is not None:
             self._load_pretrained_model(

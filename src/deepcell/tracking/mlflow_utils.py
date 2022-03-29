@@ -4,6 +4,7 @@ from typing import Optional
 
 import mlflow
 import numpy as np
+import pandas as pd
 import requests
 from mlflow.entities import ViewType
 
@@ -12,6 +13,7 @@ from deepcell.metrics import Metrics
 
 class MLFlowTrackableMixin:
     """Handles MLFlow tracking"""
+
     def __init__(self, server_uri: Optional[str] = None,
                  experiment_name: Optional[str] = None):
         """
@@ -30,15 +32,41 @@ class MLFlowTrackableMixin:
                 name=experiment_name).experiment_id
             self._resume_active_parent_mlflow_run()
 
-    def _create_parent_mlflow_run(self, run_name: str,
-                                  sagemaker_job_name: Optional[str] = None):
+    def _create_parent_mlflow_run(
+            self, run_name: str,
+            hyperparameters: dict,
+            hyperparameters_exclude_keys: Optional[list] = None,
+            sagemaker_job_name: Optional[str] = None):
         """
         Creates a parent MLFlow run under self._experiment_id
         @param run_name: Run name
+        @param hyperparameters: Hyperparameters to log
+        @param hyperparameters_exclude_keys: Exclude these keys from logging
         @param sagemaker_job_name:  An optional sagemaker job name to tag, in
             order to link to the sagemaker job if running on sagemaker
         @return:
         """
+        def construct_hyperparams_for_logging(
+                hyperparams: dict,
+                hyperparams_exclude_keys: Optional[list] = None) -> dict:
+            """
+            Flattens nested dict and removes keys which should not be logged
+            @param hyperparams:
+            @param hyperparams_exclude_keys:
+            @return:
+            """
+            if hyperparams_exclude_keys is None:
+                hyperparams_exclude_keys = []
+            hyperparams = {k: v for k, v in hyperparams.items()
+                           if k not in hyperparams_exclude_keys}
+            # flatten
+            hyperparams = pd.json_normalize(hyperparams, sep='_')
+            hyperparams = hyperparams.to_dict(orient='records')[0]
+
+            hyperparams = {k: v for k, v in hyperparams.items()
+                           if 'log_level' not in k}
+            return hyperparams
+
         tags = {
             'is_parent': 'true'
         }
@@ -48,6 +76,10 @@ class MLFlowTrackableMixin:
             experiment_id=self._experiment_id,
             run_name=run_name,
             tags=tags)
+        hyperparameters = construct_hyperparams_for_logging(
+            hyperparams=hyperparameters,
+            hyperparams_exclude_keys=hyperparameters_exclude_keys)
+        mlflow.log_params(params=hyperparameters)
         self._parent_run = run
 
     def _resume_active_parent_mlflow_run(self) -> None:
