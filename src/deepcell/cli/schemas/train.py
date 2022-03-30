@@ -1,6 +1,6 @@
 import argschema
 
-from deepcell.cli.schemas.base import BaseSchema, UnsplitBaseSchema
+from deepcell.cli.schemas.base import BaseSchema
 from deepcell.cli.schemas.model import TrainModelSchema
 from deepcell.cli.schemas.optimization import OptimizationSchema
 from deepcell.cli.schemas.tracking import TrackingSchema
@@ -42,7 +42,7 @@ class TrainSchema(_TrainSchema, BaseSchema):
     )
 
 
-class KFoldCrossValidationSchema(_TrainSchema, UnsplitBaseSchema):
+class KFoldCrossValidationSchema(_TrainSchema, BaseSchema):
     n_folds = argschema.fields.Int(
         default=5,
         description='Number of folds for cross validation'

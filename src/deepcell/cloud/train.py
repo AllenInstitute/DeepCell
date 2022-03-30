@@ -1,5 +1,5 @@
+import json
 import logging
-import os
 import tempfile
 import time
 from pathlib import Path
@@ -10,9 +10,11 @@ import mlflow
 import sagemaker
 from sagemaker.estimator import Estimator
 
+from deepcell.aws_utils import get_sagemaker_execution_role_arn, \
+    create_bucket_if_not_exists, download_from_s3
 from deepcell.data_splitter import DataSplitter
-from deepcell.datasets.model_input import ModelInput, write_model_inputs_to_disk
-from deepcell.datasets.roi_dataset import RoiDataset
+from deepcell.datasets.model_input import ModelInput, \
+    copy_model_inputs_to_dir, write_model_input_metadata_to_disk
 from deepcell.tracking.mlflow_utils import MLFlowTrackableMixin
 
 
@@ -90,25 +92,39 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
             boto_session=boto_session, default_bucket=bucket_name)
 
     def run(self,
-            model_inputs: List[ModelInput],
             train_params: dict,
+            model_inputs: Optional[List[ModelInput]] = None,
+            load_data_from_s3: bool = True,
             k_folds=5):
         """
         Train the model using `model_inputs` on sagemaker
 
         Parameters
         ----------
-        model_inputs: the input data
+        model_inputs: the input data. If provided, data_load_path should not be
         train_params: Training parameters to log to MLFlow
-        k_folds: The number of CV splits
+        load_data_from_s3: Whether to load data from S3
+            If provided, model_inputs should not be.
+            This is only used if not in "local mode"
+        k_folds: The number of CV splits.
 
         Returns
         -------
         None
         """
+        if load_data_from_s3 and self._local_mode:
+            raise ValueError('load_data_from_s3 should only be set to `True` '
+                             'if running in a cloud environment, not locally')
+        if model_inputs is not None and load_data_from_s3:
+            raise ValueError('Supply either `model_inputs` or set '
+                             '`load_data_from_s3` to `True`, but not both')
+        if model_inputs is None and not load_data_from_s3:
+            raise ValueError('Supply one of `model_inputs` or set '
+                             '`load_data_from_s3` to `True`')
         sagemaker_session = None if self._local_mode else \
             self._sagemaker_session
-        sagemaker_role_arn = self._get_sagemaker_execution_role_arn()
+
+        sagemaker_role_arn = get_sagemaker_execution_role_arn()
 
         if self._is_mlflow_tracking_enabled:
             self._create_parent_mlflow_run(
@@ -117,33 +133,77 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
                 hyperparameters_exclude_keys=['tracking_params', 'save_path',
                                               'model_load_path',
                                               'model_inputs_path',
-                                              'model_inputs', 'n_folds'])
+                                              'model_inputs', 'n_folds',
+                                              'data_load_path'])
+        s3_uri = f's3://{self._bucket_name}/input_data' \
+            if load_data_from_s3 else None
+        if load_data_from_s3:
+            model_inputs = self._get_model_inputs_from_s3(s3_uri=s3_uri)
+        else:
+            if not self._local_mode:
+                # If we are not running locally and s3_data_load_path not
+                # provided, upload all model_input metadata to S3
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    write_model_input_metadata_to_disk(
+                        path=Path(temp_dir) / 'all',
+                        model_inputs=model_inputs
+                    )
+                    self._sagemaker_session.upload_data(
+                        path=str(Path(temp_dir) / 'all'),
+                        key_prefix='input_data/all',
+                        bucket=self._bucket_name)
 
-        y = RoiDataset.get_numeric_labels(model_inputs=model_inputs)
         for k, (train_idx, test_idx) in enumerate(
                 DataSplitter.get_cross_val_split_idxs(
-                    n=len(model_inputs), y=y, seed=self._seed,
+                    model_inputs=model_inputs, seed=self._seed,
                     n_splits=k_folds)):
             train = [model_inputs[i] for i in train_idx]
-            validation = [model_inputs[i] for i in test_idx]
+            test = [model_inputs[i] for i in test_idx]
 
             output_dir = f'file://{Path(self._output_dir) / str(k)}' if \
                 self._local_mode else None
+            job_name = f'deepcell-train-fold-{k}-{int(time.time())}'
+            env_vars = {
+                'fold': f'{k}',
+                'mlflow_server_uri': self._mlflow_server_uri,
+                'mlflow_experiment_name': self._mlflow_experiment_name,
+                'sagemaker_job_name': job_name
+            }
+            hyperparameters = env_vars if self._local_mode else {}
 
             with tempfile.TemporaryDirectory() as temp_dir:
-                data_path = self._prepare_data(
-                    destination_dir=temp_dir, k=k, train=train,
-                    test=validation)
-                job_name = f'deepcell-train-fold-{k}-{int(time.time())}'
-                env_vars = {
-                    'fold': f'{k}',
-                    'mlflow_server_uri': self._mlflow_server_uri,
-                    'mlflow_experiment_name': self._mlflow_experiment_name,
-                    'sagemaker_job_name': job_name
+                local_data_path = {
+                    'train': Path(temp_dir) / 'train' / str(k),
+                    'validation': Path(temp_dir) / 'validation' / str(k)
                 }
-                # In local mode, due to a bug, environment vars. are not
-                # passed. Pass through hyperparameters instead
-                hyperparameters = env_vars if self._local_mode else {}
+                if not load_data_from_s3:
+                    self._logger.info(f'Copying train model inputs to '
+                                      f'{local_data_path["train"]}')
+                    copy_model_inputs_to_dir(
+                        destination=local_data_path['train'],
+                        model_inputs=train
+                    )
+                    self._logger.info(f'Copying validation model inputs to '
+                                      f'{local_data_path["validation"]}')
+                    copy_model_inputs_to_dir(
+                        destination=local_data_path['validation'],
+                        model_inputs=test
+                    )
+                if self._local_mode:
+                    # In local mode, we are just reading local data
+                    data_path = {k: f'file://{v}'
+                                 for k, v in local_data_path.items()}
+                elif not load_data_from_s3:
+                    # If not reading data from S3,
+                    # we need to upload data to s3
+                    data_path = self._upload_local_data_to_s3(
+                        k=k, local_data_path=local_data_path)
+                else:
+                    # We are loading data from s3
+                    data_path = {
+                        'train': f'{s3_uri}/train/',
+                        'validation': f'{s3_uri}/validation/'
+                    }
 
                 estimator = Estimator(
                     sagemaker_session=sagemaker_session,
@@ -158,17 +218,6 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
                     environment=env_vars
                 )
 
-                if not self._local_mode:
-                    # TODO check if data exists on s3 or overwrite is true.
-                    #  If not then upload it.
-                    self._logger.info('Uploading input data to S3')
-                    self._create_bucket_if_not_exists()
-                    for channel in data_path:
-                        s3_path = self._sagemaker_session.upload_data(
-                            path=str(data_path[channel]),
-                            key_prefix=f'input_data/{channel}/{k}',
-                            bucket=self._bucket_name)
-                        data_path[channel] = s3_path
                 estimator.fit(
                     inputs=data_path,
                     # TODO change this to false to enable parallel training
@@ -178,92 +227,59 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
         self._log_cross_validation_end_metrics_to_mlflow()
         self._end_mlflow_run()
 
-    def _prepare_data(
+    def _upload_local_data_to_s3(
             self,
-            destination_dir: str,
-            k: int,
-            train: List[ModelInput],
-            test: List[ModelInput],
-    ) -> Dict[str, Union[str, Path]]:
+            local_data_path: Dict[str, Path],
+            k: int
+    ) -> Dict[str, str]:
         """
-        Prepares input data for training
+        Uploads local data to s3
 
         Parameters
         ----------
-        destination_dir: where to copy model inputs
+        local_data_path: dict mapping sagemaker "channel" to Path on disk
         k: the current fold
-        train: train dataset
-        test: test dataset
 
         Returns
         -------
+        Dict mapping channel name to path on s3
         """
-        train_path = Path(destination_dir) / 'train' / f'{k}'
-        test_path = Path(destination_dir) / 'validation' / f'{k}'
-        os.makedirs(train_path, exist_ok=True)
-        os.makedirs(test_path, exist_ok=True)
+        self._logger.info('Uploading input data to S3')
+        create_bucket_if_not_exists(
+            bucket=self._bucket_name,
+            region_name=self._sagemaker_session.boto_session
+            .region_name)
+        s3_paths = {}
+        for channel in local_data_path:
+            s3_path = self._sagemaker_session.upload_data(
+                path=str(local_data_path[channel]),
+                key_prefix=f'input_data/{channel}/{k}',
+                bucket=self._bucket_name)
+            s3_paths[channel] = s3_path
 
-        # Copy model inputs
-        for model_input in train:
-            model_input.copy(destination=train_path)
-        for model_input in test:
-            model_input.copy(destination=test_path)
+        return s3_paths
 
-        # Copy metadata
-        write_model_inputs_to_disk(model_inputs=train,
-                                   path=train_path / 'model_inputs.json')
-        write_model_inputs_to_disk(model_inputs=test,
-                                   path=test_path / 'model_inputs.json')
-
-        if self._local_mode:
-            train_path = f'file://{train_path}'
-            test_path = f'file://{test_path}'
-
-        return {
-            'train': train_path,
-            'validation': test_path
-        }
-
-    def _get_sagemaker_execution_role_arn(self) -> str:
+    @staticmethod
+    def _get_model_inputs_from_s3(s3_uri: str,
+                                  fold: Optional[int] = None,
+                                  is_train=False) \
+            -> List[ModelInput]:
         """
-        Gets the sagemaker execution role arn
-        Returns
-        -------
-        The sagemaker execution role arn
-        Raises
-        -------
-        RuntimeError if the role cannot be found
+        Get model inputs from s3
+        @param s3_uri: Path on s3 to read data from
+        @param fold: Optional fold, to get model inputs for just that fold
+        @param is_train: Whether to get train or validation model inputs
+            (only applicable with `fold` passed)
+        @return: List[ModelInput]
         """
-        iam = self._sagemaker_session.boto_session.client('iam')
-        roles = iam.list_roles(PathPrefix='/service-role/')
-        sm_roles = [x for x in roles['Roles'] if
-                    x['RoleName'].startswith('AmazonSageMaker-ExecutionRole')]
-        if sm_roles:
-            sm_role = sm_roles[0]
+        if fold is not None:
+            train_or_validation = 'train/' if is_train else 'validation/'
         else:
-            raise RuntimeError('Could not find the sagemaker execution role. '
-                               'It should have already been created in AWS')
-        return sm_role['Arn']
-
-    def _create_bucket_if_not_exists(self):
-        """
-        Creates an s3 bucket with name self._bucket_name if it doesn't exist
-        Returns
-        -------
-        None, creates bucket
-        """
-        s3 = self._sagemaker_session.boto_session.client('s3')
-        buckets = s3.list_buckets()
-        buckets = buckets['Buckets']
-        buckets = [x for x in buckets if x['Name'] == self._bucket_name]
-
-        if len(buckets) == 0:
-            self._logger.info(f'Creating bucket {self._bucket_name}')
-            region_name = self._sagemaker_session.boto_session.region_name
-            s3.create_bucket(
-                ACL='private',
-                Bucket=self._bucket_name,
-                CreateBucketConfiguration={
-                    'LocationConstraint': region_name
-                }
-            )
+            train_or_validation = ''
+        with download_from_s3(
+                uri=f'{s3_uri}/'
+                    f'{fold or "all"}/'
+                    f'{train_or_validation}model_inputs.json')['Body'] as f:
+            model_inputs = json.load(f)
+        model_inputs = [ModelInput(**x) for x in model_inputs]
+        return model_inputs

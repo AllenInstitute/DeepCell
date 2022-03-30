@@ -100,8 +100,7 @@ class DataSplitter:
     def get_cross_val_split(self, train_dataset: RoiDataset, n_splits=5,
                             shuffle=True):
         for train_index, test_index in self.get_cross_val_split_idxs(
-                n=len(train_dataset),
-                y=train_dataset.y,
+                model_inputs=train_dataset.model_inputs,
                 n_splits=n_splits,
                 shuffle=shuffle):
             train = self._sample_dataset(
@@ -119,8 +118,7 @@ class DataSplitter:
 
     @staticmethod
     def get_cross_val_split_idxs(
-            n: int,
-            y: np.ndarray,
+            model_inputs: List[ModelInput],
             n_splits=5,
             shuffle=True,
             seed=None) -> Iterator[Tuple[np.ndarray, np.ndarray]]:
@@ -129,8 +127,7 @@ class DataSplitter:
 
         Parameters
         ----------
-        n: total number of observations
-        y: labels for observations
+        model_inputs: List of ModelInput to split
         n_splits: total number of cross validation splits
         shuffle: whether to shuffle before performing the split
         seed: seed for reproducibility of shuffling
@@ -139,6 +136,8 @@ class DataSplitter:
         -------
         yields Tuple of np.ndarray for train and test indices
         """
+        n = len(model_inputs)
+        y = RoiDataset.get_numeric_labels(model_inputs=model_inputs)
         skf = StratifiedKFold(n_splits=n_splits, shuffle=shuffle,
                               random_state=seed)
         for train_index, test_index in skf.split(np.zeros(n), y):

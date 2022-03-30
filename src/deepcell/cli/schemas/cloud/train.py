@@ -1,6 +1,7 @@
 import argschema
 
-from deepcell.cli.schemas.train import KFoldCrossValidationSchema
+from deepcell.cli.schemas.train import KFoldCrossValidationSchema as \
+    KFoldCrossValidationBaseSchema
 
 
 class DockerSchema(argschema.ArgSchema):
@@ -24,6 +25,27 @@ class S3ParamsSchema(argschema.ArgSchema):
                     'model outputs. Will be created if it doesn\'t '
                     'exist. Note that the bucket name must be unique across '
                     'all AWS accounts'
+    )
+
+
+class KFoldCrossValidationSchema(KFoldCrossValidationBaseSchema):
+
+    # Note: in `KFoldCrossValidationBaseSchema`, `model_inputs_path` should
+    # always be required. But in this cloud schema, it is optional as
+    # `load_data_from_s3` can be set instead
+    model_inputs_path = argschema.fields.InputFile(
+        default=None,
+        allow_none=True,
+        description='Path to json file for input examples where each '
+                    'instance has schema given by '
+                    '`deepcell.cli.schemas.data.ModelInputSchema`. '
+                    'Note: if not provided, `load_data_from_s3` must be set '
+                    'to `True`.'
+    )
+    load_data_from_s3 = argschema.fields.Bool(
+        default=True,
+        description='Whether to load data from s3.'
+                    'If provided, `model_inputs_path` should not need be.'
     )
 
 

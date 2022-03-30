@@ -12,7 +12,7 @@ from typing import List
 from deepcell.cli.modules.train import TrainRunner
 from deepcell.cli.schemas.data import ModelInputSchema
 from deepcell.datasets.model_input import ModelInput, \
-    write_model_inputs_to_disk
+    write_model_input_metadata_to_disk
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -48,10 +48,10 @@ class TrainingRunner:
         validation = self._update_model_inputs_paths(
             data_dir=VALIDATION_DATA_DIR)
 
-        write_model_inputs_to_disk(
+        write_model_input_metadata_to_disk(
             model_inputs=train,
             path=TRAINING_DATA_DIR / 'model_inputs.json')
-        write_model_inputs_to_disk(
+        write_model_input_metadata_to_disk(
             model_inputs=validation,
             path=VALIDATION_DATA_DIR / 'model_inputs.json')
         sys.argv = sys.argv[:-1]

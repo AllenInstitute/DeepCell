@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 from pathlib import Path
 from typing import Optional, Union, List
@@ -182,8 +183,8 @@ class ModelInput:
         }
 
 
-def write_model_inputs_to_disk(model_inputs: List[ModelInput],
-                               path: Union[str, Path]) -> None:
+def write_model_input_metadata_to_disk(model_inputs: List[ModelInput],
+                                       path: Union[str, Path]) -> None:
     """
     Writes a list of ModelInput to disk
     @param model_inputs: list of model inputs
@@ -192,3 +193,22 @@ def write_model_inputs_to_disk(model_inputs: List[ModelInput],
     """
     with open(path, 'w') as f:
         f.write(json.dumps([x.to_dict() for x in model_inputs], indent=2))
+
+
+def copy_model_inputs_to_dir(
+        destination: Path,
+        model_inputs: List[ModelInput]) -> None:
+    """Copies model inputs and metadata to `destination`
+    @param destination: Destination
+    @param model_inputs: List[ModelInput]
+    """
+    os.makedirs(destination, exist_ok=True)
+
+    # Copy model inputs
+    for model_input in model_inputs:
+        model_input.copy(destination=destination)
+
+    # Copy metadata
+    write_model_input_metadata_to_disk(
+        model_inputs=model_inputs,
+        path=destination / 'model_inputs.json')

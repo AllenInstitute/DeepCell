@@ -34,19 +34,12 @@ class BaseSchema(argschema.ArgSchema):
                     'validation_model_inputs_path'):
             if key not in data:
                 continue
-
-            with open(str(data[key]), 'r') as f:
-                model_inputs = json.load(f)
-            model_inputs = [ModelInputSchema().load(model_input)
-                            for model_input in model_inputs]
-            data[key.replace('_path', '')] = model_inputs
+            elif data[key] is None:
+                data[key.replace('_path', '')] = None
+            else:
+                with open(str(data[key]), 'r') as f:
+                    model_inputs = json.load(f)
+                model_inputs = [ModelInputSchema().load(model_input)
+                                for model_input in model_inputs]
+                data[key.replace('_path', '')] = model_inputs
         return data
-
-
-class UnsplitBaseSchema(BaseSchema):
-    model_inputs_path = argschema.fields.InputFile(
-        required=True,
-        description='Path to json file for input examples where each '
-                    'instance has schema given by '
-                    '`deepcell.cli.schemas.data.ModelInputSchema`'
-    )
