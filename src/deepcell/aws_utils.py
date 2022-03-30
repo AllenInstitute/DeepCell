@@ -2,8 +2,6 @@ import logging
 from urllib.parse import urlparse
 
 import boto3
-import botocore
-
 
 logger = logging.getLogger(__name__)
 

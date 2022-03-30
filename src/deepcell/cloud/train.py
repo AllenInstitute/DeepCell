@@ -138,17 +138,18 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
             model_inputs = self._get_model_inputs_from_s3(s3_uri=s3_uri)
         else:
             if not self._local_mode:
-                # If we are not running locally and s3_data_load_path not
-                # provided, upload all model_input metadata to S3
+                # If we are not running locally and we are not loading data
+                # from s3, upload all model_input metadata to S3
                 with tempfile.TemporaryDirectory() as temp_dir:
                     write_model_input_metadata_to_disk(
-                        path=Path(temp_dir) / 'all',
+                        path=Path(temp_dir) / 'all' / 'model_inputs.json',
                         model_inputs=model_inputs
                     )
                     self._sagemaker_session.upload_data(
-                        path=str(Path(temp_dir) / 'all'),
+                        path=str(Path(temp_dir) / 'all' / 'model_inputs.json'),
                         key_prefix='input_data/all',
                         bucket=self._bucket_name)
+        channels = ('train', 'validation')
 
         for k, (train_idx, test_idx) in enumerate(
                 DataSplitter.get_cross_val_split_idxs(
@@ -169,10 +170,8 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
             hyperparameters = env_vars if self._local_mode else {}
 
             with tempfile.TemporaryDirectory() as temp_dir:
-                local_data_path = {
-                    'train': Path(temp_dir) / 'train' / str(k),
-                    'validation': Path(temp_dir) / 'validation' / str(k)
-                }
+                local_data_path = {c: Path(temp_dir) / c / str(k)
+                                   for c in channels}
                 if not load_data_from_s3:
                     self._logger.info(f'Copying train model inputs to '
                                       f'{local_data_path["train"]}')
@@ -197,10 +196,7 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
                         k=k, local_data_path=local_data_path)
                 else:
                     # We are loading data from s3
-                    data_path = {
-                        'train': f'{s3_uri}/train/',
-                        'validation': f'{s3_uri}/validation/'
-                    }
+                    data_path = {c: f'{s3_uri}/{c}/{k}' for c in channels}
 
                 estimator = Estimator(
                     sagemaker_session=sagemaker_session,
