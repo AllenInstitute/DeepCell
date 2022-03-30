@@ -23,6 +23,8 @@ class CloudKFoldTrainRunner(argschema.ArgSchemaParser):
         with open(self._container_path / 'train_input.json', 'w') as f:
             f.write(TrainSchema().dumps(self.args['train_params']))
 
+        # TODO add ability to load image from ECR rather than building and
+        #  uploading another one
         ecr_uploader = ECRUploader(
             repository_name=repository_name,
             image_tag=image_tag,
@@ -47,7 +49,7 @@ class CloudKFoldTrainRunner(argschema.ArgSchemaParser):
         )
         runner.run(
             model_inputs=self.args['train_params']['model_inputs'],
-            load_data_from_s3=self.args['train_params']['data_load_path'],
+            load_data_from_s3=self.args['train_params']['load_data_from_s3'],
             k_folds=self.args['train_params']['n_folds'],
             train_params=self.args['train_params']
         )

@@ -45,7 +45,7 @@ class KFoldCrossValidationSchema(KFoldCrossValidationBaseSchema):
     load_data_from_s3 = argschema.fields.Bool(
         default=True,
         description='Whether to load data from s3.'
-                    'If provided, `model_inputs_path` should not need be.'
+                    'If set to `true`, `model_inputs_path` should be null'
     )
 
 

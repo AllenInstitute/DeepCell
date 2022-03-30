@@ -112,9 +112,6 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
         -------
         None
         """
-        if load_data_from_s3 and self._local_mode:
-            raise ValueError('load_data_from_s3 should only be set to `True` '
-                             'if running in a cloud environment, not locally')
         if model_inputs is not None and load_data_from_s3:
             raise ValueError('Supply either `model_inputs` or set '
                              '`load_data_from_s3` to `True`, but not both')
