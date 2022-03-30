@@ -23,21 +23,23 @@ class CloudKFoldTrainRunner(argschema.ArgSchemaParser):
         with open(self._container_path / 'train_input.json', 'w') as f:
             f.write(TrainSchema().dumps(self.args['train_params']))
 
-        # TODO add ability to load image from ECR rather than building and
-        #  uploading another one
-        ecr_uploader = ECRUploader(
-            repository_name=repository_name,
-            image_tag=image_tag,
-            profile_name=self.args['profile_name']
-        )
-        ecr_uploader.build_and_push_container(
-            dockerfile_path=self._container_path / 'Dockerfile'
-        )
+        if self.args['docker_params']['image_uri'] is None:
+            ecr_uploader = ECRUploader(
+                repository_name=repository_name,
+                image_tag=image_tag,
+                profile_name=self.args['profile_name']
+            )
+            ecr_uploader.build_and_push_container(
+                dockerfile_path=self._container_path / 'Dockerfile'
+            )
+            image_uri = ecr_uploader.image_uri
+        else:
+            image_uri = self.args['docker_params']['image_uri']
 
         tracking_params = self.args['train_params']['tracking_params']
         runner = KFoldTrainingJobRunner(
             bucket_name=self.args['s3_params']['bucket_name'],
-            image_uri=ecr_uploader.image_uri,
+            image_uri=image_uri,
             profile_name=self.args['profile_name'],
             instance_type=self.args['instance_type'],
             instance_count=self.args['instance_count'],

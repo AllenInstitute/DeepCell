@@ -17,6 +17,13 @@ class DockerSchema(argschema.ArgSchema):
         description='Image tag'
     )
 
+    image_uri = argschema.fields.Str(
+        default=None,
+        allow_none=True,
+        description='URI to a prebuild docker container on ECR. '
+                    'This URI can be obtained from ECR on AWS'
+    )
+
 
 class S3ParamsSchema(argschema.ArgSchema):
     bucket_name = argschema.fields.Str(
@@ -32,7 +39,7 @@ class KFoldCrossValidationSchema(KFoldCrossValidationBaseSchema):
 
     # Note: in `KFoldCrossValidationBaseSchema`, `model_inputs_path` should
     # always be required. But in this cloud schema, it is optional as
-    # `load_data_from_s3` can be set instead
+    # `load_data_from_s3` can be used instead
     model_inputs_path = argschema.fields.InputFile(
         default=None,
         allow_none=True,
