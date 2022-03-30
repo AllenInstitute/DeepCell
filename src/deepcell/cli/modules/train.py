@@ -55,7 +55,8 @@ class TrainRunner(argschema.ArgSchemaParser):
         trainer.train(
             train_loader=train_loader, valid_loader=valid_loader,
             eval_fold=self.args['fold'],
-            sagemaker_job_name=tracking_params['sagemaker_job_name']
+            sagemaker_job_name=tracking_params['sagemaker_job_name'],
+            mlflow_parent_run_id=tracking_params['parent_run_id']
         )
 
 

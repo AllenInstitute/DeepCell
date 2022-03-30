@@ -1,3 +1,4 @@
+import contextlib
 import os
 import time
 from pathlib import Path
@@ -126,7 +127,8 @@ class Trainer(MLFlowTrackableMixin):
               eval_fold=None,
               valid_loader: DataLoader = None,
               log_after_each_epoch=True,
-              sagemaker_job_name: Optional[str] = None) -> None:
+              sagemaker_job_name: Optional[str] = None,
+              mlflow_parent_run_id: Optional[str] = None) -> None:
         """
         Runs the training loop
         @param train_loader: train dataloader
@@ -136,22 +138,9 @@ class Trainer(MLFlowTrackableMixin):
             False disables this logging
         @param sagemaker_job_name: If running via sagemaker, pass a job name
             to log
+        @param mlflow_parent_run_id: Optional MLFlow run id to resume it
         @return: None
         """
-        if self._is_mlflow_tracking_enabled:
-            if eval_fold is not None:
-                self._create_nested_mlflow_run(
-                    run_name=f'fold-{eval_fold}',
-                    sagemaker_job_name=sagemaker_job_name)
-            else:
-                self._create_parent_mlflow_run(
-                    run_name=f'train-{int(time.time())}',
-                    sagemaker_job_name=sagemaker_job_name,
-                    # TODO this use case is not fully supported.
-                    # Need to construct hyperparams
-                    hyperparameters={}
-                )
-
         if self.model_load_path is not None:
             self._load_pretrained_model(
                 checkpoint_path=
@@ -169,93 +158,106 @@ class Trainer(MLFlowTrackableMixin):
 
         start_epoch = self.early_stopping_callback.best_epoch + 1 if \
             self.early_stopping_callback else 0
-        for epoch in range(start_epoch, self.n_epochs):
-            epoch_train_metrics = Metrics()
-            epoch_val_metrics = Metrics()
 
-            self.model.train()
-            for batch_idx, (data, target) in enumerate(train_loader):
-                # move to GPU
-                if self.use_cuda:
-                    data, target = data.cuda(), target.cuda()
+        if self._is_mlflow_tracking_enabled:
+            if mlflow_parent_run_id is None:
+                raise NotImplementedError()
+            else:
+                mlflow_parent_run = self._resume_parent_mlflow_run(
+                    run_id=mlflow_parent_run_id)
+                mlflow_run = self._create_nested_mlflow_run(
+                    run_name=f'fold-{eval_fold}',
+                    sagemaker_job_name=sagemaker_job_name)
+        else:
+            mlflow_parent_run = contextlib.nullcontext()
+            mlflow_run = contextlib.nullcontext()
 
-                self.optimizer.zero_grad()
-                output = self.model(data)
-                output = output.squeeze()
-                loss = self.criterion(output, target.float())
-                loss.backward()
-                self.optimizer.step()
+        with mlflow_parent_run:
+            with mlflow_run:
+                for epoch in range(start_epoch, self.n_epochs):
+                    epoch_train_metrics = Metrics()
+                    epoch_val_metrics = Metrics()
 
-                epoch_train_metrics.update_loss(loss=loss.item(), num_batches=len(train_loader))
-                epoch_train_metrics.update_outputs(y_true=target, y_out=output)
+                    self.model.train()
+                    for batch_idx, (data, target) in enumerate(train_loader):
+                        # move to GPU
+                        if self.use_cuda:
+                            data, target = data.cuda(), target.cuda()
 
-            self._callback_metrics['loss'][epoch] = epoch_train_metrics.loss
-            self._callback_metrics['f1'][epoch] = epoch_train_metrics.F1
-
-            if valid_loader:
-                self.model.eval()
-                for batch_idx, (data, target) in enumerate(valid_loader):
-                    # move to GPU
-                    if self.use_cuda:
-                        data, target = data.cuda(), target.cuda()
-
-                    # update the average validation loss
-                    with torch.no_grad():
+                        self.optimizer.zero_grad()
                         output = self.model(data)
                         output = output.squeeze()
                         loss = self.criterion(output, target.float())
+                        loss.backward()
+                        self.optimizer.step()
 
-                        epoch_val_metrics.update_loss(loss=loss.item(), num_batches=len(valid_loader))
-                        epoch_val_metrics.update_outputs(y_true=target, y_out=output)
+                        epoch_train_metrics.update_loss(loss=loss.item(), num_batches=len(train_loader))
+                        epoch_train_metrics.update_outputs(y_true=target, y_out=output)
 
-                self._callback_metrics['val_loss'][epoch] = \
-                    epoch_val_metrics.loss
-                self._callback_metrics['val_f1'][epoch] = \
-                    epoch_val_metrics.F1
+                    self._callback_metrics['loss'][epoch] = epoch_train_metrics.loss
+                    self._callback_metrics['f1'][epoch] = epoch_train_metrics.F1
 
-                if self.early_stopping_callback is not None:
-                    self.early_stopping_callback.on_epoch_end(
-                        epoch=epoch, metrics=self._callback_metrics)
-                    if self.early_stopping_callback.best_epoch == epoch:
-                        scheduler_state_dict = self.scheduler.state_dict() if \
-                            self.scheduler is not None else None
-                        self._current_best_state_dicts = {
-                            'model': self.model.state_dict(),
-                            'optimizer': self.optimizer.state_dict(),
-                            'scheduler': scheduler_state_dict
-                        }
-                        self.early_stopping_callback.time_since_best_epoch = 0
-                    else:
-                        self.early_stopping_callback.time_since_best_epoch += 1
-                        if self.early_stopping_callback.time_since_best_epoch \
-                                > self.early_stopping_callback.patience:
-                            logger.info('Stopping due to early stopping')
-                            self._save_model_and_performance(
-                                eval_fold=eval_fold)
-                            if self._is_mlflow_tracking_enabled:
-                                self._log_early_stopping_metrics(
-                                    best_epoch=self.early_stopping_callback.
-                                    best_epoch)
-                            self._end_mlflow_run()
-                            return
+                    if valid_loader:
+                        self.model.eval()
+                        for batch_idx, (data, target) in enumerate(valid_loader):
+                            # move to GPU
+                            if self.use_cuda:
+                                data, target = data.cuda(), target.cuda()
 
-            if self.scheduler is not None:
-                self.scheduler.step(epoch_val_metrics.loss)
+                            # update the average validation loss
+                            with torch.no_grad():
+                                output = self.model(data)
+                                output = output.squeeze()
+                                loss = self.criterion(output, target.float())
 
-            if log_after_each_epoch:
-                logger.info(f'Epoch: {epoch + 1}    '
-                            f'Train F1: {epoch_train_metrics.F1:.6f}    '
-                            f'Val F1: {epoch_val_metrics.F1:.6f}    '
-                            f'Train Loss: {epoch_train_metrics.loss:.6f}    '
-                            f'Val Loss: {epoch_val_metrics.loss:.6f}'
-                            )
-                if self._is_mlflow_tracking_enabled:
-                    self._log_epoch_end_metrics_to_mlflow(
-                        train_metrics=epoch_train_metrics,
-                        val_metrics=epoch_val_metrics,
-                        epoch=epoch)
-        self._save_model_and_performance(eval_fold=eval_fold)
-        self._end_mlflow_run()
+                                epoch_val_metrics.update_loss(loss=loss.item(), num_batches=len(valid_loader))
+                                epoch_val_metrics.update_outputs(y_true=target, y_out=output)
+
+                        self._callback_metrics['val_loss'][epoch] = \
+                            epoch_val_metrics.loss
+                        self._callback_metrics['val_f1'][epoch] = \
+                            epoch_val_metrics.F1
+
+                        if self.early_stopping_callback is not None:
+                            self.early_stopping_callback.on_epoch_end(
+                                epoch=epoch, metrics=self._callback_metrics)
+                            if self.early_stopping_callback.best_epoch == epoch:
+                                scheduler_state_dict = self.scheduler.state_dict() if \
+                                    self.scheduler is not None else None
+                                self._current_best_state_dicts = {
+                                    'model': self.model.state_dict(),
+                                    'optimizer': self.optimizer.state_dict(),
+                                    'scheduler': scheduler_state_dict
+                                }
+                                self.early_stopping_callback.time_since_best_epoch = 0
+                            else:
+                                self.early_stopping_callback.time_since_best_epoch += 1
+                                if self.early_stopping_callback.time_since_best_epoch \
+                                        > self.early_stopping_callback.patience:
+                                    logger.info('Stopping due to early stopping')
+                                    self._save_model_and_performance(
+                                        eval_fold=eval_fold)
+                                    if self._is_mlflow_tracking_enabled:
+                                        self._log_early_stopping_metrics(
+                                            best_epoch=self.early_stopping_callback.
+                                            best_epoch)
+                                    return
+
+                    if self.scheduler is not None:
+                        self.scheduler.step(epoch_val_metrics.loss)
+
+                    if log_after_each_epoch:
+                        logger.info(f'Epoch: {epoch + 1}\t'
+                                    f'Train F1: {epoch_train_metrics.F1:.6f}\t'
+                                    f'Val F1: {epoch_val_metrics.F1:.6f}\t'
+                                    f'Train Loss: {epoch_train_metrics.loss:.6f}\t'
+                                    f'Val Loss: {epoch_val_metrics.loss:.6f}')
+                        if self._is_mlflow_tracking_enabled:
+                            self._log_epoch_end_metrics_to_mlflow(
+                                train_metrics=epoch_train_metrics,
+                                val_metrics=epoch_val_metrics,
+                                epoch=epoch)
+                self._save_model_and_performance(eval_fold=eval_fold)
 
     @staticmethod
     def from_model(

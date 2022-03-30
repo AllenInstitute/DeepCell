@@ -20,3 +20,8 @@ class TrackingSchema(argschema.ArgSchema):
         description='If running in sagemaker, pass the job name to log in '
                     'MLFlow'
     )
+    parent_run_id = argschema.fields.String(
+        default=None,
+        allow_none=True,
+        description='Provide an MLFlow run id to resume it'
+    )

@@ -1,3 +1,4 @@
+import contextlib
 import json
 import logging
 import tempfile
@@ -112,6 +113,9 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
         -------
         None
         """
+        if self._local_mode:
+            if model_inputs is None:
+                raise ValueError('model_inputs is required in local mode')
         if model_inputs is not None and load_data_from_s3:
             raise ValueError('Supply either `model_inputs` or set '
                              '`load_data_from_s3` to `True`, but not both')
@@ -124,14 +128,18 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
         sagemaker_role_arn = get_sagemaker_execution_role_arn()
 
         if self._is_mlflow_tracking_enabled:
-            self._create_parent_mlflow_run(
+            mlflow_run = self._create_parent_mlflow_run(
                 run_name=f'CV-{int(time.time())}',
                 hyperparameters=train_params,
                 hyperparameters_exclude_keys=['tracking_params', 'save_path',
                                               'model_load_path',
                                               'model_inputs_path',
                                               'model_inputs', 'n_folds',
-                                              'data_load_path'])
+                                              'data_load_path',
+                                              'load_data_from_s3'])
+        else:
+            mlflow_run = contextlib.nullcontext()
+
         s3_uri = f's3://{self._bucket_name}/input_data' \
             if load_data_from_s3 else None
         if load_data_from_s3:
@@ -151,74 +159,79 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
                         bucket=self._bucket_name)
         channels = ('train', 'validation')
 
-        for k, (train_idx, test_idx) in enumerate(
-                DataSplitter.get_cross_val_split_idxs(
-                    model_inputs=model_inputs, seed=self._seed,
-                    n_splits=k_folds)):
-            train = [model_inputs[i] for i in train_idx]
-            test = [model_inputs[i] for i in test_idx]
+        with mlflow_run:
+            for k, (train_idx, test_idx) in enumerate(
+                    DataSplitter.get_cross_val_split_idxs(
+                        model_inputs=model_inputs, seed=self._seed,
+                        n_splits=k_folds)):
+                train = [model_inputs[i] for i in train_idx]
+                test = [model_inputs[i] for i in test_idx]
 
-            output_dir = f'file://{Path(self._output_dir) / str(k)}' if \
-                self._local_mode else None
-            job_name = f'deepcell-train-fold-{k}-{int(time.time())}'
-            env_vars = {
-                'fold': f'{k}',
-                'mlflow_server_uri': self._mlflow_server_uri,
-                'mlflow_experiment_name': self._mlflow_experiment_name,
-                'sagemaker_job_name': job_name
-            }
-            hyperparameters = env_vars if self._local_mode else {}
+                output_dir = f'file://{Path(self._output_dir) / str(k)}' if \
+                    self._local_mode else None
+                job_name = None if self._local_mode else \
+                    f'deepcell-train-fold-{k}-{int(time.time())}'
+                env_vars = {
+                    'fold': f'{k}',
+                    'mlflow_server_uri': self._mlflow_server_uri,
+                    'mlflow_experiment_name': self._mlflow_experiment_name,
+                    'sagemaker_job_name': job_name,
+                    'mlflow_parent_run_id':
+                        (mlflow_run.info.run_id if
+                         self._is_mlflow_tracking_enabled else None)
+                }
+                hyperparameters = env_vars if self._local_mode else {}
 
-            with tempfile.TemporaryDirectory() as temp_dir:
-                local_data_path = {c: Path(temp_dir) / c / str(k)
-                                   for c in channels}
-                if not load_data_from_s3:
-                    self._logger.info(f'Copying train model inputs to '
-                                      f'{local_data_path["train"]}')
-                    copy_model_inputs_to_dir(
-                        destination=local_data_path['train'],
-                        model_inputs=train
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    local_data_path = {c: Path(temp_dir) / c / str(k)
+                                       for c in channels}
+                    if not load_data_from_s3:
+                        self._logger.info(f'Copying train model inputs to '
+                                          f'{local_data_path["train"]}')
+                        copy_model_inputs_to_dir(
+                            destination=local_data_path['train'],
+                            model_inputs=train
+                        )
+                        self._logger.info(
+                            f'Copying validation model inputs '
+                            f'to {local_data_path["validation"]}')
+                        copy_model_inputs_to_dir(
+                            destination=local_data_path['validation'],
+                            model_inputs=test
+                        )
+                    if self._local_mode:
+                        # In local mode, we are just reading local data
+                        data_path = {k: f'file://{v}'
+                                     for k, v in local_data_path.items()}
+                    elif not load_data_from_s3:
+                        # If not reading data from S3,
+                        # we need to upload data to s3
+                        data_path = self._upload_local_data_to_s3(
+                            k=k, local_data_path=local_data_path)
+                    else:
+                        # We are loading data from s3
+                        data_path = {c: f'{s3_uri}/{c}/{k}' for c in channels}
+
+                    estimator = Estimator(
+                        sagemaker_session=sagemaker_session,
+                        role=sagemaker_role_arn,
+                        instance_count=self._instance_count,
+                        instance_type=self._instance_type,
+                        image_uri=self._image_uri,
+                        output_path=output_dir,
+                        hyperparameters=hyperparameters,
+                        volume_size=self._volume_size,
+                        max_run=self._timeout,
+                        environment=env_vars
                     )
-                    self._logger.info(f'Copying validation model inputs to '
-                                      f'{local_data_path["validation"]}')
-                    copy_model_inputs_to_dir(
-                        destination=local_data_path['validation'],
-                        model_inputs=test
+
+                    estimator.fit(
+                        inputs=data_path,
+                        # TODO change this to false to enable parallel training
+                        wait=True,
+                        job_name=job_name
                     )
-                if self._local_mode:
-                    # In local mode, we are just reading local data
-                    data_path = {k: f'file://{v}'
-                                 for k, v in local_data_path.items()}
-                elif not load_data_from_s3:
-                    # If not reading data from S3,
-                    # we need to upload data to s3
-                    data_path = self._upload_local_data_to_s3(
-                        k=k, local_data_path=local_data_path)
-                else:
-                    # We are loading data from s3
-                    data_path = {c: f'{s3_uri}/{c}/{k}' for c in channels}
-
-                estimator = Estimator(
-                    sagemaker_session=sagemaker_session,
-                    role=sagemaker_role_arn,
-                    instance_count=self._instance_count,
-                    instance_type=self._instance_type,
-                    image_uri=self._image_uri,
-                    output_path=output_dir,
-                    hyperparameters=hyperparameters,
-                    volume_size=self._volume_size,
-                    max_run=self._timeout,
-                    environment=env_vars
-                )
-
-                estimator.fit(
-                    inputs=data_path,
-                    # TODO change this to false to enable parallel training
-                    wait=True,
-                    job_name=job_name
-                )
-        self._log_cross_validation_end_metrics_to_mlflow()
-        self._end_mlflow_run()
+            self._log_cross_validation_end_metrics_to_mlflow()
 
     def _upload_local_data_to_s3(
             self,

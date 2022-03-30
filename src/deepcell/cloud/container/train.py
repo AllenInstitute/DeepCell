@@ -108,6 +108,8 @@ class TrainingRunner:
         self._train_cfg['fold'] = self._fold
         self._train_cfg['tracking_params']['sagemaker_job_name'] = \
             self._get_input_argument(name='sagemaker_job_name')
+        self._train_cfg['tracking_params']['parent_run_id'] = \
+            self._get_input_argument(name='mlflow_parent_run_id')
 
     def _get_input_argument(self, name):
         """
