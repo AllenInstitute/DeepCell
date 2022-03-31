@@ -180,6 +180,9 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
                         (mlflow_run.info.run_id if
                          self._is_mlflow_tracking_enabled else None)
                 }
+
+                # Due to
+                # https://github.com/aws/sagemaker-python-sdk/issues/2930
                 hyperparameters = env_vars if self._local_mode else {}
 
                 with tempfile.TemporaryDirectory() as temp_dir:

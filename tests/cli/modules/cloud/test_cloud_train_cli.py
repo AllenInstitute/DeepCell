@@ -25,18 +25,16 @@ class TestTrainCLI:
 
     @patch("boto3.session")
     @patch('docker.APIClient')
-    @patch.object(KFoldTrainingJobRunner, '_get_sagemaker_execution_role_arn',
-                  return_value='')
+    @patch('deepcell.cloud.train.get_sagemaker_execution_role_arn',
+           return_value='')
+    @patch.object(KFoldTrainingJobRunner, '_upload_local_data_to_s3')
     @patch.object(sagemaker.estimator.Estimator, '__init__', return_value=None)
     @patch.object(sagemaker.estimator.Estimator, 'fit')
     @patch.object(ECRUploader, '_docker_login', return_value=('', ''))
     @pytest.mark.parametrize('local_mode', [True, False])
-    def test_cli(self, _, __, ___, ____, _____, ______, local_mode):
+    def test_cli(self, _, __, ___, ____, _____, ______, _______, local_mode):
         """Smoke tests the CLI"""
-        if local_mode:
-            instance_type = None
-        else:
-            instance_type = 'mock_instance_type'
+        instance_type = 'local' if local_mode else 'ml.p3.2xlarge'
 
         with tempfile.TemporaryDirectory() as temp_path:
             with open(Path(temp_path) / 'model_inputs.json', 'w') as f:
@@ -44,19 +42,16 @@ class TestTrainCLI:
 
             with open(Path(temp_path) / 'model_inputs.json', 'r') as f:
                 train_params = {
-                    'data_params': {
-                        'model_inputs_path': f.name
-                    },
+                    'n_folds': 2,
+                    'model_inputs_path': f.name,
+                    'load_data_from_s3': False,
                     'save_path': temp_path,
                     'optimization_params': {
                         'n_epochs': 3
-                    },
-                    'test_fraction': 0.5,
-                    'n_folds': 2
+                    }
                 }
 
                 input_data = {
-                    'local_mode': local_mode,
                     'train_params': train_params,
                     'instance_type': instance_type
                 }

@@ -117,9 +117,9 @@ class MLFlowTrackableMixin:
     @staticmethod
     def _log_epoch_end_metrics_to_mlflow(train_metrics: Metrics,
                                          val_metrics: Metrics,
-                                         epoch: int):
+                                         epoch: int) -> None:
         """
-        Logs metrics
+        Logs metrics during training at the end of an epoch
         """
         mlflow.log_metric(key='train_f1', value=train_metrics.F1,
                           step=epoch)
@@ -131,7 +131,7 @@ class MLFlowTrackableMixin:
                           step=epoch)
 
     @staticmethod
-    def _log_early_stopping_metrics(best_epoch: int):
+    def _log_early_stopping_metrics(best_epoch: int) -> None:
         """
         Logs metrics when early stopping is triggered
         @param best_epoch: The best epoch, as identified by
@@ -140,7 +140,13 @@ class MLFlowTrackableMixin:
         """
         mlflow.set_tag(key='best_epoch', value=best_epoch)
 
-    def _log_cross_validation_end_metrics_to_mlflow(self):
+    def _log_cross_validation_end_metrics_to_mlflow(self) -> None:
+        """
+        Logs average cross validation metrics at the end of training
+        @return: None
+        """
+        if not self._is_mlflow_tracking_enabled:
+            return
         query = f"tags.mlflow.parentRunId = '{self._parent_run.info.run_id}'"
         results = mlflow.search_runs(filter_string=query,
                                      experiment_ids=[self._experiment_id])

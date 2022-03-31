@@ -191,6 +191,8 @@ def write_model_input_metadata_to_disk(model_inputs: List[ModelInput],
     @param path: Where to write
     @return: None
     """
+    path = Path(path)
+    os.makedirs(path.parent, exist_ok=True)
     with open(path, 'w') as f:
         f.write(json.dumps([x.to_dict() for x in model_inputs], indent=2))
 
