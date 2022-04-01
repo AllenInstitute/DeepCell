@@ -1,4 +1,3 @@
-import json
 import os.path
 from pathlib import Path
 
@@ -7,6 +6,7 @@ import marshmallow
 from marshmallow.validate import OneOf
 
 from deepcell.datasets.model_input import ModelInput
+from deepcell.datasets.exp_metadata import ExperimentMetadata
 
 
 class ModelInputSchema(argschema.ArgSchema):
@@ -53,6 +53,32 @@ class ModelInputSchema(argschema.ArgSchema):
                     data[k] = Path(v)
 
         return ModelInput(**data)
+
+
+class ExperimentMetadataSchema(argschema.ArgSchema):
+    """Defines metadata for experiments"""
+    experiment_id = argschema.fields.String(
+        required=True,
+        description='experiment_id'
+    )
+    imaging_depth = argschema.fields.Int(
+        required=True,
+        description='Depth of the experiment'
+    )
+    equipment = argschema.fields.String(
+        required=True,
+        description='Name of the equipment doing data acquisition.',
+    )
+    problem_experiment = argschema.fields.Bool(
+        required=True,
+        description='Marker that the experiment is special and should be '
+                    'considered a unique sample.',
+    )
+
+    @marshmallow.post_load
+    def make_experiment_metadata(self, data):
+        data = {k: v for k, v in data.items() if k not in ('log_level',)}
+        return ExperimentMetadata(**data)
 
 
 class DataSchema(argschema.ArgSchema):
