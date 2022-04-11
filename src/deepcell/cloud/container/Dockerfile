@@ -1,7 +1,7 @@
 # using the image from https://github.com/aws/deep-learning-containers/blob/master/available_images.md
 FROM 763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:1.10.0-gpu-py38-cu113-ubuntu20.04-e3
 
-RUN pip install git+https://github.com/AllenInstitute/DeepCell.git@ticket/18/sagemaker_train
+RUN pip install git+https://github.com/AllenInstitute/DeepCell.git
 
 ENV PATH="/opt/ml/code:${PATH}"
 
