@@ -9,7 +9,7 @@ import sagemaker
 from deepcell.cli.modules.cloud.train import CloudKFoldTrainRunner
 from deepcell.cloud.ecr import ECRUploader
 from deepcell.cloud.train import KFoldTrainingJobRunner
-from tests.util.util import get_test_data
+from deepcell.testing.util import get_test_data
 
 
 class TestTrainCLI:

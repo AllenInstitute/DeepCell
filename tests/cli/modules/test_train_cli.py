@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from deepcell.cli.modules.train import TrainRunner
-from tests.util.util import get_test_data
+from deepcell.testing.util import get_test_data
 
 
 @pytest.mark.parametrize('fold', [None, 0])

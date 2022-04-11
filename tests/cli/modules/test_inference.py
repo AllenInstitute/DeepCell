@@ -6,7 +6,7 @@ import torch
 import torchvision
 
 from deepcell.cli.modules.inference import InferenceModule
-from tests.util.util import get_test_data
+from deepcell.testing.util import get_test_data
 
 
 class TestInferenceCli:
