@@ -3,6 +3,7 @@ from marshmallow.validate import OneOf
 
 from argschema.schemas import DefaultSchema
 
+
 class ModelSchema(DefaultSchema):
     model_architecture = argschema.fields.String(
         validation=OneOf(('vgg11_bn', )),
@@ -22,6 +23,7 @@ class ModelSchema(DefaultSchema):
     )
     classifier_cfg = argschema.fields.List(
         argschema.fields.Int,
+        cli_as_single_argument=True,
         default=[],
         description='A configuration of the form '
                     '[# neurons in first layer, '
@@ -51,11 +53,4 @@ class TrainModelSchema(ModelSchema):
     dropout_prob = argschema.fields.Float(
         default=0.0,
         description='Dropout probability for fully connected layers'
-    )
-
-
-class InferenceModelSchema(ModelSchema):
-    checkpoint_path = argschema.fields.InputDir(
-        required=True,
-        description='Path to model checkpoint'
     )

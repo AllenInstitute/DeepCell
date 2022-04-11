@@ -1,11 +1,12 @@
-import logging
+import contextlib
 import os
-import sys
+import time
 from pathlib import Path
-from typing import Optional, Union, List
+from typing import Optional, Union, List, Dict
 
 import numpy as np
 import torch
+import torchvision
 from torch.utils.data import DataLoader
 
 from deepcell.callbacks.base_callback import Callback
@@ -13,18 +14,15 @@ from deepcell.callbacks.early_stopping import EarlyStopping
 from deepcell.data_splitter import DataSplitter
 from deepcell.metrics import Metrics, CVMetrics
 from deepcell.datasets.roi_dataset import RoiDataset
-
-logging.basicConfig(
-    stream=sys.stdout,
-    level=logging.INFO,
-    format='%(levelname)s:\t%(asctime)s\t%(message)s',
-    datefmt='%m/%d/%Y %I:%M:%S %p'
-)
-
-logger = logging.getLogger(__name__)
+from deepcell.tracking.mlflow_utils import MLFlowTrackableMixin
+from deepcell.models.classifier import Classifier
+from deepcell.logger import init_logger
 
 
-class Trainer:
+logger = init_logger(__name__)
+
+
+class Trainer(MLFlowTrackableMixin):
     def __init__(
             self,
             model: torch.nn.Module,
@@ -34,7 +32,10 @@ class Trainer:
             save_path: Union[str, Path],
             scheduler: Optional["torch.optim.lr_scheduler._LRScheduler"] = None, # noqa E501
             callbacks: Optional[List[Callback]] = None,
-            model_load_path: Optional[Union[str, Path]] = None):
+            model_load_path: Optional[Union[str, Path]] = None,
+            mlflow_server_uri: Optional[str] = None,
+            mlflow_experiment_name: str = 'deepcell-train'
+    ):
         """
         The driver for the training and evaluation loop
         Args:
@@ -55,7 +56,15 @@ class Trainer:
             model_load_path:
                 Path to load a pretrained model. Activates continuation of
                 training
+            mlflow_server_uri
+                Optional MLFlow server URI. If provided, will log to MLFlow
+                during training
+            mlflow_experiment_name
+                Optional MLFlow experiment name. If not provided, will use the
+                default MLFlow experiment
         """
+        super().__init__(server_uri=mlflow_server_uri,
+                         experiment_name=mlflow_experiment_name)
         self.n_epochs = n_epochs
         self.model = model
         self.optimizer = optimizer
@@ -113,8 +122,25 @@ class Trainer:
 
         return cv_metrics
 
-    def train(self, train_loader: DataLoader, eval_fold=None, valid_loader: DataLoader = None,
-              log_after_each_epoch=True):
+    def train(self,
+              train_loader: DataLoader,
+              eval_fold=None,
+              valid_loader: DataLoader = None,
+              log_after_each_epoch=True,
+              sagemaker_job_name: Optional[str] = None,
+              mlflow_parent_run_id: Optional[str] = None) -> None:
+        """
+        Runs the training loop
+        @param train_loader: train dataloader
+        @param eval_fold: If using kfold, which fold is this
+        @param valid_loader: validation dataloader
+        @param log_after_each_epoch: Whether to log after each epoch.
+            False disables this logging
+        @param sagemaker_job_name: If running via sagemaker, pass a job name
+            to log
+        @param mlflow_parent_run_id: Optional MLFlow run id to resume it
+        @return: None
+        """
         if self.model_load_path is not None:
             self._load_pretrained_model(
                 checkpoint_path=
@@ -132,81 +158,176 @@ class Trainer:
 
         start_epoch = self.early_stopping_callback.best_epoch + 1 if \
             self.early_stopping_callback else 0
-        for epoch in range(start_epoch, self.n_epochs):
-            epoch_train_metrics = Metrics()
-            epoch_val_metrics = Metrics()
 
-            self.model.train()
-            for batch_idx, (data, target) in enumerate(train_loader):
-                # move to GPU
-                if self.use_cuda:
-                    data, target = data.cuda(), target.cuda()
+        if self._is_mlflow_tracking_enabled:
+            if mlflow_parent_run_id is None:
+                raise NotImplementedError()
+            else:
+                mlflow_parent_run = self._resume_parent_mlflow_run(
+                    run_id=mlflow_parent_run_id)
+                mlflow_run = self._create_nested_mlflow_run(
+                    run_name=f'fold-{eval_fold}',
+                    sagemaker_job_name=sagemaker_job_name)
+        else:
+            mlflow_parent_run = contextlib.nullcontext()
+            mlflow_run = contextlib.nullcontext()
 
-                self.optimizer.zero_grad()
-                output = self.model(data)
-                output = output.squeeze()
-                loss = self.criterion(output, target.float())
-                loss.backward()
-                self.optimizer.step()
+        with mlflow_parent_run:
+            with mlflow_run:
+                for epoch in range(start_epoch, self.n_epochs):
+                    epoch_train_metrics = Metrics()
+                    epoch_val_metrics = Metrics()
 
-                epoch_train_metrics.update_loss(loss=loss.item(), num_batches=len(train_loader))
-                epoch_train_metrics.update_outputs(y_true=target, y_out=output)
+                    self.model.train()
+                    for batch_idx, (data, target) in enumerate(train_loader):
+                        # move to GPU
+                        if self.use_cuda:
+                            data, target = data.cuda(), target.cuda()
 
-            self._callback_metrics['loss'][epoch] = epoch_train_metrics.loss
-            self._callback_metrics['f1'][epoch] = epoch_train_metrics.F1
-
-            if valid_loader:
-                self.model.eval()
-                for batch_idx, (data, target) in enumerate(valid_loader):
-                    # move to GPU
-                    if self.use_cuda:
-                        data, target = data.cuda(), target.cuda()
-
-                    # update the average validation loss
-                    with torch.no_grad():
+                        self.optimizer.zero_grad()
                         output = self.model(data)
                         output = output.squeeze()
                         loss = self.criterion(output, target.float())
+                        loss.backward()
+                        self.optimizer.step()
 
-                        epoch_val_metrics.update_loss(loss=loss.item(), num_batches=len(valid_loader))
-                        epoch_val_metrics.update_outputs(y_true=target, y_out=output)
+                        epoch_train_metrics.update_loss(loss=loss.item(), num_batches=len(train_loader))
+                        epoch_train_metrics.update_outputs(y_true=target, y_out=output)
 
-                self._callback_metrics['val_loss'][epoch] = \
-                    epoch_val_metrics.loss
-                self._callback_metrics['val_f1'][epoch] = \
-                    epoch_val_metrics.F1
+                    self._callback_metrics['loss'][epoch] = epoch_train_metrics.loss
+                    self._callback_metrics['f1'][epoch] = epoch_train_metrics.F1
 
-                if self.early_stopping_callback is not None:
-                    self.early_stopping_callback.on_epoch_end(
-                        epoch=epoch, metrics=self._callback_metrics)
-                    if self.early_stopping_callback.best_epoch == epoch:
-                        scheduler_state_dict = self.scheduler.state_dict() if \
-                            self.scheduler is not None else None
-                        self._current_best_state_dicts = {
-                            'model': self.model.state_dict(),
-                            'optimizer': self.optimizer.state_dict(),
-                            'scheduler': scheduler_state_dict
-                        }
-                        self.early_stopping_callback.time_since_best_epoch = 0
-                    else:
-                        self.early_stopping_callback.time_since_best_epoch += 1
-                        if self.early_stopping_callback.time_since_best_epoch \
-                                > self.early_stopping_callback.patience:
-                            logger.info('Stopping due to early stopping')
-                            self._save_model_and_performance(
-                                eval_fold=eval_fold)
-                            return
+                    if valid_loader:
+                        self.model.eval()
+                        for batch_idx, (data, target) in enumerate(valid_loader):
+                            # move to GPU
+                            if self.use_cuda:
+                                data, target = data.cuda(), target.cuda()
 
-            if self.scheduler is not None:
-                self.scheduler.step(epoch_val_metrics.loss)
+                            # update the average validation loss
+                            with torch.no_grad():
+                                output = self.model(data)
+                                output = output.squeeze()
+                                loss = self.criterion(output, target.float())
 
-            if log_after_each_epoch:
-                logger.info(f'Epoch: {epoch + 1} \t'
-                            f'Train F1: {epoch_train_metrics.F1:.6f} \t'
-                            f'Val F1: {epoch_val_metrics.F1:.6f}\t'
-                            f'Val Loss: {epoch_val_metrics.loss}'
-                            )
-        self._save_model_and_performance(eval_fold=eval_fold)
+                                epoch_val_metrics.update_loss(loss=loss.item(), num_batches=len(valid_loader))
+                                epoch_val_metrics.update_outputs(y_true=target, y_out=output)
+
+                        self._callback_metrics['val_loss'][epoch] = \
+                            epoch_val_metrics.loss
+                        self._callback_metrics['val_f1'][epoch] = \
+                            epoch_val_metrics.F1
+
+                        if self.early_stopping_callback is not None:
+                            self.early_stopping_callback.on_epoch_end(
+                                epoch=epoch, metrics=self._callback_metrics)
+                            if self.early_stopping_callback.best_epoch == epoch:
+                                scheduler_state_dict = self.scheduler.state_dict() if \
+                                    self.scheduler is not None else None
+                                self._current_best_state_dicts = {
+                                    'model': self.model.state_dict(),
+                                    'optimizer': self.optimizer.state_dict(),
+                                    'scheduler': scheduler_state_dict
+                                }
+                                self.early_stopping_callback.time_since_best_epoch = 0
+                            else:
+                                self.early_stopping_callback.time_since_best_epoch += 1
+                                if self.early_stopping_callback.time_since_best_epoch \
+                                        > self.early_stopping_callback.patience:
+                                    logger.info('Stopping due to early stopping')
+                                    self._save_model_and_performance(
+                                        eval_fold=eval_fold)
+                                    if self._is_mlflow_tracking_enabled:
+                                        self._log_early_stopping_metrics(
+                                            best_epoch=self.early_stopping_callback.
+                                            best_epoch)
+                                    return
+
+                    if self.scheduler is not None:
+                        self.scheduler.step(epoch_val_metrics.loss)
+
+                    if log_after_each_epoch:
+                        logger.info(f'Epoch: {epoch + 1}\t'
+                                    f'Train F1: {epoch_train_metrics.F1:.6f}\t'
+                                    f'Val F1: {epoch_val_metrics.F1:.6f}\t'
+                                    f'Train Loss: {epoch_train_metrics.loss:.6f}\t'
+                                    f'Val Loss: {epoch_val_metrics.loss:.6f}')
+                        if self._is_mlflow_tracking_enabled:
+                            self._log_epoch_end_metrics_to_mlflow(
+                                train_metrics=epoch_train_metrics,
+                                val_metrics=epoch_val_metrics,
+                                epoch=epoch)
+                self._save_model_and_performance(eval_fold=eval_fold)
+
+    @staticmethod
+    def from_model(
+            model_architecture: str,
+            use_pretrained_model: bool,
+            classifier_cfg: List[int],
+            save_path: Path,
+            n_epochs: int,
+            learning_rate: float,
+            early_stopping_params: Dict,
+            dropout_prob: float = 0.0,
+            truncate_to_layer: Optional[int] = None,
+            freeze_to_layer: Optional[int] = None,
+            model_load_path: Optional[Path] = None,
+            weight_decay: float = 0.0,
+            learning_rate_scheduler: Optional[Dict] = None,
+            mlflow_server_uri: Optional[str] = None,
+            mlflow_experiment_name: str = 'deepcell-train'
+    ) -> "Trainer":
+        """
+        Instantiates a Trainer. See `deepcell.trainer` constructor for
+        details on the input arguments
+        """
+        model = getattr(
+            torchvision.models,
+            model_architecture)(
+            pretrained=use_pretrained_model,
+            progress=False)
+
+        model = Classifier(
+            model=model,
+            truncate_to_layer=truncate_to_layer,
+            freeze_up_to_layer=freeze_to_layer,
+            classifier_cfg=classifier_cfg,
+            dropout_prob=dropout_prob)
+
+        optimizer = torch.optim.Adam(
+            model.parameters(),
+            lr=learning_rate,
+            weight_decay=weight_decay)
+        if learning_rate_scheduler is not None:
+            scheduler = getattr(
+                torch.optim.lr_scheduler,
+                learning_rate_scheduler['type'])(
+                optimizer=optimizer,
+                mode='min',
+                patience=learning_rate_scheduler['patience'],
+                factor=learning_rate_scheduler['factor'],
+                verbose=True
+            )
+        else:
+            scheduler = None
+        trainer = Trainer(
+            model=model,
+            n_epochs=n_epochs,
+            criterion=torch.nn.BCEWithLogitsLoss(),
+            optimizer=optimizer,
+            save_path=save_path,
+            scheduler=scheduler,
+            callbacks=[
+                EarlyStopping(
+                    best_metric=early_stopping_params['monitor'],
+                    patience=early_stopping_params['patience']
+                )
+            ],
+            model_load_path=model_load_path,
+            mlflow_server_uri=mlflow_server_uri,
+            mlflow_experiment_name=mlflow_experiment_name
+        )
+        return trainer
 
     def _reset(self):
         # reset model weights

@@ -1,8 +1,11 @@
-from typing import List
+from typing import List, Tuple
 
+import torchvision.transforms
 from PIL import Image
 import numpy as np
 from torch.utils.data import Dataset
+from torchvision import transforms
+import imgaug.augmenters as iaa
 
 from deepcell.datasets.model_input import ModelInput
 from deepcell.datasets.util import center_roi
@@ -64,7 +67,7 @@ class RoiDataset(Dataset):
         self.transform = transform
         self._exclude_mask = exclude_mask
         self._mask_out_projections = mask_out_projections
-        self._y = np.array([int(x.label == 'cell') for x in self._model_inputs])
+        self._y = self.get_numeric_labels(model_inputs=model_inputs)
         self._use_correlation_projection = use_correlation_projection
         self._center_roi_centroid = center_roi_centroid
         self._centroid_brightness_quantile = centroid_brightness_quantile
@@ -90,6 +93,70 @@ class RoiDataset(Dataset):
     @property
     def y(self) -> np.ndarray:
         return self._y
+
+    @staticmethod
+    def get_default_transforms(
+            crop_size: Tuple[int, int],
+            is_train: bool
+    ) -> Transform:
+        """
+        Gets the default transforms
+
+        Parameters
+        ----------
+        crop_size
+            Crop size
+        is_train
+            Whether this is a train or test dataset
+        Returns
+        -------
+        Transform
+        """
+        width, height = crop_size
+        if is_train:
+            all_transform = transforms.Compose([
+                iaa.Sequential([
+                    iaa.Affine(
+                        rotate=[0, 90, 180, 270, -90, -180, -270], order=0
+                    ),
+                    iaa.Fliplr(0.5),
+                    iaa.Flipud(0.5),
+                    iaa.CenterCropToFixedSize(height=height, width=width),
+                ]).augment_image,
+                transforms.ToTensor(),
+                # imagenet channel-wise mean/std
+                transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
+            ])
+
+            return Transform(all_transform=all_transform)
+        else:
+            all_transform = transforms.Compose([
+                iaa.Sequential([
+                    iaa.CenterCropToFixedSize(height=height, width=width)
+                ]).augment_image,
+                transforms.ToTensor(),
+                # imagenet channel-wise mean/std
+                transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
+            ])
+
+            return Transform(all_transform=all_transform)
+
+    @staticmethod
+    def get_numeric_labels(model_inputs: List[ModelInput]) -> np.ndarray:
+        """
+        Returns np.ndarray of labels encoded as int
+
+        Parameters
+        ----------
+        model_inputs: list of ModelInput
+
+        Returns
+        -------
+        np array of labels encoded as int
+        """
+        return np.array([int(x.label == 'cell') for x in model_inputs])
 
     def __getitem__(self, index):
         obs = self._model_inputs[index]

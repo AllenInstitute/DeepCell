@@ -1,5 +1,8 @@
+import json
+import os
+import shutil
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional, Union, List
 
 
 class ModelInput:
@@ -143,3 +146,71 @@ class ModelInput:
             max_projection_path=max_path,
             roi_id=roi_id
         )
+
+    def copy(self, destination: Path) -> None:
+        """
+        Copies to destination
+
+        Parameters
+        ----------
+        destination: where to copy
+
+        Returns
+        -------
+        None
+
+        """
+        shutil.copy(self.mask_path, destination)
+        shutil.copy(self.max_projection_path, destination)
+        if self.correlation_projection_path is not None:
+            shutil.copy(self.correlation_projection_path, destination)
+        if self.avg_projection_path is not None:
+            shutil.copy(self.avg_projection_path, destination)
+
+    def to_dict(self) -> dict:
+        return {
+            'experiment_id': self._experiment_id,
+            'roi_id': self._roi_id,
+            'mask_path': str(self._mask_path),
+            'max_projection_path': str(self._max_projection_path),
+            'avg_projection_path':
+                str(self._avg_projection_path) if self._avg_projection_path
+                else None,
+            'correlation_projection_path':
+                str(self._correlation_projection_path) if
+                self._correlation_projection_path else None,
+            'label': self._label
+        }
+
+
+def write_model_input_metadata_to_disk(model_inputs: List[ModelInput],
+                                       path: Union[str, Path]) -> None:
+    """
+    Writes a list of ModelInput to disk
+    @param model_inputs: list of model inputs
+    @param path: Where to write
+    @return: None
+    """
+    path = Path(path)
+    os.makedirs(path.parent, exist_ok=True)
+    with open(path, 'w') as f:
+        f.write(json.dumps([x.to_dict() for x in model_inputs], indent=2))
+
+
+def copy_model_inputs_to_dir(
+        destination: Path,
+        model_inputs: List[ModelInput]) -> None:
+    """Copies model inputs and metadata to `destination`
+    @param destination: Destination
+    @param model_inputs: List[ModelInput]
+    """
+    os.makedirs(destination, exist_ok=True)
+
+    # Copy model inputs
+    for model_input in model_inputs:
+        model_input.copy(destination=destination)
+
+    # Copy metadata
+    write_model_input_metadata_to_disk(
+        model_inputs=model_inputs,
+        path=destination / 'model_inputs.json')

@@ -14,5 +14,6 @@ setup(
       package_dir={"": "src"},
       packages=find_packages(where="src"),
       setup_requires=["setuptools_scm"],
-      install_requires=required
+      install_requires=required,
+      include_package_data=True
 )

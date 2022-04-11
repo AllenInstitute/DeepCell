@@ -1,23 +1,21 @@
 import argschema
 
-from deepcell.cli.schemas.data import InferenceDataSchema
-from deepcell.cli.schemas.model import InferenceModelSchema
+from deepcell.cli.schemas.base import BaseSchema
+from deepcell.cli.schemas.model import ModelSchema
 
 
-class InferenceSchema(argschema.ArgSchema):
+class InferenceSchema(BaseSchema):
+    model_inputs_path = argschema.fields.InputFile(
+        required=True,
+        description='Path to json file for input examples where each '
+                    'instance has schema given by '
+                    '`deepcell.cli.schemas.data.ModelInputSchema`'
+    )
     experiment_id = argschema.fields.String(
         required=True,
         description='What experiment to run inference on'
     )
-    data_params = argschema.fields.Nested(
-        InferenceDataSchema,
-        default={}
-    )
     model_params = argschema.fields.Nested(
-        InferenceModelSchema,
+        ModelSchema,
         default={}
-    )
-    out_dir = argschema.fields.OutputDir(
-        required=True,
-        description='Where to save predictions'
     )

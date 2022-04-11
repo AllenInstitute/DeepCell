@@ -1,11 +1,12 @@
 import argschema
 
-from deepcell.cli.schemas.data import TrainDataSchema
+from deepcell.cli.schemas.base import BaseSchema
 from deepcell.cli.schemas.model import TrainModelSchema
 from deepcell.cli.schemas.optimization import OptimizationSchema
+from deepcell.cli.schemas.tracking import TrackingSchema
 
 
-class TrainSchema(argschema.ArgSchema):
+class _TrainSchema(BaseSchema):
     model_params = argschema.fields.Nested(
         TrainModelSchema,
         default={}
@@ -14,27 +15,34 @@ class TrainSchema(argschema.ArgSchema):
         OptimizationSchema,
         default={}
     )
-    data_params = argschema.fields.Nested(
-        TrainDataSchema,
-        required=True
+    tracking_params = argschema.fields.Nested(
+        TrackingSchema,
+        default={}
     )
-    save_path = argschema.fields.OutputDir(
+
+
+class TrainSchema(_TrainSchema, BaseSchema):
+    train_model_inputs_path = argschema.fields.InputFile(
         required=True,
-        description='Where to save model and all outputs'
+        description='Path to json file for training examples where each '
+                    'instance has schema given by '
+                    '`deepcell.cli.schemas.data.ModelInputSchema`'
     )
-    model_load_path = argschema.fields.InputDir(
+    validation_model_inputs_path = argschema.fields.InputFile(
+        required=True,
+        description='Path to json file for validation examples where each '
+                    'instance has schema given by '
+                    '`deepcell.cli.schemas.data.ModelInputSchema`'
+    )
+    fold = argschema.fields.Int(
         default=None,
         allow_none=True,
-        description='Path to load a model checkpoint to continue training'
+        description='Which fold is being trained. Leave as None if not '
+                    'training using kfold CV'
     )
-    test_fraction = argschema.fields.Float(
-        default=0.3,
-        description='Fraction of data to reserve for the test set'
-    )
-    batch_size = argschema.fields.Int(
-        default=64,
-        description='Batch size'
-    )
+
+
+class KFoldCrossValidationSchema(_TrainSchema, BaseSchema):
     n_folds = argschema.fields.Int(
         default=5,
         description='Number of folds for cross validation'
