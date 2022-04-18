@@ -117,4 +117,3 @@ class TestTrainer:
                         [:trainer.early_stopping_callback.best_epoch + 1] ==
                         (trainer_continue._callback_metrics[k]
                         [:trainer.early_stopping_callback.best_epoch + 1]))
-
