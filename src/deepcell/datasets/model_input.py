@@ -84,10 +84,8 @@ class ModelInput:
 
     @classmethod
     def from_data_dir(cls, data_dir: Union[str, Path], experiment_id: str,
-                      roi_id: str):
-        """Instantiate a ModelInput from a data_dir
-        This should be used at test time to construct inputs from a data_dir
-        There are no labels in this scenario
+                      roi_id: str, label: Optional[str] = None):
+        """Instantiate a ModelInput from a data_dir.
 
         Args:
             data_dir:
@@ -96,6 +94,8 @@ class ModelInput:
                 Experiment id
             roi_id
                 ROI id
+            label
+                Label of roi either "cell" or "not cell".
         """
         def get_path(data_dir: Path, artifact_type: str, experiment_id: str,
                      roi_id: str):
@@ -144,7 +144,8 @@ class ModelInput:
             mask_path=mask_path,
             correlation_projection_path=correlation_projection_path,
             max_projection_path=max_path,
-            roi_id=roi_id
+            roi_id=roi_id,
+            label=label
         )
 
     def copy(self, destination: Path) -> None:

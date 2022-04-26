@@ -89,7 +89,7 @@ class RoiDataset(Dataset):
     @property
     def model_inputs(self) -> List[ModelInput]:
         return self._model_inputs
-    
+
     @property
     def y(self) -> np.ndarray:
         return self._y
