@@ -159,6 +159,8 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
                         bucket=self._bucket_name)
         channels = ('train', 'validation')
 
+        training_jobs = []
+
         with mlflow_run:
             for k, (train_idx, test_idx) in enumerate(
                     DataSplitter.get_cross_val_split_idxs(
@@ -230,10 +232,15 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
 
                     estimator.fit(
                         inputs=data_path,
-                        # TODO change this to false to enable parallel training
-                        wait=True,
+                        wait=False,
                         job_name=job_name
                     )
+                    training_jobs.append(job_name)
+
+                    # sleeps to avoid Sagemaker Training Job API throttling
+                    time.sleep(5)
+            self._wait_until_training_jobs_have_finished(
+                training_jobs=training_jobs)
             self._log_cross_validation_end_metrics_to_mlflow()
 
     def _upload_local_data_to_s3(
@@ -292,3 +299,25 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
             model_inputs = json.load(f)
         model_inputs = [ModelInput(**x) for x in model_inputs]
         return model_inputs
+
+    def _wait_until_training_jobs_have_finished(
+            self, training_jobs: List[str]):
+        """Blocks until all training jobs have completed
+
+          Args:
+             training_jobs: array of submitted training job names
+
+        """
+        all_jobs_done = False
+        while not all_jobs_done:
+            completed_jobs = 0
+            for job in training_jobs:
+                job_detail = self._sagemaker_session.sagemaker_client\
+                    .describe_training_job(TrainingJobName=job)
+                job_status = job_detail['TrainingJobStatus']
+                if job_status.lower() in ('completed', 'failed', 'stopped'):
+                    completed_jobs += 1
+            if completed_jobs == len(training_jobs):
+                all_jobs_done = True
+            else:
+                time.sleep(30)
