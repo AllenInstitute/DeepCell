@@ -27,12 +27,15 @@ class TestTrainCLI:
     @patch('docker.APIClient')
     @patch('deepcell.cloud.train.get_sagemaker_execution_role_arn',
            return_value='')
+    @patch.object(KFoldTrainingJobRunner,
+                  '_wait_until_training_jobs_have_finished')
     @patch.object(KFoldTrainingJobRunner, '_upload_local_data_to_s3')
     @patch.object(sagemaker.estimator.Estimator, '__init__', return_value=None)
     @patch.object(sagemaker.estimator.Estimator, 'fit')
     @patch.object(ECRUploader, '_docker_login', return_value=('', ''))
     @pytest.mark.parametrize('local_mode', [True, False])
-    def test_cli(self, _, __, ___, ____, _____, ______, _______, local_mode):
+    def test_cli(self, _, __, ___, ____, _____, ______, _______, ________,
+                 local_mode):
         """Smoke tests the CLI"""
         instance_type = 'local' if local_mode else 'ml.p3.2xlarge'
 
