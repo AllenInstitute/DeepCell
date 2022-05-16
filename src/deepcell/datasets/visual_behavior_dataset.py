@@ -95,16 +95,16 @@ class VisualBehaviorDataset:
             self._download_files()
         else:
             is_already_downloaded = self._are_files_already_downloaded()
-            if download and not is_already_downloaded:
-                self._logger.info('Downloading dataset')
-                self._download_dataset(artifact_dirs=artifact_dirs)
+            if download:
+                if not is_already_downloaded:
+                    self._logger.info('Downloading dataset')
+                    self._download_dataset(artifact_dirs=artifact_dirs)
 
-                self._logger.info('Renaming artifacts')
-                self._rename_artifacts()
-            else:
-                self._logger.info('Dataset already downloaded...')
-
-        self._validate_all_files_exist()
+                    self._logger.info('Renaming artifacts')
+                    self._rename_artifacts()
+                else:
+                    self._logger.info('Dataset already downloaded...')
+                self._validate_all_files_exist()
 
     @property
     def dataset(self) -> List[ModelInput]:
