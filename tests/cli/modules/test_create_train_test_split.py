@@ -165,18 +165,10 @@ class TestTrainTestSplitCli:
             test_rois = json.load(jfile)
 
         for roi_idx, roi in enumerate(train_rois):
-            if roi_idx > 0:
-                assert roi['label'] == 'not cell'
-            else:
-                assert roi['label'] == 'cell'
             assert roi['roi_id'] == str(roi_idx)
             assert roi['experiment_id'] == '0'
 
         for roi_idx, roi in enumerate(test_rois):
-            if roi_idx > 0:
-                assert roi['label'] == 'not cell'
-            else:
-                assert roi['label'] == 'cell'
             assert roi['roi_id'] == str(roi_idx)
             assert roi['experiment_id'] == '1'
 

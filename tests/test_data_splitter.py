@@ -101,7 +101,7 @@ def test_experiment_binning():
         DataSplitter(model_inputs=model_inputs,
                      experiment_metadatas=exp_inputs,
                      seed=1234)
-    exp_bin_ids = data_splitter._get_experiment_groups_for_stratified_split(
+    exp_bin_ids, _ = data_splitter._get_experiment_groups_for_stratified_split(
         experiment_metadatas=exp_inputs,
         n_depth_bins=n_depth_bins)
     assert (exp_bin_ids == 0).sum() == n_exp
