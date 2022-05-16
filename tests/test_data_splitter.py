@@ -32,7 +32,7 @@ def test_ids_different():
     train, test = data_splitter.get_train_test_split(test_size=.3,
                                                      full_dataset=model_inputs,
                                                      exp_metas=exp_inputs,
-                                                     depth_bins=2)
+                                                     n_depth_bins=2)
     assert len(set([x.roi_id for x in train.model_inputs]).intersection(
         [x.roi_id for x in test.model_inputs])) == 0
     for train, val in data_splitter.get_cross_val_split(train_dataset=train):
@@ -103,7 +103,6 @@ def test_experiment_binning():
                      seed=1234)
     exp_bin_ids = data_splitter._get_experiment_groups_for_stratified_split(
         experiment_metadatas=exp_inputs,
-        exp_ids=np.arange(len(exp_inputs), dtype=int),
         n_depth_bins=n_depth_bins)
     assert (exp_bin_ids == 0).sum() == n_exp
     assert (exp_bin_ids == 1).sum() == n_exp / n_depth_bins

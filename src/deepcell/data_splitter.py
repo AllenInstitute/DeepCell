@@ -78,7 +78,6 @@ class DataSplitter:
     @staticmethod
     def _get_experiment_groups_for_stratified_split(
             experiment_metadatas: List[ExperimentMetadata],
-            exp_ids: np.ndarray,
             n_depth_bins: int):
         """Bin up input experiment data into bins of depth and "problem"
         experiments.
@@ -87,9 +86,6 @@ class DataSplitter:
         ---------
         experiment_metadatas : List[ExperimentMetadata]
             Set of experiment metadatas to stratify.
-        exp_ids : np.ndarray
-            Array of input experiment ids. Must have same order as
-            ``experiment_metadatas``.
         n_depth_bins
             Number of of bins to split by experiment depth. Bins are
             selected to have an equal number of experiments in each bin.
@@ -117,20 +113,22 @@ class DataSplitter:
         # from 1 to n_depth_bins.
         bin_edges = np.linspace(depths[exp_bin_ids < 0].min() - 1e-8,
                                 depths[exp_bin_ids < 0].max() + 1e-8,
-                                n_depth_bins + 1)
+                                num=n_depth_bins + 1)
         bin_ids = np.digitize(depths[exp_bin_ids < 0], bin_edges)
         exp_bin_ids[exp_bin_ids < 0] = bin_ids
 
-        return exp_bin_ids
+        return exp_bin_ids, bin_edges
 
     @staticmethod
-    def _convert_exp_index_to_roi_index(exp_ids: np.ndarray,
-                                        exp_indices: List[int],
-                                        full_dataset: List[ModelInput]):
+    def _convert_exp_index_to_roi_index(
+            exp_ids: np.ndarray,
+            exp_indices: List[int],
+            full_dataset: List[ModelInput]
+    ) -> np.ndarray:
         """Given a set of indices in the the experiment list, find all
         ROIs that are in the experiments.
 
-        Paramaters
+        Parameters
         ----------
         exp_ids : np.ndarray
             Full set of experiment ids
@@ -141,21 +139,22 @@ class DataSplitter:
 
         Returns
         -------
-        artifacts : List[ModelInput]
+        roi_indexes : np.ndarray
             Subset of ROIs that are within the selected experiments.
         """
         selected_experiments = exp_ids[exp_indices]
-        artifacts = []
+        roi_indexes = []
         for idx, data in enumerate(full_dataset):
             if np.isin(int(data.experiment_id), selected_experiments):
-                artifacts.append(idx)
-        return artifacts
+                roi_indexes.append(idx)
+        roi_indexes = np.array(roi_indexes)
+        return roi_indexes
 
     def get_train_test_split(self,
                              test_size: float,
                              full_dataset: List[ModelInput],
                              exp_metas: List[ExperimentMetadata],
-                             depth_bins: int = 5):
+                             n_depth_bins: int = 5):
         """Create a train/test split ofROIs by experiment preserving the
         fraction in bins of depth, experiment type (2P vs 3P), and identified
         problem/special experiments.
@@ -179,8 +178,8 @@ class DataSplitter:
         """
         exp_ids = np.array([int(exp_meta['experiment_id'])
                             for exp_meta in exp_metas], dtype='uint64')
-        exp_bin_ids = self._get_experiment_groups_for_stratified_split(
-            exp_metas, exp_ids, depth_bins)
+        exp_bin_ids, _ = self._get_experiment_groups_for_stratified_split(
+            experiment_metadatas=exp_metas, n_depth_bins=n_depth_bins)
         sss = StratifiedShuffleSplit(n_splits=1,
                                      test_size=test_size,
                                      random_state=self.seed)

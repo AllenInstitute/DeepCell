@@ -36,7 +36,7 @@ class CreateTrainTestSplitInputSchema(ArgSchema):
     )
     vote_threshold = fields.Float(
         required=True,
-        default=1,
+        default=0.5,
         description="Fraction of labelers that must agree on a label for the "
                     "ROI to be considered a 'cell'",
     )
@@ -99,9 +99,6 @@ class CreateTrainTestSplitInputSchema(ArgSchema):
                 label = self._tally_votes(
                     roi_id=roi_id,
                     region_labels=region_labels,
-                    n_labelers=n_labelers,
-                    min_labelers_per_region=\
-                        data['min_labelers_required_per_region'],
                     vote_threshold=data['vote_threshold'])
 
                 # Create the output model input for the ROI.
@@ -117,9 +114,7 @@ class CreateTrainTestSplitInputSchema(ArgSchema):
     @staticmethod
     def _tally_votes(roi_id: int,
                      region_labels: List[pd.DataFrame],
-                     n_labelers: int,
-                     min_labelers_per_region: int,
-                     vote_threshold: int):
+                     vote_threshold: float):
         """Loop through labels and return a label of "cell" or "not cell" given
         the votes of the labelers.
 
@@ -130,10 +125,6 @@ class CreateTrainTestSplitInputSchema(ArgSchema):
         region_labels : List[pandas.DataFrame]
             Set of labels for all ROIs from all labelers over the region.
             DataFrames must be indexed by ``roi_id`` values.
-        n_lablers : int
-            Number of labels submitted for the region/ROI.
-        min_labelers_per_region : int
-            Number of labelers required to consider region.
         vote_threshold :  float
             Fraction of votes for "cell" to return a label for the ROI of
             "cell".
@@ -143,13 +134,14 @@ class CreateTrainTestSplitInputSchema(ArgSchema):
         label : str
             Label for ROI. "cell" or "not cell"
         """
-        n_votes = 0
+        n_cell_votes = 0
+        n_total_votes = 0
         label = 'not cell'
         for roi_labeler in region_labels:
             if roi_labeler.loc[roi_id, 'label'] == 'cell':
-                n_votes += 1
-        if n_votes >= min_labelers_per_region \
-           or n_votes / n_labelers >= vote_threshold:
+                n_cell_votes += 1
+            n_total_votes += 1
+        if n_cell_votes / n_total_votes > vote_threshold:
             label = 'cell'
         return label
 
@@ -199,7 +191,7 @@ class CreateTrainTestSplit(ArgSchemaParser):
             test_size=self.args['test_size'],
             full_dataset=model_inputs,
             exp_metas=self.args['experiment_metadata'],
-            depth_bins=self.args['n_depth_bins'])
+            n_depth_bins=self.args['n_depth_bins'])
 
         train_dicts = [model_roi.to_dict()
                        for model_roi in train_rois.model_inputs]
