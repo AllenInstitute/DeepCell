@@ -2,7 +2,8 @@ from typing import Dict
 
 import numpy as np
 import torch
-from sklearn.metrics import average_precision_score, f1_score
+from sklearn.metrics import average_precision_score, f1_score, precision_score, \
+    recall_score
 
 
 class Metrics:
@@ -15,12 +16,30 @@ class Metrics:
         self.y_trues = []
 
     @property
-    def F1(self):
+    def F1(self) -> float:
         y_pred = np.array(self.y_scores) > 0.5
         y_pred = y_pred.astype('int')
         f1 = f1_score(y_true=self.y_trues, y_pred=y_pred,
                       zero_division=0)
         return f1
+
+    @property
+    def precision(self) -> float:
+        y_pred = np.array(self.y_scores) > 0.5
+        y_pred = y_pred.astype('int')
+        precision = precision_score(
+            y_true=self.y_trues, y_pred=y_pred,
+            zero_division=0)
+        return precision
+
+    @property
+    def recall(self) -> float:
+        y_pred = np.array(self.y_scores) > 0.5
+        y_pred = y_pred.astype('int')
+        recall = recall_score(
+            y_true=self.y_trues, y_pred=y_pred,
+            zero_division=0)
+        return recall
 
     @property
     def AUPR(self):
