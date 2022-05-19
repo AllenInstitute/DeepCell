@@ -202,10 +202,9 @@ class RoiDataset(Dataset):
                     corr = np.array(corr)
                     res[:, :, 0] = corr
             else:
-                with open(obs.avg_projection_path, 'rb') as f:
-                    avg = Image.open(f)
-                    avg = np.array(avg)
-                    res[:, :, 0] = avg
+                raise RuntimeError('Expected to find a correlation projection '
+                                   f'for exp {obs.experiment_id}, '
+                                   f'{obs.roi_id}')
         else:
             with open(obs.avg_projection_path, 'rb') as f:
                 avg = Image.open(f)
