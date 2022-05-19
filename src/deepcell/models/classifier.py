@@ -47,9 +47,10 @@ class Classifier(torch.nn.Module):
                                               layer=truncate_to_layer)
         self.features = torch.nn.Sequential(*conv_layers)
 
-        for layer in self.features[:freeze_up_to_layer]:
-            for p in layer.parameters():
-                p.requires_grad = False
+        if freeze_up_to_layer is not None:
+            for layer in self.features[:freeze_up_to_layer]:
+                for p in layer.parameters():
+                    p.requires_grad = False
 
         self.avgpool = torch.nn.AdaptiveAvgPool2d(
             final_activation_map_spatial_dimensions)
@@ -77,6 +78,7 @@ class Classifier(torch.nn.Module):
         if type(model) is torchvision.models.vgg.VGG:
             layers = layers[0]
         else:
+            # also remove avg pool (adding it separately)
             layers = layers[:-2]
 
         # Truncate to layer
