@@ -129,6 +129,10 @@ class MLFlowTrackableMixin:
                           step=epoch)
         mlflow.log_metric(key='val_loss', value=val_metrics.loss,
                           step=epoch)
+        mlflow.log_metric(key='val_precision', value=val_metrics.precision,
+                          step=epoch)
+        mlflow.log_metric(key='val_recall', value=val_metrics.recall,
+                          step=epoch)
 
     @staticmethod
     def _log_early_stopping_metrics(best_epoch: int) -> None:
