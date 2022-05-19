@@ -63,7 +63,8 @@ class CloudKFoldTrainRunner(argschema.ArgSchemaParser):
             model_inputs=self.args['train_params']['model_inputs'],
             load_data_from_s3=self.args['train_params']['load_data_from_s3'],
             k_folds=self.args['train_params']['n_folds'],
-            train_params=self.args['train_params']
+            train_params=self.args['train_params'],
+            is_trial_run=self.args['is_trial_run']
         )
 
 
