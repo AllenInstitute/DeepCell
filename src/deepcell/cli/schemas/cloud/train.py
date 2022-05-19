@@ -98,3 +98,9 @@ class CloudKFoldTrainSchema(argschema.ArgSchema):
         default=6 * 60 * 60,
         description='Training job timeout in seconds'
     )
+
+    is_trial_run = argschema.fields.Bool(
+        default=False,
+        description='Set this to True to only run on a single fold. Useful'
+                    'for trying out a new idea without running on every fold'
+    )

@@ -96,7 +96,8 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
             train_params: dict,
             model_inputs: Optional[List[ModelInput]] = None,
             load_data_from_s3: bool = True,
-            k_folds=5):
+            k_folds=5,
+            is_trial_run=False):
         """
         Train the model using `model_inputs` on sagemaker
 
@@ -108,6 +109,8 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
             If provided, model_inputs should not be.
             This is only used if not in "local mode"
         k_folds: The number of CV splits.
+        is_trial_run: Set this to True to only run on a single fold. Useful
+                    for trying out a new idea without running on every fold
 
         Returns
         -------
@@ -166,6 +169,9 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
                     DataSplitter.get_cross_val_split_idxs(
                         model_inputs=model_inputs, seed=self._seed,
                         n_splits=k_folds)):
+                if is_trial_run:
+                    if k != 0:
+                        continue
                 train = [model_inputs[i] for i in train_idx]
                 test = [model_inputs[i] for i in test_idx]
 
