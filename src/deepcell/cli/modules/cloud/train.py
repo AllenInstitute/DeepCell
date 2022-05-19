@@ -11,11 +11,20 @@ from deepcell.cloud.train import KFoldTrainingJobRunner
 
 class CloudKFoldTrainRunner(argschema.ArgSchemaParser):
     default_schema = CloudKFoldTrainSchema
-    _logger = logging.getLogger(__name__)
+
     _container_path = \
         Path(__file__).parent.parent.parent.parent / 'cloud' / 'container'
 
     def run(self):
+        logger = logging.getLogger('root')
+        logger.setLevel(level=logging.INFO)
+        sh = logging.StreamHandler()
+        sh.setLevel(level=logging.INFO)
+        sh.setFormatter(logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        ))
+        logger.addHandler(sh)
+
         repository_name = self.args['docker_params']['repository_name']
         image_tag = self.args['docker_params']['image_tag']
 
@@ -47,7 +56,8 @@ class CloudKFoldTrainRunner(argschema.ArgSchemaParser):
             volume_size=self.args['volume_size'],
             output_dir=self.args['train_params']['save_path'],
             mlflow_server_uri=tracking_params['mlflow_server_uri'],
-            mlflow_experiment_name=tracking_params['mlflow_experiment_name']
+            mlflow_experiment_name=tracking_params['mlflow_experiment_name'],
+            seed=1234
         )
         runner.run(
             model_inputs=self.args['train_params']['model_inputs'],
