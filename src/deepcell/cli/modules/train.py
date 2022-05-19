@@ -12,7 +12,7 @@ class TrainRunner(argschema.ArgSchemaParser):
 
     def run(self):
         logger = init_logger(__name__)
-        logger.info({k: v for k, v in self.args
+        logger.info({k: v for k, v in self.args.items()
                      # Don't print this (too big)
                      if not k.endswith('model_inputs')})
 
