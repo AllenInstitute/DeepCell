@@ -3,6 +3,7 @@ from torch.utils.data import DataLoader
 
 from deepcell.cli.schemas.train import TrainSchema
 from deepcell.datasets.roi_dataset import RoiDataset
+from deepcell.logger import init_logger
 from deepcell.trainer import Trainer
 
 
@@ -10,6 +11,9 @@ class TrainRunner(argschema.ArgSchemaParser):
     default_schema = TrainSchema
 
     def run(self):
+        logger = init_logger(__name__)
+        logger.info(self.args)
+
         train = self.args['train_model_inputs']
         validation = self.args['validation_model_inputs']
 
