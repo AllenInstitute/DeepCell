@@ -45,7 +45,7 @@ class InferenceModule(argschema.ArgSchemaParser):
         _, inference_res = inference(
             model=model,
             test_loader=test_dataloader,
-            has_labels=False,
+            has_labels=self.args['has_labels'],
             checkpoint_path=str(self.args['model_load_path']))
 
         if self.args['experiment_id'] is not None:
