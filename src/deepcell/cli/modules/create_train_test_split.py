@@ -182,10 +182,8 @@ class CreateTrainTestSplit(ArgSchemaParser):
 
     def run(self):
         model_inputs = self.args['model_inputs']
-        exp_metas = self.args['experiment_metadata']
 
         splitter = DataSplitter(model_inputs=model_inputs,
-                                experiment_metadatas=exp_metas,
                                 seed=self.args['seed'])
         train_rois, test_rois = splitter.get_train_test_split(
             test_size=self.args['test_size'],
