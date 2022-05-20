@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Tuple, Union, Dict
+from typing import Tuple, Union, Dict, List, Optional
 
 import numpy as np
 import os
@@ -10,6 +10,7 @@ from sklearn.metrics import precision_score, recall_score, \
     average_precision_score
 from torch.utils.data import DataLoader
 
+from deepcell.datasets.model_input import ModelInput
 from deepcell.metrics import Metrics
 from deepcell.datasets.roi_dataset import RoiDataset
 from deepcell.data_splitter import DataSplitter
@@ -156,10 +157,12 @@ def inference(model: torch.nn.Module,
 
 
 def cv_performance(
-        model: torch.nn.Module, data_splitter: DataSplitter,
-        train: RoiDataset,
+        model: torch.nn.Module,
+        model_inputs: List[ModelInput],
+        data_splitter: DataSplitter,
         checkpoint_path: Union[str, Path],
-        threshold=0.5) -> Tuple[pd.DataFrame, Dict]:
+        threshold=0.5
+) -> Tuple[pd.DataFrame, Dict]:
     """
     Evaluates each of the k trained models on the respective validation set
     Returns the CV predictions as well as performance stats
@@ -167,10 +170,10 @@ def cv_performance(
     Args:
         model:
             Model to evaluate
-        data_splitter:
-            DataSplitter instance
-        train:
-            Train dataset
+        model_inputs:
+            List of model inputs
+        data_splitter
+            DataSplitter, to perform train/val split
         checkpoint_path:
             Model weights to load
         threshold
@@ -187,12 +190,14 @@ def cv_performance(
     recalls = []
     auprs = []
 
-    for i, (_, val) in enumerate(
-            data_splitter.get_cross_val_split(train_dataset=train)):
+    for k, (_, val) in enumerate(
+            data_splitter.get_cross_val_split(
+                train_dataset=RoiDataset(model_inputs=model_inputs)
+            )):
         val_loader = DataLoader(dataset=val, shuffle=False, batch_size=64)
         _, res = inference(model=model, test_loader=val_loader,
                            threshold=threshold,
-                           cv_fold=i, ensemble=False,
+                           cv_fold=k, ensemble=False,
                            checkpoint_path=checkpoint_path)
 
         res['y_true'] = val.y

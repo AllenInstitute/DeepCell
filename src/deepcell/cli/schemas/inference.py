@@ -1,4 +1,5 @@
 import argschema
+from marshmallow.validate import OneOf
 
 from deepcell.cli.schemas.base import BaseSchema
 from deepcell.cli.schemas.model import ModelSchema
@@ -18,9 +19,13 @@ class InferenceSchema(BaseSchema):
         description='If provided, we are running inference on a specific '
                     'experiment'
     )
-    has_labels = argschema.fields.Bool(
-        default=False,
-        description='Whether we have labels (test set) or do not'
+    mode = argschema.fields.String(
+        required=True,
+        validate=OneOf(('CV', 'test', 'production')),
+        description='Inference mode. "CV" gathers predictions on a validation '
+                    'set. "test" gathers predictions on a test set.'
+                    '"production" gathers predictions on a set of examples in '
+                    'production where there are no labels'
     )
     model_params = argschema.fields.Nested(
         ModelSchema,
