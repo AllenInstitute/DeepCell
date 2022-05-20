@@ -187,6 +187,7 @@ def cv_performance(
     y_preds = []
     y_true = []
     roi_ids = []
+    experiment_ids = []
     precisions = []
     recalls = []
     auprs = []
@@ -206,6 +207,7 @@ def cv_performance(
         y_scores += res['y_score'].tolist()
         y_preds += res['y_pred'].tolist()
         y_true += res['y_true'].tolist()
+        experiment_ids += res['experiment_id'].tolist()
         roi_ids += res['roi-id'].tolist()
 
         precision = precision_score(y_pred=res['y_pred'], y_true=res['y_true'])
@@ -217,8 +219,13 @@ def cv_performance(
         auprs.append(aupr)
 
     df = pd.DataFrame(
-        {'y_true': y_true, 'y_score': y_scores, 'y_pred': y_preds},
-        index=roi_ids)
+        {
+            'experiment_id': experiment_ids,
+            'roi_id': roi_ids,
+            'y_true': y_true,
+            'y_score': y_scores,
+            'y_pred': y_preds
+        })
     df['error'] = (df['y_true'] - df['y_score']).abs().round(2)
 
     precisions = np.array(precisions)
