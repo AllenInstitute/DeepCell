@@ -47,13 +47,19 @@ class InferenceModule(argschema.ArgSchemaParser):
             test_loader=test_dataloader,
             has_labels=False,
             checkpoint_path=str(self.args['model_load_path']))
-        inference_res['experiment_id'] = self.args['experiment_id']
 
-        inference_res.to_csv(Path(self.args['save_path']) /
-                             f'{self.args["experiment_id"]}_inference.csv',
+        if self.args['experiment_id'] is not None:
+            out_filename = f'{self.args["experiment_id"]}_inference.csv'
+        else:
+            out_filename = f'inference.csv'
+        inference_res.to_csv(Path(self.args['save_path']) / f'{out_filename}',
                              index=False)
 
 
-if __name__ == "__main__":
+def main():
     inference = InferenceModule()
     inference.run()
+
+
+if __name__ == "__main__":
+    main()
