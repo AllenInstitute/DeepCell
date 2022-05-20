@@ -12,7 +12,6 @@ from deepcell.transform import Transform
 class DataSplitter:
     def __init__(self,
                  model_inputs: List[ModelInput],
-                 experiment_metadatas: List[ExperimentMetadata],
                  train_transform=None,
                  test_transform=None, seed=None,
                  cre_line=None, exclude_mask=False,
@@ -27,8 +26,6 @@ class DataSplitter:
         Args:
             model_inputs:
                 List of model inputs
-            experiment_metadatas:
-                List of experiment metadata.
             train_transform:
                 Transforms to apply to training data
             test_transform:
@@ -58,7 +55,6 @@ class DataSplitter:
                 `deepcell.datasets.util.calc_roi_centroid`
         """
         self._model_inputs = model_inputs
-        self._exp_metas = experiment_metadatas
         self.train_transform = train_transform
         self.test_transform = test_transform
         self.seed = seed
