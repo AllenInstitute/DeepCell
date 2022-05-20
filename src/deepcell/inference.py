@@ -75,6 +75,7 @@ def inference(model: torch.nn.Module,
     y_scores = np.zeros((len(models), len(dataset), num_iters))
 
     use_cuda = torch.cuda.is_available()
+    print(f'CUDA is available: {use_cuda}')
 
     for i, model_checkpoint in enumerate(models):
         map_location = None if use_cuda else torch.device('cpu')
