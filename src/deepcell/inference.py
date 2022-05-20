@@ -41,8 +41,6 @@ def inference(model: torch.nn.Module,
             If so, inference will be made once per model and averaged
         cv_fold:
             Whether to use a specific model cv_fold from checkpoint_path
-        use_cuda:
-            Should be True if on GPU
         tta_num_iters:
             Number of times to perform test-time augmentation (default 0)
         tta_stat
