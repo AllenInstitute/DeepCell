@@ -14,6 +14,7 @@ from deepcell.datasets.model_input import ModelInput
 from deepcell.metrics import Metrics
 from deepcell.datasets.roi_dataset import RoiDataset
 from deepcell.data_splitter import DataSplitter
+from deepcell.transform import Transform
 
 
 def inference(model: torch.nn.Module,
@@ -159,10 +160,11 @@ def inference(model: torch.nn.Module,
 
 def cv_performance(
         model: torch.nn.Module,
-        model_inputs: List[ModelInput],
-        data_splitter: DataSplitter,
+        model_inputs: Union[List[ModelInput], List[List[ModelInput]]],
         checkpoint_path: Union[str, Path],
-        threshold=0.5
+        data_splitter: Optional[DataSplitter] = None,
+        threshold=0.5,
+        test_transform: Optional[Transform] = None
 ) -> Tuple[pd.DataFrame, Dict]:
     """
     Evaluates each of the k trained models on the respective validation set
@@ -179,10 +181,32 @@ def cv_performance(
             Model weights to load
         threshold
             classification threshold
+        test_transform
+            Test transform to pass to RoiDataset (in case of no DataSplitter)
     Returns:
         Dataframe of predictions, precision, recall, aupr (mean, std) across
         folds
     """
+    if data_splitter is None and type(model_inputs[0]) != list:
+        raise RuntimeError('If no data splitter is passed, a list of list '
+                           'of ModelInput is expected, where each list is '
+                           'a single validation set')
+    if data_splitter is None and test_transform is None:
+        raise ValueError('Pass test_transform if no data splitter')
+    if data_splitter is not None and type(model_inputs[0]) == list:
+        raise RuntimeError('If a data splitter is passed, a list '
+                           'of ModelInput is expected')
+
+    def get_validation_set():
+        if data_splitter is None:
+            for k in range(5):
+                yield RoiDataset(model_inputs=model_inputs[k],
+                                 transform=test_transform)
+            else:
+                for _, val in data_splitter.get_cross_val_split(
+                        train_dataset=RoiDataset(model_inputs=model_inputs)):
+                    yield val
+
     y_scores = []
     y_preds = []
     y_true = []
@@ -192,10 +216,7 @@ def cv_performance(
     recalls = []
     auprs = []
 
-    for k, (_, val) in enumerate(
-            data_splitter.get_cross_val_split(
-                train_dataset=RoiDataset(model_inputs=model_inputs)
-            )):
+    for k, val in enumerate(get_validation_set()):
         val_loader = DataLoader(dataset=val, shuffle=False, batch_size=64)
         _, res = inference(model=model, test_loader=val_loader,
                            threshold=threshold,

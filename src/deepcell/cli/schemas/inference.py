@@ -6,11 +6,14 @@ from deepcell.cli.schemas.model import ModelSchema
 
 
 class InferenceSchema(BaseSchema):
-    model_inputs_path = argschema.fields.InputFile(
+    model_inputs_paths = argschema.fields.List(
+        argschema.fields.InputFile,
+        cli_as_single_argument=True,
         required=True,
-        description='Path to json file for input examples where each '
-                    'instance has schema given by '
-                    '`deepcell.cli.schemas.data.ModelInputSchema`'
+        description='Set of paths to load model_inputs from. Each json file '
+                    'has schema given by '
+                    '`deepcell.cli.schemas.data.ModelInputSchema`. Multiple '
+                    'files can be specified in the case of "CV"'
     )
     experiment_id = argschema.fields.String(
         required=False,
