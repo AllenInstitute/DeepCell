@@ -1,18 +1,17 @@
 import json
 from pathlib import Path
+from typing import List
 
 import argschema
 import torchvision
 from torch.utils.data import DataLoader
-from torchvision.transforms import transforms
-from imgaug import augmenters as iaa
 
+from deepcell.cli.schemas.data import ModelInputSchema
 from deepcell.cli.schemas.inference import InferenceSchema
 from deepcell.data_splitter import DataSplitter
 from deepcell.datasets.model_input import ModelInput
 from deepcell.inference import inference, cv_performance
 from deepcell.datasets.roi_dataset import RoiDataset
-from deepcell.transform import Transform
 from deepcell.models.classifier import Classifier
 
 
@@ -23,10 +22,14 @@ class InferenceModule(argschema.ArgSchemaParser):
     default_schema = InferenceSchema
 
     def run(self):
+        if len(self.args['model_inputs_paths']) > 1 and \
+                self.args['mode'] != 'CV':
+            raise RuntimeError('Passing multiple model_inputs_paths when '
+                               'mode != "CV" is not understood')
+        model_inputs = self._load_model_inputs()
+
         test_transform = RoiDataset.get_default_transforms(
             crop_size=self.args['data_params']['crop_size'], is_train=False)
-
-        model_inputs = self.args['model_inputs']
 
         model = getattr(
             torchvision.models,
@@ -39,6 +42,8 @@ class InferenceModule(argschema.ArgSchemaParser):
             classifier_cfg=self.args['model_params']['classifier_cfg'])
 
         if self.args['mode'] in ('test', 'production'):
+            model_inputs = model_inputs[0]
+
             test = RoiDataset(
                 model_inputs=model_inputs,
                 transform=test_transform
@@ -52,16 +57,21 @@ class InferenceModule(argschema.ArgSchemaParser):
                 has_labels=self.args['mode'] == 'test',
                 checkpoint_path=str(self.args['model_load_path']))
         else:
-            data_splitter = DataSplitter(
-                model_inputs=model_inputs,
-                test_transform=test_transform,
-                seed=1234
-            )
+            if len(model_inputs) > 1:
+                # Just passing the raw split validation model inputs
+                data_splitter = None
+            else:
+                data_splitter = DataSplitter(
+                    model_inputs=model_inputs[0],
+                    test_transform=test_transform,
+                    seed=1234
+                )
             inference_res, _ = cv_performance(
                 model=model,
                 model_inputs=model_inputs,
                 data_splitter=data_splitter,
-                checkpoint_path=self.args['model_load_path']
+                checkpoint_path=self.args['model_load_path'],
+                test_transform=test_transform
             )
 
         if self.args['experiment_id'] is not None:
@@ -70,6 +80,16 @@ class InferenceModule(argschema.ArgSchemaParser):
             out_filename = f'inference.csv'
         inference_res.to_csv(Path(self.args['save_path']) / f'{out_filename}',
                              index=False)
+
+    def _load_model_inputs(self) -> List[List[ModelInput]]:
+        res = []
+        for path in self.args['model_inputs_paths']:
+            with open(path, 'r') as f:
+                model_inputs = json.load(f)
+            model_inputs = [ModelInput(**model_input)
+                            for model_input in model_inputs]
+            res.append(model_inputs)
+        return res
 
 
 def main():
