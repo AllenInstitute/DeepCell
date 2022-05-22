@@ -73,7 +73,7 @@ class InferenceModule(argschema.ArgSchemaParser):
                 checkpoint_path=self.args['model_load_path'],
                 test_transform=test_transform,
                 use_max_activation_image=(
-                    self.args['data_params']['use_max_activation_image'])
+                    self.args['data_params']['use_max_activation_img'])
             )
 
         if self.args['experiment_id'] is not None:
