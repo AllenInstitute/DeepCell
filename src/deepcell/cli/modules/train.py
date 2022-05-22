@@ -26,11 +26,15 @@ class TrainRunner(argschema.ArgSchemaParser):
 
         train = RoiDataset(
             model_inputs=train,
-            transform=train_transform
+            transform=train_transform,
+            use_max_activation_img=(
+                self.args['data_params']['use_max_activation_img'])
         )
         validation = RoiDataset(
             model_inputs=validation,
-            transform=test_transform
+            transform=test_transform,
+            use_max_activation_img=(
+                self.args['data_params']['use_max_activation_img'])
         )
 
         train_loader = DataLoader(dataset=train, shuffle=True,

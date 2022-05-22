@@ -86,6 +86,8 @@ class TrainingRunner:
                 str(data_dir / Path(model_input['mask_path']).name))
             model_input['max_projection_path'] = (
                 str(data_dir / Path(model_input['max_projection_path']).name))
+            model_input['max_activation_path'] = (
+                str(data_dir / Path(model_input['max_activation_path']).name))
             if model_input['avg_projection_path'] is not None:
                 model_input['avg_projection_path'] = (
                     str(data_dir /

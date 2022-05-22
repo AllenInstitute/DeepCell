@@ -28,6 +28,10 @@ class ModelInputSchema(argschema.ArgSchema):
         required=True,
         description='max projection path'
     )
+    max_activation_path = argschema.fields.InputFile(
+        required=True,
+        description='max activation path'
+    )
     avg_projection_path = argschema.fields.InputFile(
         default=None,
         allow_none=True,
@@ -92,4 +96,9 @@ class DataSchema(argschema.ArgSchema):
     center_roi_centroid = argschema.fields.Bool(
         default=False,
         description='Manually center input by finding centroid of soma'
+    )
+    use_max_activation_img = argschema.fields.Bool(
+        default=False,
+        description='Whether to use the max activation image instead of '
+                    'projections'
     )

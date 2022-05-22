@@ -11,6 +11,7 @@ class ModelInput:
                  experiment_id: str,
                  mask_path: Path,
                  max_projection_path: Path,
+                 max_activation_path: Optional[Path] = None,
                  avg_projection_path: Optional[Path] = None,
                  correlation_projection_path: Optional[Path] = None,
                  project_name: Optional[str] = None,
@@ -25,6 +26,8 @@ class ModelInput:
                 Experiment id
             max_projection_path:
                 max projection path
+            max_activation_path
+                max activation path
             correlation_projection_path:
                 correlation projection path
             avg_projection_path:
@@ -44,6 +47,7 @@ class ModelInput:
         self._roi_id = roi_id
         self._experiment_id = experiment_id
         self._max_projection_path = max_projection_path
+        self._max_activation_path = max_activation_path
         self._correlation_projection_path = correlation_projection_path
         self._avg_projection_path = avg_projection_path
         self._mask_path = mask_path
@@ -61,6 +65,10 @@ class ModelInput:
     @property
     def max_projection_path(self) -> Path:
         return self._max_projection_path
+
+    @property
+    def max_activation_path(self) -> Optional[Path]:
+        return self._max_activation_path
 
     @property
     def correlation_projection_path(self) -> Optional[Path]:
@@ -137,6 +145,10 @@ class ModelInput:
                             artifact_type='max',
                             experiment_id=experiment_id,
                             roi_id=roi_id)
+        max_activation_path = get_path(data_dir=data_dir,
+                                       artifact_type='max_activation',
+                                       experiment_id=experiment_id,
+                                       roi_id=roi_id)
 
         return ModelInput(
             experiment_id=experiment_id,
@@ -144,6 +156,7 @@ class ModelInput:
             mask_path=mask_path,
             correlation_projection_path=correlation_projection_path,
             max_projection_path=max_path,
+            max_activation_path=max_activation_path,
             roi_id=roi_id,
             label=label
         )
@@ -163,6 +176,7 @@ class ModelInput:
         """
         shutil.copy(self.mask_path, destination)
         shutil.copy(self.max_projection_path, destination)
+        shutil.copy(self.max_activation_path, destination)
         if self.correlation_projection_path is not None:
             shutil.copy(self.correlation_projection_path, destination)
         if self.avg_projection_path is not None:
@@ -174,6 +188,7 @@ class ModelInput:
             'roi_id': self._roi_id,
             'mask_path': str(self._mask_path),
             'max_projection_path': str(self._max_projection_path),
+            'max_activation_path': str(self._max_activation_path),
             'avg_projection_path':
                 str(self._avg_projection_path) if self._avg_projection_path
                 else None,

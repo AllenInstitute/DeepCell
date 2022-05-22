@@ -1,6 +1,5 @@
 from typing import List, Tuple
 
-import torchvision.transforms
 from PIL import Image
 import numpy as np
 from torch.utils.data import Dataset
@@ -25,7 +24,8 @@ class RoiDataset(Dataset):
                  use_correlation_projection=True,
                  center_roi_centroid=False,
                  centroid_brightness_quantile=0.8,
-                 centroid_use_mask=False):
+                 centroid_use_mask=False,
+                 use_max_activation_img=False):
         """
         A dataset of segmentation masks as identified by Suite2p with
         binary label "cell" or "not cell"
@@ -59,6 +59,9 @@ class RoiDataset(Dataset):
             centroid_use_mask
                 Used if center_roi_centroid is True. See `use_mask` arg in
                 `deepcell.datasets.util.calc_roi_centroid`
+            use_max_activation_img
+                Whether to use the max activation image. If True, this
+                is used instead of the projections.
         """
         super().__init__()
 
@@ -72,6 +75,7 @@ class RoiDataset(Dataset):
         self._center_roi_centroid = center_roi_centroid
         self._centroid_brightness_quantile = centroid_brightness_quantile
         self._centroid_use_mask = centroid_use_mask
+        self._use_max_activation_img = use_max_activation_img
 
         if cre_line:
             experiment_genotype_map = get_experiment_genotype_map()
@@ -195,6 +199,23 @@ class RoiDataset(Dataset):
         """
         res = np.zeros((*self._image_dim, 3), dtype=np.uint8)
 
+        with open(obs.mask_path, 'rb') as f:
+            mask = Image.open(f)
+            mask = np.array(mask)
+
+        if self._use_max_activation_img:
+            if obs.max_activation_path is not None:
+                with open(obs.max_activation_path, 'rb') as f:
+                    max_activation = Image.open(f)
+                    max_activation = np.array(max_activation)
+                    res[:, :, 0] = max_activation
+                    res[:, :, 1] = max_activation
+                    res[:, :, 2] = mask
+                    return res
+            else:
+                raise RuntimeError('Expected to find a max activation img '
+                                   f'for exp {obs.experiment_id}, '
+                                   f'{obs.roi_id}')
         if self._use_correlation_projection:
             if obs.correlation_projection_path is not None:
                 with open(obs.correlation_projection_path, 'rb') as f:
@@ -215,10 +236,6 @@ class RoiDataset(Dataset):
             max = Image.open(f)
             max = np.array(max)
             res[:, :, 1] = max
-
-        with open(obs.mask_path, 'rb') as f:
-            mask = Image.open(f)
-            mask = np.array(mask)
 
             if self._exclude_mask:
                 res[:, :, 2] = max
