@@ -168,17 +168,6 @@ class RoiDataset(Dataset):
         input = self._construct_input(obs=obs)
 
         if self.transform:
-            avg, max_, mask = input[:, :, 0], input[:, :, 1], input[:, :, 2]
-            if self.transform.avg_transform:
-                avg = self.transform.avg_transform(avg)
-                input[:, :, 0] = avg
-            if self.transform.max_transform:
-                max_ = self.transform.max_transform(max_)
-                input[:, :, 1] = max_
-            if self.transform.mask_transform:
-                mask = self.transform.mask_transform(mask)
-                input[:, :, 2] = mask
-
             if self.transform.all_transform:
                 input = self.transform.all_transform(input)
 

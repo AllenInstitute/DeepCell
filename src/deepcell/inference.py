@@ -164,7 +164,8 @@ def cv_performance(
         checkpoint_path: Union[str, Path],
         data_splitter: Optional[DataSplitter] = None,
         threshold=0.5,
-        test_transform: Optional[Transform] = None
+        test_transform: Optional[Transform] = None,
+        use_max_activation_image: bool = False
 ) -> Tuple[pd.DataFrame, Dict]:
     """
     Evaluates each of the k trained models on the respective validation set
@@ -183,6 +184,8 @@ def cv_performance(
             classification threshold
         test_transform
             Test transform to pass to RoiDataset (in case of no DataSplitter)
+        use_max_activation_image
+            Whether to use max activation image
     Returns:
         Dataframe of predictions, precision, recall, aupr (mean, std) across
         folds
@@ -200,8 +203,10 @@ def cv_performance(
     def get_validation_set():
         if data_splitter is None:
             for k in range(5):
-                yield RoiDataset(model_inputs=model_inputs[k],
-                                 transform=test_transform)
+                yield RoiDataset(
+                    model_inputs=model_inputs[k],
+                    transform=test_transform,
+                    use_max_activation_img=use_max_activation_image)
             else:
                 for _, val in data_splitter.get_cross_val_split(
                         train_dataset=RoiDataset(model_inputs=model_inputs)):
