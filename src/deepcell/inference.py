@@ -207,10 +207,10 @@ def cv_performance(
                     model_inputs=model_inputs[k],
                     transform=test_transform,
                     use_max_activation_img=use_max_activation_image)
-            else:
-                for _, val in data_splitter.get_cross_val_split(
-                        train_dataset=RoiDataset(model_inputs=model_inputs)):
-                    yield val
+        else:
+            for _, val in data_splitter.get_cross_val_split(
+                    train_dataset=RoiDataset(model_inputs=model_inputs)):
+                yield val
 
     y_scores = []
     y_preds = []
