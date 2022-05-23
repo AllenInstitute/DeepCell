@@ -1,6 +1,5 @@
 from typing import List, Tuple
 
-import torchvision.transforms
 from PIL import Image
 import numpy as np
 from torch.utils.data import Dataset
@@ -11,6 +10,9 @@ from deepcell.datasets.model_input import ModelInput
 from deepcell.datasets.util import center_roi
 from deepcell.transform import Transform
 from deepcell.util import get_experiment_genotype_map
+
+IMAGENET_CHANNELWISE_MEANS = [0.485, 0.456, 0.406]
+IMAGENET_CHANNELWISE_STDS = [0.229, 0.224, 0.225]
 
 
 class RoiDataset(Dataset):
@@ -97,7 +99,9 @@ class RoiDataset(Dataset):
     @staticmethod
     def get_default_transforms(
             crop_size: Tuple[int, int],
-            is_train: bool
+            is_train: bool,
+            means: List[float] = None,
+            stds: List[float] = None
     ) -> Transform:
         """
         Gets the default transforms
@@ -108,10 +112,23 @@ class RoiDataset(Dataset):
             Crop size
         is_train
             Whether this is a train or test dataset
+        means
+            Channel-wise means to standardize data
+            (after converting to [0, 1] range).
+            The defaults are the ImageNet published channel-wise means
+        stds
+            Channel-wise stds to standardize data
+            (after converting to [0, 1] range)
+            The defaults are the ImageNet published channel-wise stds
         Returns
         -------
         Transform
         """
+        if means is None:
+            means = IMAGENET_CHANNELWISE_MEANS
+        if stds is None:
+            stds = IMAGENET_CHANNELWISE_STDS
+
         width, height = crop_size
         if is_train:
             all_transform = transforms.Compose([
@@ -124,9 +141,8 @@ class RoiDataset(Dataset):
                     iaa.CenterCropToFixedSize(height=height, width=width),
                 ]).augment_image,
                 transforms.ToTensor(),
-                # imagenet channel-wise mean/std
-                transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
+                transforms.Normalize(mean=means,
+                                     std=stds)
             ])
 
             return Transform(all_transform=all_transform)
@@ -136,9 +152,8 @@ class RoiDataset(Dataset):
                     iaa.CenterCropToFixedSize(height=height, width=width)
                 ]).augment_image,
                 transforms.ToTensor(),
-                # imagenet channel-wise mean/std
-                transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
+                transforms.Normalize(mean=means,
+                                     std=stds)
             ])
 
             return Transform(all_transform=all_transform)
