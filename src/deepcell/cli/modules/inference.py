@@ -29,7 +29,10 @@ class InferenceModule(argschema.ArgSchemaParser):
         model_inputs = self._load_model_inputs()
 
         test_transform = RoiDataset.get_default_transforms(
-            crop_size=self.args['data_params']['crop_size'], is_train=False)
+            crop_size=self.args['data_params']['crop_size'], is_train=False,
+            means=self.args['data_params']['channel_wise_means'],
+            stds=self.args['data_params']['channel_wise_stds']
+        )
 
         model = getattr(
             torchvision.models,
