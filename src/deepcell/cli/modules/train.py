@@ -20,9 +20,13 @@ class TrainRunner(argschema.ArgSchemaParser):
         validation = self.args['validation_model_inputs']
 
         train_transform = RoiDataset.get_default_transforms(
-            crop_size=self.args['data_params']['crop_size'], is_train=True)
+            crop_size=self.args['data_params']['crop_size'], is_train=True,
+            means=self.args['data_params']['channel_wise_means']
+        )
         test_transform = RoiDataset.get_default_transforms(
-            crop_size=self.args['data_params']['crop_size'], is_train=False)
+            crop_size=self.args['data_params']['crop_size'], is_train=False,
+            means=self.args['data_params']['channel_wise_stds']
+        )
 
         train = RoiDataset(
             model_inputs=train,

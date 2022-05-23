@@ -102,3 +102,25 @@ class DataSchema(argschema.ArgSchema):
         description='Whether to use the max activation image instead of '
                     'projections'
     )
+    channel_wise_means = argschema.fields.List(
+        argschema.fields.Float,
+        default=[0.485, 0.456, 0.406],
+        cli_as_single_argument=True,
+        description='Channel wise means to standardize data '
+                    '(after converting to [0, 1] range). '
+                    'The defaults are the ImageNet published channel-wise '
+                    'means. Only use these means if doing transfer learning '
+                    'on a model trained on ImageNet. Otherwise, use dataset '
+                    'means'
+    )
+    channel_wise_stds = argschema.fields.List(
+        argschema.fields.Float,
+        default=[0.229, 0.224, 0.225],
+        cli_as_single_argument=True,
+        description='Channel wise stds to standardize data '
+                    '(after converting to [0, 1] range). '
+                    'The defaults are the ImageNet published channel-wise '
+                    'stds. Only use these stds if doing transfer learning '
+                    'on a model trained on ImageNet. Otherwise, use dataset '
+                    'stds'
+    )
