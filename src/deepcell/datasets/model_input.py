@@ -126,7 +126,7 @@ class ModelInput:
 
         try:
             correlation_projection_path = get_path(data_dir=data_dir,
-                                                   artifact_type='corr',
+                                                   artifact_type='correlation',
                                                    experiment_id=experiment_id,
                                                    roi_id=roi_id)
         except RuntimeError:

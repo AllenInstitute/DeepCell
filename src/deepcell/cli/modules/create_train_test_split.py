@@ -74,6 +74,8 @@ class CreateTrainTestSplitInputSchema(ArgSchema):
         region_query = db.select([JobRegion.id, JobRegion.experiment_id])
         region_data = db_engine.execute(region_query).fetchall()
 
+        seen = set()
+
         for (region_id, exp_id) in region_data:
             # For each region, load the user labels from the database.
             label_query = db.select([UserLabels.user_id,
@@ -96,6 +98,14 @@ class CreateTrainTestSplitInputSchema(ArgSchema):
                 # Don't create a ModelInput if the label is a False Negative.
                 if not roi_row['is_segmented']:
                     continue
+                # If we've already seen this (roi_id, exp_id) combo,
+                # skip it
+                # We need to check this because an ROI can appear in
+                # multiple regions
+                if (roi_id, exp_id) in seen:
+                    continue
+                seen.add((roi_id, exp_id))
+
                 label = self._tally_votes(
                     roi_id=roi_id,
                     region_labels=region_labels,
