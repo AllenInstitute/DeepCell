@@ -192,13 +192,22 @@ class RoiDataset(Dataset):
             mask = Image.open(f)
             mask = np.array(mask)
 
+        if obs.correlation_projection_path is not None:
+            with open(obs.correlation_projection_path, 'rb') as f:
+                corr = Image.open(f)
+                corr = np.array(corr)
+        else:
+            raise RuntimeError('Expected to find a correlation projection '
+                               f'for exp {obs.experiment_id}, '
+                               f'{obs.roi_id}')
+
         if self._use_max_activation_img:
             if obs.max_activation_path is not None:
                 with open(obs.max_activation_path, 'rb') as f:
                     max_activation = Image.open(f)
                     max_activation = np.array(max_activation)
                     res[:, :, 0] = max_activation
-                    res[:, :, 1] = max_activation
+                    res[:, :, 1] = corr
                     res[:, :, 2] = mask
                     return res
             else:
@@ -206,15 +215,7 @@ class RoiDataset(Dataset):
                                    f'for exp {obs.experiment_id}, '
                                    f'{obs.roi_id}')
         if self._use_correlation_projection:
-            if obs.correlation_projection_path is not None:
-                with open(obs.correlation_projection_path, 'rb') as f:
-                    corr = Image.open(f)
-                    corr = np.array(corr)
-                    res[:, :, 0] = corr
-            else:
-                raise RuntimeError('Expected to find a correlation projection '
-                                   f'for exp {obs.experiment_id}, '
-                                   f'{obs.roi_id}')
+            res[:, :, 0] = corr
         else:
             with open(obs.avg_projection_path, 'rb') as f:
                 avg = Image.open(f)
