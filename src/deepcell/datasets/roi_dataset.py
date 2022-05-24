@@ -217,6 +217,11 @@ class RoiDataset(Dataset):
                                f'for exp {obs.experiment_id}, '
                                f'{obs.roi_id}')
 
+        res[:, :, 0] = mask
+        res[:, :, 1] = mask
+        res[:, :, 2] = mask
+        return res
+
         if self._use_max_activation_img:
             if obs.max_activation_path is not None:
                 with open(obs.max_activation_path, 'rb') as f:
