@@ -74,10 +74,7 @@ class InferenceModule(argschema.ArgSchemaParser):
                 model_inputs=model_inputs,
                 data_splitter=data_splitter,
                 checkpoint_path=self.args['model_load_path'],
-                test_transform=test_transform,
-                use_max_activation_image=(
-                    self.args['data_params']['use_max_activation_img'])
-            )
+                test_transform=test_transform)
 
         if self.args['experiment_id'] is not None:
             out_filename = f'{self.args["experiment_id"]}_inference.csv'
