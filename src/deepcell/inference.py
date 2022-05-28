@@ -202,10 +202,10 @@ def cv_performance(
             for k in range(5):
                 yield RoiDataset(model_inputs=model_inputs[k],
                                  transform=test_transform)
-            else:
-                for _, val in data_splitter.get_cross_val_split(
-                        train_dataset=RoiDataset(model_inputs=model_inputs)):
-                    yield val
+        else:
+            for _, val in data_splitter.get_cross_val_split(
+                    train_dataset=RoiDataset(model_inputs=model_inputs)):
+                yield val
 
     y_scores = []
     y_preds = []
