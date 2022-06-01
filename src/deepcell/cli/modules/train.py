@@ -3,6 +3,7 @@ from torch.utils.data import DataLoader
 
 from deepcell.cli.schemas.train import TrainSchema
 from deepcell.datasets.roi_dataset import RoiDataset
+from deepcell.logger import init_logger
 from deepcell.trainer import Trainer
 
 
@@ -10,13 +11,24 @@ class TrainRunner(argschema.ArgSchemaParser):
     default_schema = TrainSchema
 
     def run(self):
+        logger = init_logger(__name__)
+        logger.info({k: v for k, v in self.args.items()
+                     # Don't print this (too big)
+                     if not k.endswith('model_inputs')})
+
         train = self.args['train_model_inputs']
         validation = self.args['validation_model_inputs']
 
         train_transform = RoiDataset.get_default_transforms(
-            crop_size=self.args['data_params']['crop_size'], is_train=True)
+            crop_size=self.args['data_params']['crop_size'], is_train=True,
+            means=self.args['data_params']['channel_wise_means'],
+            stds=self.args['data_params']['channel_wise_stds']
+        )
         test_transform = RoiDataset.get_default_transforms(
-            crop_size=self.args['data_params']['crop_size'], is_train=False)
+            crop_size=self.args['data_params']['crop_size'], is_train=False,
+            means=self.args['data_params']['channel_wise_means'],
+            stds=self.args['data_params']['channel_wise_stds'],
+        )
 
         train = RoiDataset(
             model_inputs=train,

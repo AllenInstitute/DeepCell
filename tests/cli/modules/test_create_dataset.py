@@ -13,9 +13,9 @@ from cell_labeling_app.database.populate_labeling_job import Region
 from cell_labeling_app.database.schemas import (
     JobRegion, LabelingJob, User, UserLabels)
 
-from deepcell.cli.modules.create_train_test_split import \
+from deepcell.cli.modules.create_dataset import \
     CreateTrainTestSplit, \
-    CreateTrainTestSplitInputSchema
+    CreateTrainTestSplitInputSchema, _tally_votes
 
 
 class TestTrainTestSplitCli:
@@ -173,62 +173,15 @@ class TestTrainTestSplitCli:
             assert roi['experiment_id'] == '1'
 
     @pytest.mark.parametrize('labels, expected', (
-            ([
-
-                 pd.DataFrame({
-                     'label': ['cell']
-                 }),
-                 pd.DataFrame({
-                     'label': ['cell']
-                 }),
-                 pd.DataFrame({
-                     'label': ['cell']
-                 })
-             ], 'cell'),
-            ([
-                 pd.DataFrame({
-                     'label': ['cell']
-                 }),
-                 pd.DataFrame({
-                     'label': ['cell']
-                 }),
-                 pd.DataFrame({
-                     'label': ['not cell']
-                 })
-             ], 'cell'),
-            ([
-                 pd.DataFrame({
-                     'label': ['not cell']
-                 }),
-                 pd.DataFrame({
-                     'label': ['not cell']
-                 }),
-                 pd.DataFrame({
-                     'label': ['not cell']
-                 })
-             ], 'not cell'),
-            ([
-                 pd.DataFrame({
-                     'label': ['cell']
-                 }),
-                 pd.DataFrame({
-                     'label': ['cell']
-                 }),
-                 pd.DataFrame({
-                     'label': ['cell']
-                 }),
-                 pd.DataFrame({
-                     'label': ['not cell']
-                 }),
-                 pd.DataFrame({
-                     'label': ['not cell']
-                 })
-             ], 'cell')
+            (pd.Series(['cell', 'cell', 'cell']), 'cell'),
+            (pd.Series(['cell', 'cell', 'not cell']), 'cell'),
+            (pd.Series(['not cell' 'not cell', 'not cell']), 'not cell'),
+            (pd.Series(['cell', 'cell', 'cell', 'not cell', 'not cell']),
+             'cell')
 
     ))
     def test_tally_votes(self, labels, expected):
-        assert CreateTrainTestSplitInputSchema._tally_votes(
-            roi_id=0,
-            region_labels=labels,
+        assert _tally_votes(
+            labels=labels,
             vote_threshold=0.5
         ) == expected

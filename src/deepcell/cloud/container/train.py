@@ -48,6 +48,12 @@ class TrainingRunner:
         validation = self._update_model_inputs_paths(
             data_dir=VALIDATION_DATA_DIR)
 
+        assert len(set([(x.experiment_id, x.roi_id) for x in train])
+               .intersection(
+            set([(x.experiment_id, x.roi_id) for x in validation]))) == 0
+        print(f'Training size: {len(train)}')
+        print(f'Validation size: {len(validation)}')
+
         write_model_input_metadata_to_disk(
             model_inputs=train,
             path=TRAINING_DATA_DIR / 'model_inputs.json')

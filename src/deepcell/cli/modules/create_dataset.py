@@ -3,7 +3,6 @@ import marshmallow
 import pandas as pd
 from pathlib import Path
 import sqlalchemy as db
-from typing import List
 
 from argschema import ArgSchema, ArgSchemaParser, fields
 from cell_labeling_app.database.schemas import JobRegion, UserLabels
@@ -64,98 +63,6 @@ class CreateTrainTestSplitInputSchema(ArgSchema):
     )
 
     @marshmallow.post_load
-    def get_model_inputs(self, data):
-        """Load the json blob labeling data from the app database and return
-        the data as ModelInput objects.
-        """
-        model_inputs = []
-        # Get all the potential regions.
-        db_engine = db.create_engine(f"sqlite:///{data['label_db']}")
-        region_query = db.select([JobRegion.id, JobRegion.experiment_id])
-        region_data = db_engine.execute(region_query).fetchall()
-
-        seen = set()
-
-        for (region_id, exp_id) in region_data:
-            # For each region, load the user labels from the database.
-            label_query = db.select([UserLabels.user_id,
-                                     UserLabels.region_id,
-                                     UserLabels.labels])
-            label_query = label_query.where(
-                UserLabels.region_id == region_id)
-            label_results = db_engine.execute(label_query).fetchall()
-            # Count the number of times this region was classified by a
-            # User.
-            n_labelers = len(label_results)
-            if n_labelers < data["min_labelers_required_per_region"]:
-                continue
-            # Load the labeling data if the number of classifiers is
-            # sufficient.
-            region_labels = [pd.DataFrame(
-                                 data=json.loads(labels)).set_index('roi_id')
-                             for _, _, labels in label_results]
-            for roi_id, roi_row in region_labels[0].iterrows():
-                # Don't create a ModelInput if the label is a False Negative.
-                if not roi_row['is_segmented']:
-                    continue
-                # If we've already seen this (roi_id, exp_id) combo,
-                # skip it
-                # We need to check this because an ROI can appear in
-                # multiple regions
-                if (roi_id, exp_id) in seen:
-                    continue
-                seen.add((roi_id, exp_id))
-
-                label = self._tally_votes(
-                    roi_id=roi_id,
-                    region_labels=region_labels,
-                    vote_threshold=data['vote_threshold'])
-
-                # Create the output model input for the ROI.
-                model_input = ModelInput.from_data_dir(
-                    data_dir=data['artifact_dir'],
-                    experiment_id=str(exp_id),
-                    roi_id=str(roi_id),
-                    label=label)
-                model_inputs.append(model_input)
-        data['model_inputs'] = model_inputs
-        return data
-
-    @staticmethod
-    def _tally_votes(roi_id: int,
-                     region_labels: List[pd.DataFrame],
-                     vote_threshold: float):
-        """Loop through labels and return a label of "cell" or "not cell" given
-        the votes of the labelers.
-
-        Parameters
-        ---------
-        roi_id : int
-            Id of the ROI to consider.
-        region_labels : List[pandas.DataFrame]
-            Set of labels for all ROIs from all labelers over the region.
-            DataFrames must be indexed by ``roi_id`` values.
-        vote_threshold :  float
-            Fraction of votes for "cell" to return a label for the ROI of
-            "cell".
-
-        Returns
-        -------
-        label : str
-            Label for ROI. "cell" or "not cell"
-        """
-        n_cell_votes = 0
-        n_total_votes = 0
-        label = 'not cell'
-        for roi_labeler in region_labels:
-            if roi_labeler.loc[roi_id, 'label'] == 'cell':
-                n_cell_votes += 1
-            n_total_votes += 1
-        if n_cell_votes / n_total_votes > vote_threshold:
-            label = 'cell'
-        return label
-
-    @marshmallow.post_load
     def get_experiment_metadata(self, data):
         """Load experiment metadata and trim to only those experiments that
         are labeled by users.
@@ -191,11 +98,22 @@ class CreateTrainTestSplit(ArgSchemaParser):
     default_schema = CreateTrainTestSplitInputSchema
 
     def run(self):
-        model_inputs = self.args['model_inputs']
-        exp_metas = self.args['experiment_metadata']
+        labels = construct_dataset(
+            label_db_path=self.args['label_db'],
+            vote_threshold=self.args['vote_threshold'],
+            min_labelers_per_roi=self.args['min_labelers_required_per_region'])
+
+        model_inputs = [
+            ModelInput.from_data_dir(
+                data_dir=self.args['artifact_dir'],
+                experiment_id=row.experiment_id,
+                roi_id=row.roi_id,
+                label=row.label
+            )
+            for row in labels.itertuples(index=False)
+        ]
 
         splitter = DataSplitter(model_inputs=model_inputs,
-                                experiment_metadatas=exp_metas,
                                 seed=self.args['seed'])
         train_rois, test_rois = splitter.get_train_test_split(
             test_size=self.args['test_size'],
@@ -213,6 +131,110 @@ class CreateTrainTestSplit(ArgSchemaParser):
             json.dump(train_dicts, jfile)
         with open(output_dir / 'test_rois.json', 'w') as jfile:
             json.dump(test_dicts, jfile)
+
+
+def construct_dataset(
+        label_db_path: str,
+        min_labelers_per_roi: int,
+        vote_threshold: float,
+        raw: bool = False
+) -> pd.DataFrame:
+    """
+    Create labeled dataset
+
+    @param label_db_path: Path to label database
+    @param min_labelers_per_roi: minimum number of labelers required to have seen
+        a given ROI
+    @param vote_threshold: Threshold to mark an ROI as cell
+    @param raw: If True, returns untallied labels
+    @return: pd.DataFrame
+    """
+    user_labels = _get_raw_user_labels(label_db_path=label_db_path)
+    user_labels['labels'] = user_labels['labels'].apply(
+        lambda x: json.loads(x))
+
+    experiment_ids = []
+    user_ids = []
+    for row in user_labels.itertuples(index=False):
+        labels = pd.DataFrame(row.labels)
+        labels = labels[labels['is_segmented']]
+
+        if not labels.empty:
+            experiment_ids += [row.experiment_id] * labels.shape[0]
+            user_ids += [row.user_id] * labels.shape[0]
+
+    labels = pd.concat([pd.DataFrame(x) for x in user_labels['labels']],
+                       ignore_index=True)
+
+    labels = labels[labels['is_segmented']].copy()
+
+    labels['experiment_id'] = experiment_ids
+    labels['user_id'] = user_ids
+
+    n_users_labeled = labels.groupby(['experiment_id', 'roi_id'])[
+        'user_id'].nunique().reset_index().rename(
+        columns={'user_id': 'n_users_labeled'})
+
+    # Filter out ROIs with < min_labelers_per_roi labels
+    labels = labels.merge(n_users_labeled, on=['experiment_id', 'roi_id'])
+    labels = labels[labels['n_users_labeled'] >= min_labelers_per_roi]
+    labels = labels.drop(columns='n_users_labeled')
+
+    # Drop cases where a single user labeled an ROI more than once
+    labels = labels.drop_duplicates(
+        subset=['experiment_id', 'roi_id', 'user_id'])
+
+    if not raw:
+        labels = labels.groupby(['experiment_id', 'roi_id'])['label']\
+            .apply(lambda x: _tally_votes(labels=x,
+                                          vote_threshold=vote_threshold))
+        labels = labels.reset_index()
+
+    labels['experiment_id'] = labels['experiment_id'].astype(str)
+    labels['roi_id'] = labels['roi_id'].astype(str)
+    return labels
+
+
+def _tally_votes(
+        labels: pd.Series,
+        vote_threshold: float
+):
+    """Loop through labels and return a label of "cell" or "not cell" given
+    the votes of the labelers.
+
+    Parameters
+    ---------
+    labels : pandas.Series
+        List of user labels
+    vote_threshold :  float
+        Fraction of votes for "cell" to return a label for the ROI of
+        "cell".
+
+    Returns
+    -------
+    label : str
+        Label for ROI. "cell" or "not cell"
+    """
+    cell_count = len([label for label in labels if label == 'cell'])
+    cell_frac = cell_count / len(labels)
+    return 'cell' if cell_frac >= vote_threshold else 'not cell'
+
+
+def _get_raw_user_labels(label_db_path: str) -> pd.DataFrame:
+    """
+    Queries label database for user labels
+    @param label_db_path: Path to label database
+    @return: pd.DataFrame
+    """
+    db_engine = db.create_engine(f"sqlite:///{label_db_path}")
+    query = (db.select([JobRegion.experiment_id,
+                        UserLabels.labels,
+                        UserLabels.user_id])
+             .select_from(UserLabels).join(JobRegion,
+                                           JobRegion.id ==
+                                           UserLabels.region_id))
+    labels = pd.read_sql(sql=query, con=db_engine)
+    return labels
 
 
 if __name__ == "__main__":

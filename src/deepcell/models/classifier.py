@@ -2,6 +2,7 @@ from typing import List, Optional
 
 import numpy as np
 import torch
+import torchvision.models.vgg
 from torch import nn
 
 
@@ -46,9 +47,10 @@ class Classifier(torch.nn.Module):
                                               layer=truncate_to_layer)
         self.features = torch.nn.Sequential(*conv_layers)
 
-        for layer in self.features[:freeze_up_to_layer]:
-            for p in layer.parameters():
-                p.requires_grad = False
+        if freeze_up_to_layer is not None:
+            for layer in self.features[:freeze_up_to_layer]:
+                for p in layer.parameters():
+                    p.requires_grad = False
 
         self.avgpool = torch.nn.AdaptiveAvgPool2d(
             final_activation_map_spatial_dimensions)
@@ -70,14 +72,28 @@ class Classifier(torch.nn.Module):
 
     @staticmethod
     def _truncate_to_layer(model, layer):
-        conv_layers = list(model.children())[0]
-        return conv_layers[:layer]
+        layers = list(model.children())
+
+        # remove classifier
+        if type(model) is torchvision.models.vgg.VGG:
+            layers = layers[0]
+        else:
+            # also remove avg pool (adding it separately)
+            layers = layers[:-2]
+
+        # Truncate to layer
+        layers = layers[:layer]
+
+        return layers
 
     def _get_last_filter_num(self):
         idx = -1
-        while idx > -1 * len(self.features):
-            if hasattr(self.features[idx], 'out_channels'):
-                return self.features[idx].out_channels
+        while idx >= -1 * len(self.features):
+            layer = self.features[idx]
+            for module in reversed(
+                    [mod for _, mod in layer.named_modules()]):
+                if hasattr(module, 'out_channels'):
+                    return module.out_channels
             idx -= 1
 
         raise Exception('Could not find number of filters in last conv layer')

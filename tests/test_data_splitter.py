@@ -27,7 +27,6 @@ def test_ids_different():
 
     data_splitter = \
         DataSplitter(model_inputs=model_inputs,
-                     experiment_metadatas=exp_inputs,
                      seed=1234)
     train, test = data_splitter.get_train_test_split(test_size=.3,
                                                      full_dataset=model_inputs,
@@ -53,14 +52,8 @@ def test_dataset_is_shuffled():
                                max_projection_path=Path('foo'),
                                avg_projection_path=Path('foo')
                                ) for i in range(5000)]
-    exp_inputs = [ExperimentMetadata(experiment_id=idx,
-                                     imaging_depth=idx % 2,
-                                     equipment='2P',
-                                     problem_experiment=False)
-                  for idx in range(10)]
     data_splitter = \
         DataSplitter(model_inputs=model_inputs,
-                     experiment_metadatas=exp_inputs,
                      seed=1234)
 
     index = np.random.choice(range(len(model_inputs)), size=100, replace=False)
@@ -99,7 +92,6 @@ def test_experiment_binning():
 
     data_splitter = \
         DataSplitter(model_inputs=model_inputs,
-                     experiment_metadatas=exp_inputs,
                      seed=1234)
     exp_bin_ids, _ = data_splitter._get_experiment_groups_for_stratified_split(
         experiment_metadatas=exp_inputs,
@@ -128,7 +120,6 @@ def test_convert_exp_index_to_roi_index():
     expected_exps = np.array([1, 2])
     data_splitter = \
         DataSplitter(model_inputs=model_inputs,
-                     experiment_metadatas=exp_inputs,
                      seed=1234)
     rois_idxs = data_splitter._convert_exp_index_to_roi_index(
         exp_ids=np.arange(10, dtype=int),
