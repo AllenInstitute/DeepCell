@@ -21,11 +21,13 @@ class TrainRunner(argschema.ArgSchemaParser):
 
         train_transform = RoiDataset.get_default_transforms(
             crop_size=self.args['data_params']['crop_size'], is_train=True,
-            means=self.args['data_params']['channel_wise_means']
+            means=self.args['data_params']['channel_wise_means'],
+            stds=self.args['data_params']['channel_wise_stds']
         )
         test_transform = RoiDataset.get_default_transforms(
             crop_size=self.args['data_params']['crop_size'], is_train=False,
-            means=self.args['data_params']['channel_wise_stds']
+            means=self.args['data_params']['channel_wise_means'],
+            stds=self.args['data_params']['channel_wise_stds'],
         )
 
         train = RoiDataset(
