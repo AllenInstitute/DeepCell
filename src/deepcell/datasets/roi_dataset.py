@@ -11,6 +11,7 @@ from deepcell.datasets.util import center_roi
 from deepcell.transform import Transform
 from deepcell.util import get_experiment_genotype_map
 
+# See https://pytorch.org/vision/stable/models.html
 IMAGENET_CHANNELWISE_MEANS = [0.485, 0.456, 0.406]
 IMAGENET_CHANNELWISE_STDS = [0.229, 0.224, 0.225]
 
