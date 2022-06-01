@@ -2,6 +2,7 @@ import json
 import tempfile
 from pathlib import Path
 import pandas as pd
+import pytest
 import torch
 import torchvision
 
@@ -15,7 +16,8 @@ class TestInferenceCli:
     def setup_class(cls):
 
         data_dir = tempfile.TemporaryDirectory()
-        dataset = get_test_data(write_dir=data_dir.name, is_train=False)
+        train_dataset = get_test_data(write_dir=data_dir.name, is_train=True)
+        prod_dataset = get_test_data(write_dir=data_dir.name, is_train=False)
 
         net = torchvision.models.vgg11_bn(pretrained=True, progress=False)
         net.classifier = torch.nn.Sequential(torch.nn.Linear(512, 1))
@@ -23,10 +25,11 @@ class TestInferenceCli:
 
         for fold in range(5):
             torch.save({'state_dict': net.state_dict()},
-                       Path(checkpoint_path.name) / f'model_{fold}.pt')
+                       Path(checkpoint_path.name) / f'{fold}_model.pt')
 
         cls.data_dir = data_dir
-        cls.dataset = dataset
+        cls.prod_dataset = prod_dataset
+        cls.train_dataset = train_dataset
         cls.checkpoint_path = checkpoint_path
         cls.experiment_id = '0'
 
@@ -34,16 +37,20 @@ class TestInferenceCli:
         self.data_dir.cleanup()
         self.checkpoint_path.cleanup()
 
-    def test_inference_cli(self):
+    @pytest.mark.parametrize('mode', ('test', 'CV', 'production'))
+    def test_inference_cli(self, mode):
+        dataset = self.prod_dataset if mode == 'production' else \
+            self.train_dataset
         with tempfile.TemporaryDirectory() as out_dir:
             with open(Path(out_dir) / 'model_inputs.json', 'w') as f:
-                json.dump(self.dataset, f)
+                json.dump(dataset, f)
 
             with open(Path(out_dir) / 'model_inputs.json', 'r') as f:
                 input_json = {
                     'experiment_id': self.experiment_id,
-                    'model_inputs_path': f.name,
+                    'model_inputs_paths': [f.name],
                     'model_load_path': self.checkpoint_path.name,
+                    'mode': mode,
                     'model_params': {
                         'classifier_cfg': []
                     },
@@ -52,6 +59,11 @@ class TestInferenceCli:
                 inference_mod = InferenceModule(input_data=input_json, args=[])
                 inference_mod.run()
 
-                df = pd.read_csv(Path(out_dir) /
-                                 f'{self.experiment_id}_inference.csv')
-                assert df.shape[0] == len(self.dataset)
+                if mode == 'CV':
+                    filename = 'cv_preds.csv'
+                elif mode == 'production':
+                    filename = 'test_preds.csv'
+                else:
+                    filename = f'{self.experiment_id}_inference.csv'
+                df = pd.read_csv(Path(out_dir) / filename)
+                assert df.shape[0] == len(dataset)

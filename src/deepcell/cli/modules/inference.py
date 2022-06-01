@@ -60,7 +60,7 @@ class InferenceModule(argschema.ArgSchemaParser):
                 has_labels=self.args['mode'] == 'test',
                 checkpoint_path=str(self.args['model_load_path']))
         else:
-            if len(model_inputs) > 1:
+            if type(model_inputs[0]) == list:
                 # Just passing the raw split validation model inputs
                 data_splitter = None
             else:
@@ -76,12 +76,13 @@ class InferenceModule(argschema.ArgSchemaParser):
                 checkpoint_path=self.args['model_load_path'],
                 test_transform=test_transform)
 
-        if self.args['experiment_id'] is not None:
-            out_filename = f'{self.args["experiment_id"]}_inference.csv'
-        elif self.args['mode'] == 'CV':
+        if self.args['mode'] == 'CV':
             out_filename = 'cv_preds.csv'
-        else:
+        elif self.args['mode'] == 'production':
             out_filename = 'test_preds.csv'
+        else:
+            out_filename = f'{self.args["experiment_id"]}_inference.csv'
+
         inference_res.to_csv(Path(self.args['save_path']) / f'{out_filename}',
                              index=False)
 

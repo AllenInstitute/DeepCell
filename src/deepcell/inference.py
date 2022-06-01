@@ -1,3 +1,4 @@
+import warnings
 from pathlib import Path
 from typing import Tuple, Union, Dict, List, Optional
 
@@ -117,12 +118,16 @@ def inference(model: torch.nn.Module,
             TP = ((dataset.y == 1) & (y_preds_model == 1)).sum().item()
             FP = ((dataset.y == 0) & (y_preds_model == 1)).sum().item()
             FN = ((dataset.y == 1) & (y_preds_model == 0)).sum().item()
-            p = TP / (TP + FP)
-            r = TP / (TP + FN)
-            f1 = 2 * p * r / (p + r)
-            print(f'{model_checkpoint} precision: {p}')
-            print(f'{model_checkpoint} recall: {r}')
-            print(f'{model_checkpoint} f1: {f1}')
+
+            if TP + FP == 0 or TP + FN == 0:
+                warnings.warn('Division by zero')
+            else:
+                p = TP / (TP + FP)
+                r = TP / (TP + FN)
+                f1 = 2 * p * r / (p + r)
+                print(f'{model_checkpoint} precision: {p}')
+                print(f'{model_checkpoint} recall: {r}')
+                print(f'{model_checkpoint} f1: {f1}')
 
     # average over num_iters
     if tta_num_iters > 0:
@@ -199,7 +204,7 @@ def cv_performance(
 
     def get_validation_set():
         if data_splitter is None:
-            for k in range(5):
+            for k in range(len(model_inputs)):
                 yield RoiDataset(model_inputs=model_inputs[k],
                                  transform=test_transform)
         else:
