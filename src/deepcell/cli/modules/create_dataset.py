@@ -98,7 +98,7 @@ class CreateTrainTestSplit(ArgSchemaParser):
     default_schema = CreateTrainTestSplitInputSchema
 
     def run(self):
-        labels = _construct_dataset(
+        labels = construct_dataset(
             label_db_path=self.args['label_db'],
             vote_threshold=self.args['vote_threshold'],
             min_labelers_per_roi=self.args['min_labelers_required_per_region'])
@@ -133,10 +133,11 @@ class CreateTrainTestSplit(ArgSchemaParser):
             json.dump(test_dicts, jfile)
 
 
-def _construct_dataset(
+def construct_dataset(
         label_db_path: str,
         min_labelers_per_roi: int,
-        vote_threshold: float
+        vote_threshold: float,
+        raw: bool = False
 ) -> pd.DataFrame:
     """
     Create labeled dataset
@@ -145,6 +146,7 @@ def _construct_dataset(
     @param min_labelers_per_roi: minimum number of labelers required to have seen
         a given ROI
     @param vote_threshold: Threshold to mark an ROI as cell
+    @param raw: If True, returns untallied labels
     @return: pd.DataFrame
     """
     user_labels = _get_raw_user_labels(label_db_path=label_db_path)
@@ -182,9 +184,11 @@ def _construct_dataset(
     labels = labels.drop_duplicates(
         subset=['experiment_id', 'roi_id', 'user_id'])
 
-    labels = labels.groupby(['experiment_id', 'roi_id'])['label']\
-        .apply(lambda x: _tally_votes(labels=x, vote_threshold=vote_threshold))
-    labels = labels.reset_index()
+    if not raw:
+        labels = labels.groupby(['experiment_id', 'roi_id'])['label']\
+            .apply(lambda x: _tally_votes(labels=x,
+                                          vote_threshold=vote_threshold))
+        labels = labels.reset_index()
 
     labels['experiment_id'] = labels['experiment_id'].astype(str)
     labels['roi_id'] = labels['roi_id'].astype(str)
