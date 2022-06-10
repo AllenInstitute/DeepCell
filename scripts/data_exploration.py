@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 import re
@@ -6,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from deepcell.cli.modules.create_dataset import construct_dataset
 from matplotlib import pyplot as plt
 from scipy.stats import pearsonr
 from sklearn.metrics import precision_score, recall_score, \
@@ -17,6 +19,9 @@ from deepcell.data_splitter import DataSplitter
 from deepcell.datasets.exp_metadata import ExperimentMetadata
 
 plt.style.use('ggplot')
+
+MIN_LABELERS_PER_ROI = 3
+EXPERIMENT_METADATA_PATH = '/allen/aibs/informatics/chris.morrison/ticket-29/experiment_metadata.json'
 
 
 def _get_train_test_experiments(experiment_metadata: pd.DataFrame):
@@ -191,15 +196,7 @@ def plot_distribution_of_depths(user_labels: pd.DataFrame,
     )
 
 
-def get_overall_target_distribution(
-        user_labels: pd.DataFrame,
-        job_regions: pd.DataFrame
-):
-    labels = _construct_dataset(user_labels=user_labels,
-                                job_regions=job_regions)
-    targets = _get_targets(labels=labels,
-                           filter_by_maximally_labeled_fov=False)
-
+def get_overall_target_distribution(targets: pd.DataFrame):
     target_counts = targets.groupby('label').size()
     target_counts = target_counts.reset_index()
     target_counts = target_counts.rename(columns={0: 'count'})
@@ -209,16 +206,11 @@ def get_overall_target_distribution(
 
 
 def get_cell_count_distribution(
-        user_labels: pd.DataFrame,
-        job_regions: pd.DataFrame,
+        labels: pd.DataFrame,
+        targets: pd.DataFrame,
         by_depth_bin=False,
         cell_probability=False
 ):
-    labels = _construct_dataset(user_labels=user_labels,
-                                job_regions=job_regions)
-    targets = _get_targets(labels=labels,
-                           filter_by_maximally_labeled_fov=False)
-
     cells = targets[targets['label'] == 'cell']
     n_cells_per_fov = cells.groupby('experiment_id').size()
 
@@ -284,97 +276,6 @@ def get_cell_count_distribution(
     plt.show()
 
 
-def _construct_dataset(
-        user_labels: pd.DataFrame,
-        job_regions: pd.DataFrame,
-        only_false_negatives=False
-):
-    def _get_majority_label(labels):
-        if labels.shape[0] == 1:
-            label = labels['label'].iloc[0]
-        else:
-            label = \
-                'cell' if labels['count'].iloc[0] > labels['count'].iloc[1] \
-                    else 'not cell'
-        return label
-
-    user_labels = user_labels.merge(job_regions, left_on='region_id',
-                                    right_on='id')
-    user_labels['labels'] = user_labels['labels'].apply(
-        lambda x: json.loads(x))
-
-    region_ids = []
-    experiment_ids = []
-    user_ids = []
-    for row in user_labels.itertuples(index=False):
-        labels = pd.DataFrame(row.labels)
-        if only_false_negatives:
-            labels = labels[~labels['is_segmented']]
-        else:
-            labels = labels[labels['is_segmented']]
-
-        if not labels.empty:
-            region_ids += [row.region_id] * labels.shape[0]
-            experiment_ids += [row.experiment_id] * labels.shape[0]
-            user_ids += [row.user_id] * labels.shape[0]
-
-    labels = pd.concat([pd.DataFrame(x) for x in user_labels['labels']],
-                       ignore_index=True)
-
-    if only_false_negatives:
-        labels = labels[~labels['is_segmented']].copy()
-    else:
-        labels = labels[labels['is_segmented']].copy()
-
-    labels['region_id'] = region_ids
-    labels['experiment_id'] = experiment_ids
-    labels['user_id'] = user_ids
-
-    if not only_false_negatives:
-        n_users_labeled = labels.groupby(['experiment_id', 'roi_id'])[
-            'user_id'].nunique().reset_index().rename(
-            columns={'user_id': 'n_users_labeled'})
-
-        # Filter out ROIs with < 3 labels
-        labels = labels.merge(n_users_labeled, on=['experiment_id', 'roi_id'])
-        labels = labels[labels['n_users_labeled'] >= 3]
-        labels = labels.drop(columns='n_users_labeled')
-
-    majority_labels = labels.groupby(
-        ['experiment_id', 'roi_id', 'label']).size().reset_index().rename(
-        columns={0: 'count'}).sort_values('label').groupby(
-        ['experiment_id', 'roi_id']).apply(_get_majority_label)
-    majority_labels = majority_labels.reset_index()\
-        .rename(columns={0: 'majority_label'})
-
-    labels = labels.merge(majority_labels, on=['experiment_id', 'roi_id'])
-
-    return labels
-
-
-def _get_targets(labels: pd.DataFrame,
-                 filter_by_maximally_labeled_fov=True):
-    targets = labels.groupby(['experiment_id', 'roi_id'])['label'].apply(
-        lambda x: 'cell' if len([l for l in x if l == 'cell']) >= 3
-        else 'not cell')
-
-    targets = targets.reset_index()
-
-    targets = targets.merge(
-        labels.drop_duplicates(subset=['experiment_id', 'roi_id'])
-        [['experiment_id', 'roi_id', 'majority_label']],
-        on=['experiment_id', 'roi_id'])
-
-    if filter_by_maximally_labeled_fov:
-        n_regions_per_exp = labels.groupby('experiment_id')[
-            'region_id'].nunique()
-        fully_labeled_exps = n_regions_per_exp[n_regions_per_exp == 3].index
-
-        targets = targets[targets['experiment_id'].isin(fully_labeled_exps)]
-
-    return targets
-
-
 def _get_experiment_meta_with_depth_bin(experiment_meta: pd.DataFrame):
     exp_metas = []
     for row in experiment_meta.itertuples(index=False):
@@ -438,10 +339,10 @@ def _add_n_samples_to_title(fig, experiment_meta: pd.DataFrame,
 
 
 def _get_experiment_meta_dataframe():
-    experiment_meta = pd.read_json('~/Downloads/experiment_metadata.json')
+    experiment_meta = pd.read_json(EXPERIMENT_METADATA_PATH)
     experiment_meta = experiment_meta.T
 
-    with open('/Users/adam.amster/Downloads/experiment_metadata.json') as f:
+    with open(EXPERIMENT_METADATA_PATH) as f:
         experiment_ids = json.load(f).keys()
     experiment_meta['experiment_id'] = experiment_ids
     experiment_meta['experiment_id'] = experiment_meta['experiment_id'] \
@@ -451,14 +352,10 @@ def _get_experiment_meta_dataframe():
 
 
 def get_disagreement(
-        user_labels: pd.DataFrame,
-        job_regions: pd.DataFrame,
-        by_depth=False,
-        use_majority=False
+        labels: pd.DataFrame,
+        by_depth=False
 ):
-    roi_label_agreement = _get_roi_label_agreement(user_labels=user_labels,
-                                                   job_regions=job_regions,
-                                                   use_majority=use_majority)
+    roi_label_agreement = _get_roi_label_agreement(labels=labels)
 
     fraction_groupby = ['fraction']
     if by_depth:
@@ -505,24 +402,17 @@ def get_disagreement(
     plt.show()
 
 
-def get_disagreement_by_user(user_labels: pd.DataFrame,
-                             job_regions: pd.DataFrame):
-    labels = _construct_dataset(user_labels=user_labels,
-                                job_regions=job_regions)
-    targets = _get_targets(
-        labels=_construct_dataset(user_labels=user_labels,
-                                  job_regions=job_regions),
-        filter_by_maximally_labeled_fov=False)
-    labels = labels.merge(targets, on=['experiment_id', 'roi_id'],
-                          suffixes=('_user', '_total'))
+def get_disagreement_by_user(raw_labels: pd.DataFrame, targets: pd.DataFrame):
+    raw_labels = raw_labels.merge(targets, on=['experiment_id', 'roi_id'],
+                                  suffixes=('_user', '_total'))
 
-    cells = labels[labels['majority_label'] == 'cell']
+    cells = raw_labels[raw_labels['majority_label'] == 'cell']
     user_disagreement = cells.groupby('user_id').apply(
         lambda x: (x['label_user'] != x['majority_label']).mean())
     user_disagreement = user_disagreement.reset_index()\
         .rename(columns={0: 'fraction'})
 
-    num_regions_labeled = labels.groupby('user_id')['region_id'].nunique()
+    num_regions_labeled = raw_labels.groupby('user_id')['region_id'].nunique()
     num_regions_labeled = num_regions_labeled.reset_index().rename(
         columns={'region_id': 'num_regions'})
     user_disagreement = user_disagreement.merge(num_regions_labeled, on='user_id')
@@ -536,41 +426,6 @@ def get_disagreement_by_user(user_labels: pd.DataFrame,
     plt.title('Fraction of times user disagreed with majority')
     plt.ylabel('Fraction')
     plt.xlabel('Labeler')
-    plt.show()
-
-
-def get_false_negatives(user_labels: pd.DataFrame, job_regions: pd.DataFrame):
-    labels = _construct_dataset(user_labels=user_labels,
-                                job_regions=job_regions,
-                                only_false_negatives=True)
-    targets = _get_targets(
-        labels=_construct_dataset(user_labels=user_labels,
-                                  job_regions=job_regions),
-        filter_by_maximally_labeled_fov=False)
-
-    print(labels.shape[0])
-    print(labels.groupby('experiment_id')['user_id'].nunique())
-
-    experiment_meta = _get_experiment_meta_with_depth_bin(
-        experiment_meta=_get_experiment_meta_dataframe()
-    )
-
-    labels = labels.merge(experiment_meta, on='experiment_id')
-
-    # get recall by depth bin
-    targets = targets.merge(experiment_meta, on='experiment_id')
-    targets = targets[targets['label'] == 'cell']
-    tp = targets.groupby('depth_bin').size()
-    fn = labels.groupby('depth_bin').size()
-    recall = tp / (tp + fn)
-    recall = recall.fillna(1.0)
-
-    recall = recall.loc[
-        _get_sorted_depth_bin_labels(experiment_meta=experiment_meta)]
-    recall = recall.reset_index().rename(columns={0: 'sensitivity'})
-
-    sns.barplot(data=recall, x='depth_bin', y='sensitivity')
-    plt.title('Sensitivity by depth bin')
     plt.show()
 
 
@@ -601,23 +456,31 @@ def get_notes(job_region: pd.DataFrame):
           ][['notes', 'user_id']])
 
 
-def get_legacy_classifier_performance(user_labels: pd.DataFrame,
-                                      job_regions: pd.DataFrame,
-                                      by_depth=False,
-                                      use_majority_label=False):
-    label = 'majority_label' if use_majority_label else 'label'
-    labels = _construct_dataset(user_labels=user_labels,
-                                job_regions=job_regions)
-    targets = _get_targets(labels=labels,
-                           filter_by_maximally_labeled_fov=False)
-    targets['experiment_id'] = targets['experiment_id'].astype(str)
+def get_classifier_performance(preds_path: Path,
+                               labels: pd.DataFrame,
+                               targets: pd.DataFrame,
+                               by_depth=False,
+                               is_legacy: bool = False):
+    label = 'label'
 
-    classifier_scores = _get_classifier_scores()
-    classifier_scores = classifier_scores.rename(columns={'roi-id': 'roi_id'})
+    classifier_scores = _get_classifier_scores(preds_path=preds_path, is_legacy=is_legacy)
+    classifier_scores = classifier_scores.rename(columns={'roi-id': 'roi_id',
+                                                          'y_true': label})
+    if classifier_scores[label].dtype == 'int64':
+        classifier_scores[label] = classifier_scores[label].apply(
+            lambda x: 'cell' if x else 'not cell')
 
-    res = classifier_scores.merge(targets, on=['experiment_id', 'roi_id'])
-    res['y_pred'] = res['y_pred'].apply(lambda x: 'cell' if x else 'not cell')
-    res = res.rename(columns={'y_score': 'Classifier score'})
+    if classifier_scores['y_pred'].dtype != 'object':
+        classifier_scores['y_pred'] = classifier_scores['y_pred'].apply(
+            lambda x: 'cell' if x else 'not cell')
+
+    if is_legacy:
+        classifier_scores = \
+            classifier_scores.merge(targets, on=['experiment_id', 'roi_id'])
+        classifier_scores['y_pred'] = \
+            classifier_scores['y_pred'].apply(lambda x: 'cell' if x else 'not cell')
+    classifier_scores = \
+        classifier_scores.rename(columns={'y_score': 'Classifier score'})
 
     if by_depth:
         experiment_meta = _get_experiment_meta_with_depth_bin(
@@ -625,9 +488,9 @@ def get_legacy_classifier_performance(user_labels: pd.DataFrame,
         )
 
         experiment_meta['experiment_id'] = experiment_meta['experiment_id'].astype(str)
-        res = res.merge(experiment_meta[['experiment_id', 'depth_bin']],
+        classifier_scores = classifier_scores.merge(experiment_meta[['experiment_id', 'depth_bin']],
                         on='experiment_id')
-        g = sns.FacetGrid(res, col='depth_bin',
+        g = sns.FacetGrid(classifier_scores, col='depth_bin',
                           col_order=_get_sorted_depth_bin_labels(
                               experiment_meta=experiment_meta))
         g.map_dataframe(sns.histplot, x='Classifier score', hue='label',
@@ -641,68 +504,59 @@ def get_legacy_classifier_performance(user_labels: pd.DataFrame,
         plt.suptitle('Legacy classifier score distribution by depth')
 
         # Since precision is problematic, show precision by depth bin
-        print(res.groupby(['depth_bin']).apply(
+        print(classifier_scores.groupby(['depth_bin']).apply(
             lambda x: precision_score(y_true=x[label], y_pred=x['y_pred'],
                                       pos_label='cell')))
         plt.show()
 
-        # confusion matrices
-        f, axes = plt.subplots(2, 6, figsize=(30, 10), sharey='row')
-
-        for i, normalization in enumerate(('pred', 'true')):
-            for j, depth_bin in enumerate(
-                    # make depth bins sorted ascending
-                    [x for x in reversed(res['depth_bin'].unique())]):
-                df = res[res['depth_bin'] == depth_bin]
-                disp = ConfusionMatrixDisplay.from_predictions(
-                    y_true=df[label],
-                    y_pred=df['y_pred'],
-                    normalize=normalization)
-                disp.plot(ax=axes[i, j])
-                disp.ax_.set_title(
-                    f'{depth_bin}\nN={df.shape[0]} '
-                    f'normalized by {normalization}')
-                disp.ax_.grid(False)
-        plt.show()
+        _get_confusion_matrix_by_depth(classifier_scores=classifier_scores,
+                                       label_col=label, pred_col='y_pred')
     else:
-        sns.histplot(res, x='Classifier score', hue='label', multiple='dodge',
+        sns.histplot(classifier_scores, x='Classifier score', hue=label, multiple='dodge',
                      stat='probability', common_norm=False)
-        plt.title('Legacy classifier score distribution')
+        plt.title('Classifier score distribution')
         plt.show()
 
-        ConfusionMatrixDisplay.from_predictions(y_true=res[label],
-                                                y_pred=res['y_pred'])
-        plt.show()
+        _get_confusion_matrix(classifier_scores=classifier_scores,
+                              label_col=label, pred_col='y_pred')
 
-    precision = precision_score(y_true=res[label], y_pred=res['y_pred'],
+    precision = precision_score(y_true=classifier_scores[label], y_pred=classifier_scores['y_pred'],
                                 pos_label='cell')
-    recall = recall_score(y_true=res[label], y_pred=res['y_pred'],
+    recall = recall_score(y_true=classifier_scores[label], y_pred=classifier_scores['y_pred'],
                           pos_label='cell')
     print(recall, precision)
 
     # Get misclassified examples
-    print(res[res[label] == 'not cell']\
+    print(classifier_scores[classifier_scores[label] == 'not cell']\
           .sort_values('Classifier score', ascending=False)
           [['experiment_id', 'roi_id', 'Classifier score']])
 
     # Get disagreement with examples with high classifier score
-    agreement = _get_roi_label_agreement(user_labels=user_labels,
-                                         job_regions=job_regions)
+    agreement = _get_roi_label_agreement(labels=labels, targets=targets)
     agreement['experiment_id'] = agreement['experiment_id'].astype(str)
-    agreement = agreement[['experiment_id', 'roi_id', 'fraction']]
-    res = res.merge(agreement, on=['experiment_id', 'roi_id'])
+    agreement['roi_id'] = agreement['roi_id'].astype(int)
+    agreement = agreement[['experiment_id', 'roi_id', 'fraction', 'is_consensus', 'label_target']]
+    res = classifier_scores.merge(agreement, on=['experiment_id', 'roi_id'])
 
     # Plot distribution of classifier score at varying levels of agreement
-    sns.boxplot(data=res[res[label] == 'not cell'], x='fraction',
-                y='Classifier score')
-    plt.xlabel('Cell agreement')
-    plt.title('Legacy classifier score at varying cell agreement')
+    sns.boxplot(data=res, x='is_consensus',
+                y='Classifier score', hue='label',
+                hue_order=('not cell', 'cell'))
+    plt.title('Classifier score in cases with consensus vs without')
+    plt.show()
+
+    # Plot association between labeler disagreement and classifier mistakes
+    res['is_correct'] = res['y_pred'] == res['label']
+    error_rates = (1 - res.groupby(['label', 'is_consensus'])[
+        'is_correct'].mean()).reset_index().rename(
+        columns={'is_correct': 'error_rate'})
+    sns.barplot(data=error_rates, x='is_consensus', y='error_rate',
+                hue='label', hue_order=('not cell', 'cell'))
+    plt.title('Classifier error rate in cases with consensus vs without')
     plt.show()
 
 
-def get_overlabeled_rois(user_labels: pd.DataFrame, job_regions: pd.DataFrame):
-    labels = _construct_dataset(user_labels=user_labels,
-                                job_regions=job_regions)
+def get_overlabeled_rois(labels: pd.DataFrame):
     more_than_1_region = (labels.groupby(['experiment_id', 'roi_id'])[
                               'region_id'].nunique() > 1).reset_index().rename(
         columns={'region_id': 'more_than_one_region'})
@@ -723,58 +577,56 @@ def get_overlabeled_rois(user_labels: pd.DataFrame, job_regions: pd.DataFrame):
     print(targets[targets['more_than_one_region']]['more_than_one_label'].mean())
 
 
-def _get_classifier_scores():
-    preds_path = Path('/Users/adam.amster/Downloads/legacy_classifier_scores/')
-    predictions = []
-    for file in os.listdir(preds_path):
-        predictions.append(
-            pd.read_csv(preds_path / file, dtype={'experiment_id': str})
-        )
-    predictions = pd.concat(predictions, ignore_index=True)
+def _get_classifier_scores(preds_path: Path, is_legacy: bool = False):
+    if is_legacy:
+        predictions = []
+        for file in os.listdir(preds_path):
+            predictions.append(
+                pd.read_csv(preds_path / file, dtype={'experiment_id': str})
+            )
+        predictions = pd.concat(predictions, ignore_index=True)
+    else:
+        predictions = pd.read_csv(preds_path)
+        predictions['experiment_id'] = predictions['experiment_id'].astype(str)
     return predictions
 
 
-def _get_roi_label_agreement(user_labels: pd.DataFrame,
-                             job_regions: pd.DataFrame):
+def _get_roi_label_agreement(labels: pd.DataFrame, targets: pd.DataFrame):
     label = 'label'
-    labels = _construct_dataset(user_labels=user_labels,
-                                job_regions=job_regions)
+
     roi_label_counts = labels.groupby(
         ['experiment_id', 'roi_id', label]).size()
 
-    roi_label_agreement = roi_label_counts\
+    roi_counts = labels.groupby(
+        ['experiment_id', 'roi_id']).size().reset_index().rename(columns={0: 'total_count'})
+
+    roi_label_counts = roi_label_counts\
         .reset_index() \
         .rename(columns={0: 'count'})
 
+    roi_label_agreement = roi_label_counts.merge(
+        roi_counts, on=['experiment_id', 'roi_id'])
     roi_label_agreement['fraction'] = \
-        roi_label_agreement['count'] / 3
+        roi_label_agreement['count'] / roi_label_agreement['total_count']
 
-    # Account for cases with 0 cells
-    zero_cells = \
-        roi_label_agreement[(roi_label_agreement[label] == 'not cell') & (
-                roi_label_agreement['count'] >= 3)].copy()
-    zero_cells[label] = 'cell'
-    zero_cells['fraction'] = 0.0
-    roi_label_agreement = pd.concat([roi_label_agreement, zero_cells])
+    roi_label_agreement = targets.merge(
+        roi_label_agreement, on=['experiment_id', 'roi_id'],
+        suffixes=('_target', '_agreement'))
 
-    roi_label_agreement = \
-        roi_label_agreement[roi_label_agreement[label] == 'cell']
+    roi_label_agreement['is_consensus'] = roi_label_agreement['fraction'] == 1.0
 
-    # TODO why are there duplicates?
+    # Now, for each exp_id, roi_id combo, we have the target and whether
+    # there was consensus
     roi_label_agreement = \
         roi_label_agreement.drop_duplicates(subset=['experiment_id', 'roi_id'])
+
     return roi_label_agreement
 
 
-def get_train_test_split(user_labels: pd.DataFrame, job_regions: pd.DataFrame):
-    labels = _construct_dataset(user_labels=user_labels,
-                                job_regions=job_regions)
-
+def get_train_test_split(labels: pd.DataFrame, targets: pd.DataFrame):
     experiment_meta = _get_experiment_meta_with_depth_bin(
         experiment_meta=_get_experiment_meta_dataframe()
     )
-    targets = _get_targets(labels=labels,
-                           filter_by_maximally_labeled_fov=False)
     experiment_meta = experiment_meta[experiment_meta['experiment_id']
         .isin(labels['experiment_id'].unique())]
 
@@ -859,10 +711,67 @@ def get_train_test_split(user_labels: pd.DataFrame, job_regions: pd.DataFrame):
     plt.show()
 
 
+def _get_confusion_matrix(classifier_scores: pd.DataFrame, label_col: str,
+                          pred_col: str):
+    for normalization in ('true', 'pred'):
+        disp = ConfusionMatrixDisplay.from_predictions(
+            y_true=classifier_scores[label_col],
+            y_pred=classifier_scores[pred_col],
+            normalize=normalization
+        )
+        disp.ax_.set_title(
+            f'N={classifier_scores.shape[0]}\n'
+            f'normalized by {normalization}')
+        disp.ax_.grid(False)
+
+        # Increase font size of values
+        for labels_ in disp.text_.ravel():
+            labels_.set_fontsize(24)
+    plt.show()
+
+
+def _get_confusion_matrix_by_depth(classifier_scores: pd.DataFrame,
+                                   label_col: str, pred_col: str):
+    experiment_meta = _get_experiment_meta_with_depth_bin(
+        experiment_meta=_get_experiment_meta_dataframe())
+    experiment_meta['experiment_id'] = \
+        experiment_meta['experiment_id'].astype(str)
+    classifier_scores = classifier_scores.merge(experiment_meta,
+                                                on='experiment_id')
+    f, axes = plt.subplots(2, 6, figsize=(30, 10), sharey='row')
+
+    for i, normalization in enumerate(('pred', 'true')):
+        for j, depth_bin in enumerate(_get_sorted_depth_bin_labels(
+                experiment_meta=experiment_meta)):
+            df = classifier_scores[classifier_scores['depth_bin'] == depth_bin]
+            disp = ConfusionMatrixDisplay.from_predictions(
+                y_true=df[label_col],
+                y_pred=df[pred_col],
+                normalize=normalization)
+            disp.plot(ax=axes[i, j])
+            if normalization == 'pred':
+                subtitle = f'N predicted cells=' \
+                           f'{df[df[pred_col] == "cell"].shape[0]}'
+            else:
+                subtitle = f'N cells=' \
+                           f'{df[df[label_col] == "cell"].shape[0]}'
+            disp.ax_.set_title(
+                f'{depth_bin}\nN={df.shape[0]}\n{subtitle}\n'
+                f'normalized by {normalization}')
+            disp.ax_.grid(False)
+
+            # Increase font size of values
+            for labels_ in disp.text_.ravel():
+                labels_.set_fontsize(24)
+    plt.show()
+
 def main():
-    user_labels = pd.read_csv('~/Downloads/user_labels.csv',
-                              parse_dates=['timestamp'])
-    job_regions = pd.read_csv('~/Downloads/job_regions.csv')
+    labels = construct_dataset(
+        label_db_path=args.labels_db_path,
+        min_labelers_per_roi=MIN_LABELERS_PER_ROI,
+        vote_threshold=args.vote_threshold,
+        raw=True
+    )
 
     # plot_duration_trends()
     # plot_distribution_of_depths(user_labels=user_labels)
@@ -882,9 +791,9 @@ def main():
     # get_notes(job_region=job_regions)
     # get_legacy_classifier_performance(user_labels=user_labels,
     #                                   job_regions=job_regions)
-    # get_legacy_classifier_performance(user_labels=user_labels,
-    #                                   job_regions=job_regions,
-    #                                   use_majority_label=True)
+    get_classifier_performance(labels=labels,
+                               preds_path=args.preds_path,
+                               is_legacy=args.use_legacy_classifier)
     # get_legacy_classifier_performance(user_labels=user_labels,
     #                                   job_regions=job_regions,
     #                                   by_depth=True)
@@ -893,8 +802,16 @@ def main():
     #                                   by_depth=True,
     #                                   use_majority_label=True)
     # get_overlabeled_rois(user_labels=user_labels, job_regions=job_regions)
-    get_train_test_split(user_labels=user_labels, job_regions=job_regions)
+    # get_train_test_split(user_labels=user_labels, job_regions=job_regions)
     # get_disagreement_by_user(user_labels=user_labels, job_regions=job_regions)
 
+
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--preds_path', required=True)
+    parser.add_argument('--use_legacy_classifier', action='store_true',
+                        default=False)
+    parser.add_argument('--labels_db_path', required=True)
+    parser.add_argument('--vote_threshold', default=0.5, type=float)
+    args = parser.parse_args()
     main()
