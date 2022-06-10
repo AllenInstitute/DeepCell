@@ -1,4 +1,6 @@
 import json
+from typing import Optional, List, Dict
+
 import marshmallow
 import pandas as pd
 from pathlib import Path
@@ -11,11 +13,12 @@ from deepcell.datasets.model_input import ModelInput
 from deepcell.cli.schemas.data import ExperimentMetadataSchema
 
 
-class CreateTrainTestSplitInputSchema(ArgSchema):
-    label_db = fields.InputFile(
+class CreateDatasetInputSchema(ArgSchema):
+    labels_path = fields.InputFile(
         required=True,
-        description="Path to sqlite database containing all labels for the "
-                    "app."
+        description="Path to labels. Must either be sqlite database "
+                    "containing all labels or already preprocessed labels "
+                    "in csv format"
     )
     artifact_dir = fields.InputDir(
         required=True,
@@ -62,46 +65,41 @@ class CreateTrainTestSplitInputSchema(ArgSchema):
                     "training and test datasets.",
     )
 
-    @marshmallow.post_load
-    def get_experiment_metadata(self, data):
-        """Load experiment metadata and trim to only those experiments that
-        are labeled by users.
-        """
-        # Get the set of experiments that has a user label given.
-        db_engine = db.create_engine(f"sqlite:///{data['label_db']}")
-        exp_id_query = db.select(db.distinct(JobRegion.experiment_id))
-        exp_id_query = exp_id_query.join(UserLabels,
-                                         JobRegion.id == UserLabels.region_id)
-        exp_id_data = db_engine.execute(exp_id_query).fetchall()
 
-        # Retrieve the data for the experiments that have a user label.
-        with open(data['experiment_metadata'], 'r') as f:
-            exp_metas = json.load(f)
-        output_exp_metas = []
-        for (exp_id,) in exp_id_data:
-            meta = exp_metas[exp_id]
-            output_exp_metas.append(ExperimentMetadataSchema().load(
-                dict(experiment_id=str(exp_id),
-                     imaging_depth=meta['imaging_depth'],
-                     equipment=meta['equipment'],
-                     problem_experiment=meta['problem_experiment'])))
-        data['experiment_metadata'] = output_exp_metas
-        return data
-
-
-class CreateTrainTestSplit(ArgSchemaParser):
-    """Access the cell labeling app database and return ROIs in a train
-    test split by experiment.
-
-    Store the ROIs as json files.
+class CreateDataset(ArgSchemaParser):
+    """Convert a set of labeled ROIs into a dataset usable by the model
+    Splits data into a train and test set and outputs both as json files.
     """
-    default_schema = CreateTrainTestSplitInputSchema
+    default_schema = CreateDatasetInputSchema
 
     def run(self):
-        labels = construct_dataset(
-            label_db_path=self.args['label_db'],
-            vote_threshold=self.args['vote_threshold'],
-            min_labelers_per_roi=self.args['min_labelers_required_per_region'])
+        labels_path = Path(self.args['labels_path'])
+        output_dir = Path(self.args['output_dir'])
+
+        if labels_path.suffix not in ('.db', '.csv'):
+            raise ValueError(f'Expected labels_path to be a db or csv but got '
+                             f'file with suffix {labels_path.suffix}')
+
+        if labels_path.suffix == '.db':
+            raw_labels = construct_dataset(
+                label_db_path=self.args['labels_path'],
+                min_labelers_per_roi=(
+                    self.args['min_labelers_required_per_region']),
+                raw=True)
+        else:
+            raw_labels = pd.read_csv(self.args['labels_path'],
+                                 dtype={'experiment_id': str, 'roi_id': str})
+        raw_labels = raw_labels[['experiment_id', 'roi_id', 'user_id', 'label']]
+
+        # Anonymize user id
+        raw_labels['user_id'] = raw_labels['user_id'].map(
+            {user_id: i for i, user_id in
+             enumerate(raw_labels['user_id'].unique())})
+
+        raw_labels.to_csv(output_dir / 'raw_labels.csv', index=False)
+        
+        labels = _tally_votes(labels=raw_labels,
+                              vote_threshold=self.args['vote_threshold'])
 
         model_inputs = [
             ModelInput.from_data_dir(
@@ -113,12 +111,17 @@ class CreateTrainTestSplit(ArgSchemaParser):
             for row in labels.itertuples(index=False)
         ]
 
+        experiment_metadata = \
+            _get_experiment_metadata(
+                experiment_ids=labels['experiment_id'].unique(),
+                experiment_metadata_path=self.args['experiment_metadata'])
+
         splitter = DataSplitter(model_inputs=model_inputs,
                                 seed=self.args['seed'])
         train_rois, test_rois = splitter.get_train_test_split(
             test_size=self.args['test_size'],
             full_dataset=model_inputs,
-            exp_metas=self.args['experiment_metadata'],
+            exp_metas=experiment_metadata,
             n_depth_bins=self.args['n_depth_bins'])
 
         train_dicts = [model_roi.to_dict()
@@ -126,7 +129,6 @@ class CreateTrainTestSplit(ArgSchemaParser):
         test_dicts = [model_roi.to_dict()
                       for model_roi in test_rois.model_inputs]
 
-        output_dir = Path(self.args['output_dir'])
         with open(output_dir / 'train_rois.json', 'w') as jfile:
             json.dump(train_dicts, jfile)
         with open(output_dir / 'test_rois.json', 'w') as jfile:
@@ -136,19 +138,22 @@ class CreateTrainTestSplit(ArgSchemaParser):
 def construct_dataset(
         label_db_path: str,
         min_labelers_per_roi: int,
-        vote_threshold: float,
+        vote_threshold: Optional[float] = None,
         raw: bool = False
 ) -> pd.DataFrame:
     """
-    Create labeled dataset
+    Create labeled dataset from label db
 
     @param label_db_path: Path to label database
-    @param min_labelers_per_roi: minimum number of labelers required to have seen
-        a given ROI
+    @param min_labelers_per_roi: minimum number of labelers required to have
+    seen a given ROI
     @param vote_threshold: Threshold to mark an ROI as cell
     @param raw: If True, returns untallied labels
     @return: pd.DataFrame
     """
+    if not raw and vote_threshold is None:
+        raise ValueError('vote_threshold required if tallying votes')
+
     user_labels = _get_raw_user_labels(label_db_path=label_db_path)
     user_labels['labels'] = user_labels['labels'].apply(
         lambda x: json.loads(x))
@@ -185,17 +190,29 @@ def construct_dataset(
         subset=['experiment_id', 'roi_id', 'user_id'])
 
     if not raw:
-        labels = labels.groupby(['experiment_id', 'roi_id'])['label']\
-            .apply(lambda x: _tally_votes(labels=x,
-                                          vote_threshold=vote_threshold))
-        labels = labels.reset_index()
+        labels = _tally_votes(labels=labels, vote_threshold=vote_threshold)
 
     labels['experiment_id'] = labels['experiment_id'].astype(str)
     labels['roi_id'] = labels['roi_id'].astype(str)
     return labels
 
 
-def _tally_votes(
+def _tally_votes(labels: pd.DataFrame, vote_threshold: float):
+    """
+
+    @param labels: raw, untallied labels dataframe
+    @param vote_threshold:
+    @return: labels dataframe with a single record per ROI with the resulting
+        label using `vote_threshold`
+    """
+    labels = labels.groupby(['experiment_id', 'roi_id'])['label'] \
+        .apply(lambda x: _tally_votes_for_observation(
+               labels=x, vote_threshold=vote_threshold))
+    labels = labels.reset_index()
+    return labels
+
+
+def _tally_votes_for_observation(
         labels: pd.Series,
         vote_threshold: float
 ):
@@ -236,7 +253,25 @@ def _get_raw_user_labels(label_db_path: str) -> pd.DataFrame:
     labels = pd.read_sql(sql=query, con=db_engine)
     return labels
 
+def _get_experiment_metadata(experiment_ids: List,
+                             experiment_metadata_path: str) -> List[Dict]:
+    """Load experiment metadata for `experiment_ids`
+    @param experiment_ids: List of experiment ids to get metadata for
+    @param experiment_metadata_path: Path to experiment metadata
+    @return: List of experiment metadata
+    """
+    with open(experiment_metadata_path, 'r') as f:
+        exp_metas = json.load(f)
+    output_exp_metas = []
+    for exp_id in experiment_ids:
+        meta = exp_metas[exp_id]
+        output_exp_metas.append(ExperimentMetadataSchema().load(
+            dict(experiment_id=str(exp_id),
+                 imaging_depth=meta['imaging_depth'],
+                 equipment=meta['equipment'],
+                 problem_experiment=meta['problem_experiment'])))
+    return output_exp_metas
 
 if __name__ == "__main__":
-    create_test_train_split = CreateTrainTestSplit()
+    create_test_train_split = CreateDataset()
     create_test_train_split.run()

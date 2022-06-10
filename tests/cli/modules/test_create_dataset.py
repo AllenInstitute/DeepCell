@@ -14,8 +14,7 @@ from cell_labeling_app.database.schemas import (
     JobRegion, LabelingJob, User, UserLabels)
 
 from deepcell.cli.modules.create_dataset import \
-    CreateTrainTestSplit, \
-    CreateTrainTestSplitInputSchema, _tally_votes
+    CreateDataset, _tally_votes_for_observation
 
 
 class TestTrainTestSplitCli:
@@ -147,7 +146,7 @@ class TestTrainTestSplitCli:
                 json_blob=self._create_label_data(n_rois=self.n_rois,
                                                   cell_limit=1,
                                                   add_point=False))
-        args = {"label_db": str(self.db_fp.name),
+        args = {"labels_path": str(self.db_fp.name),
                 "artifact_dir": str(self.artifact_dir.name),
                 "experiment_metadata": str(self.exp_meta_file.name),
                 "min_labelers_required_per_region": 2,
@@ -156,7 +155,7 @@ class TestTrainTestSplitCli:
                 "n_depth_bins": 1,
                 "seed": 1234,
                 "output_dir": str(self.artifact_dir.name)}
-        train_test = CreateTrainTestSplit(args=[], input_data=args)
+        train_test = CreateDataset(args=[], input_data=args)
         train_test.run()
 
         with open(Path(self.artifact_dir.name) / "train_rois.json") as jfile:
@@ -181,7 +180,7 @@ class TestTrainTestSplitCli:
 
     ))
     def test_tally_votes(self, labels, expected):
-        assert _tally_votes(
+        assert _tally_votes_for_observation(
             labels=labels,
             vote_threshold=0.5
         ) == expected
