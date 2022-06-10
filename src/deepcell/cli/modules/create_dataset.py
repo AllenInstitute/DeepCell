@@ -1,16 +1,36 @@
 import json
+from enum import Enum
 from typing import Optional, List, Dict
 
-import marshmallow
 import pandas as pd
 from pathlib import Path
 import sqlalchemy as db
 
 from argschema import ArgSchema, ArgSchemaParser, fields
 from cell_labeling_app.database.schemas import JobRegion, UserLabels
+from marshmallow.validate import OneOf
+
 from deepcell.data_splitter import DataSplitter
 from deepcell.datasets.model_input import ModelInput
 from deepcell.cli.schemas.data import ExperimentMetadataSchema
+
+
+class VoteTallyingStrategy(Enum):
+    """
+    Vote tallying strategy.
+
+    MAJORITY means majority must vote that an ROI is a cell to consider it a
+    cell
+
+    CONSENSUS means that all must vote that an ROI is a cell to consider it a
+    cell
+
+    SOME means that only 1 must vote that an ROI is a cell to consider it a
+    cell
+    """
+    MAJORITY = 'majority'
+    CONSENSUS = 'consensus'
+    SOME = 'some'
 
 
 class CreateDatasetInputSchema(ArgSchema):
@@ -36,11 +56,15 @@ class CreateDatasetInputSchema(ArgSchema):
         description="Minimum number of labelers that have looked at an ROI "
                     "to consider the label robust.",
     )
-    vote_threshold = fields.Float(
+    vote_tallying_strategy = fields.Str(
         required=True,
-        default=0.5,
-        description="Fraction of labelers that must agree on a label for the "
-                    "ROI to be considered a 'cell'",
+        default='majority',
+        validate=OneOf(('majority', 'consensus', 'some')),
+        description="Strategy to use for deciding on a label for an ROI. " 
+                    "'Majority' will consider an ROI a cell if the majority "
+                    "vote that it is a cell. 'consensus' requires that all "
+                    "vote that the ROI is a cell.' 'some' requires that only "
+                    "1 vote that it is a cell."
     )
     test_size = fields.Float(
         required=True,
@@ -75,6 +99,8 @@ class CreateDataset(ArgSchemaParser):
     def run(self):
         labels_path = Path(self.args['labels_path'])
         output_dir = Path(self.args['output_dir'])
+        vote_tallying_strategy = VoteTallyingStrategy(
+            self.args['vote_tallying_strategy'])
 
         if labels_path.suffix not in ('.db', '.csv'):
             raise ValueError(f'Expected labels_path to be a db or csv but got '
@@ -88,8 +114,10 @@ class CreateDataset(ArgSchemaParser):
                 raw=True)
         else:
             raw_labels = pd.read_csv(self.args['labels_path'],
-                                 dtype={'experiment_id': str, 'roi_id': str})
-        raw_labels = raw_labels[['experiment_id', 'roi_id', 'user_id', 'label']]
+                                     dtype={'experiment_id': str,
+                                            'roi_id': str})
+        raw_labels = raw_labels[['experiment_id', 'roi_id', 'user_id',
+                                 'label']]
 
         # Anonymize user id
         raw_labels['user_id'] = raw_labels['user_id'].map(
@@ -97,9 +125,9 @@ class CreateDataset(ArgSchemaParser):
              enumerate(raw_labels['user_id'].unique())})
 
         raw_labels.to_csv(output_dir / 'raw_labels.csv', index=False)
-        
+
         labels = _tally_votes(labels=raw_labels,
-                              vote_threshold=self.args['vote_threshold'])
+                              vote_tallying_strategy=vote_tallying_strategy)
 
         model_inputs = [
             ModelInput.from_data_dir(
@@ -138,7 +166,7 @@ class CreateDataset(ArgSchemaParser):
 def construct_dataset(
         label_db_path: str,
         min_labelers_per_roi: int,
-        vote_threshold: Optional[float] = None,
+        vote_tallying_strategy: Optional[VoteTallyingStrategy] = None,
         raw: bool = False
 ) -> pd.DataFrame:
     """
@@ -147,12 +175,12 @@ def construct_dataset(
     @param label_db_path: Path to label database
     @param min_labelers_per_roi: minimum number of labelers required to have
     seen a given ROI
-    @param vote_threshold: Threshold to mark an ROI as cell
+    @param vote_tallying_strategy: VoteTallyingStrategy
     @param raw: If True, returns untallied labels
     @return: pd.DataFrame
     """
-    if not raw and vote_threshold is None:
-        raise ValueError('vote_threshold required if tallying votes')
+    if not raw and vote_tallying_strategy is None:
+        raise ValueError('vote_strategy required if tallying votes')
 
     user_labels = _get_raw_user_labels(label_db_path=label_db_path)
     user_labels['labels'] = user_labels['labels'].apply(
@@ -190,31 +218,33 @@ def construct_dataset(
         subset=['experiment_id', 'roi_id', 'user_id'])
 
     if not raw:
-        labels = _tally_votes(labels=labels, vote_threshold=vote_threshold)
+        labels = _tally_votes(labels=labels,
+                              vote_tallying_strategy=vote_tallying_strategy)
 
     labels['experiment_id'] = labels['experiment_id'].astype(str)
     labels['roi_id'] = labels['roi_id'].astype(str)
     return labels
 
 
-def _tally_votes(labels: pd.DataFrame, vote_threshold: float):
+def _tally_votes(labels: pd.DataFrame,
+                 vote_tallying_strategy: VoteTallyingStrategy):
     """
 
     @param labels: raw, untallied labels dataframe
-    @param vote_threshold:
+    @param vote_tallying_strategy: VoteTallyingStrategy
     @return: labels dataframe with a single record per ROI with the resulting
         label using `vote_threshold`
     """
     labels = labels.groupby(['experiment_id', 'roi_id'])['label'] \
         .apply(lambda x: _tally_votes_for_observation(
-               labels=x, vote_threshold=vote_threshold))
+               labels=x, vote_tallying_strategy=vote_tallying_strategy))
     labels = labels.reset_index()
     return labels
 
 
 def _tally_votes_for_observation(
         labels: pd.Series,
-        vote_threshold: float
+        vote_tallying_strategy: VoteTallyingStrategy
 ):
     """Loop through labels and return a label of "cell" or "not cell" given
     the votes of the labelers.
@@ -223,9 +253,7 @@ def _tally_votes_for_observation(
     ---------
     labels : pandas.Series
         List of user labels
-    vote_threshold :  float
-        Fraction of votes for "cell" to return a label for the ROI of
-        "cell".
+    vote_tallying_strategy :  VoteTallyingStrategy
 
     Returns
     -------
@@ -233,8 +261,18 @@ def _tally_votes_for_observation(
         Label for ROI. "cell" or "not cell"
     """
     cell_count = len([label for label in labels if label == 'cell'])
-    cell_frac = cell_count / len(labels)
-    return 'cell' if cell_frac >= vote_threshold else 'not cell'
+
+    if vote_tallying_strategy == VoteTallyingStrategy.CONSENSUS:
+        label = 'cell' if cell_count == len(labels) else 'not cell'
+    elif vote_tallying_strategy == VoteTallyingStrategy.MAJORITY:
+        label = 'cell' if cell_count / len(labels) > 0.5 else 'not cell'
+    elif vote_tallying_strategy == VoteTallyingStrategy.SOME:
+        label = 'cell' if cell_count > 0 else 'not cell'
+    else:
+        raise ValueError(f'vote strategy {vote_tallying_strategy} not '
+                         f'supported')
+
+    return label
 
 
 def _get_raw_user_labels(label_db_path: str) -> pd.DataFrame:
@@ -252,6 +290,7 @@ def _get_raw_user_labels(label_db_path: str) -> pd.DataFrame:
                                            UserLabels.region_id))
     labels = pd.read_sql(sql=query, con=db_engine)
     return labels
+
 
 def _get_experiment_metadata(experiment_ids: List,
                              experiment_metadata_path: str) -> List[Dict]:

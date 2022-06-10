@@ -14,7 +14,7 @@ from cell_labeling_app.database.schemas import (
     JobRegion, LabelingJob, User, UserLabels)
 
 from deepcell.cli.modules.create_dataset import \
-    CreateDataset, _tally_votes_for_observation
+    CreateDataset, _tally_votes_for_observation, VoteTallyingStrategy
 
 
 class TestTrainTestSplitCli:
@@ -150,7 +150,7 @@ class TestTrainTestSplitCli:
                 "artifact_dir": str(self.artifact_dir.name),
                 "experiment_metadata": str(self.exp_meta_file.name),
                 "min_labelers_required_per_region": 2,
-                "vote_threshold": 1,
+                "vote_tallying_strategy": 'consensus',
                 "test_size": 0.50,
                 "n_depth_bins": 1,
                 "seed": 1234,
@@ -172,15 +172,20 @@ class TestTrainTestSplitCli:
             assert roi['experiment_id'] == '1'
 
     @pytest.mark.parametrize('labels, expected', (
-            (pd.Series(['cell', 'cell', 'cell']), 'cell'),
-            (pd.Series(['cell', 'cell', 'not cell']), 'cell'),
-            (pd.Series(['not cell' 'not cell', 'not cell']), 'not cell'),
+            (pd.Series(['cell', 'cell', 'cell']), ('cell', 'cell', 'cell')),
+            (pd.Series(['cell', 'cell', 'not cell']),
+             ('cell', 'not cell', 'cell')),
+            (pd.Series(['not cell' 'not cell', 'not cell']),
+             ('not cell', 'not cell', 'not cell')),
             (pd.Series(['cell', 'cell', 'cell', 'not cell', 'not cell']),
-             'cell')
+             ('cell', 'not cell', 'cell'))
 
     ))
     def test_tally_votes(self, labels, expected):
-        assert _tally_votes_for_observation(
-            labels=labels,
-            vote_threshold=0.5
-        ) == expected
+        for i, vote_tallying_strategy in enumerate(
+                (VoteTallyingStrategy.MAJORITY, VoteTallyingStrategy.CONSENSUS,
+                 VoteTallyingStrategy.SOME)):
+            assert _tally_votes_for_observation(
+                labels=labels,
+                vote_tallying_strategy=vote_tallying_strategy
+            ) == expected[i]
