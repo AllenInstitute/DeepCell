@@ -184,7 +184,7 @@ class TestTrainTestSplitCli:
     def test_tally_votes(self, labels, expected):
         for i, vote_tallying_strategy in enumerate(
                 (VoteTallyingStrategy.MAJORITY, VoteTallyingStrategy.CONSENSUS,
-                 VoteTallyingStrategy.SOME)):
+                 VoteTallyingStrategy.ANY)):
             assert _tally_votes_for_observation(
                 labels=labels,
                 vote_tallying_strategy=vote_tallying_strategy

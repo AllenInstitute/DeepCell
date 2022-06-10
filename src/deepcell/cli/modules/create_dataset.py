@@ -25,12 +25,12 @@ class VoteTallyingStrategy(Enum):
     CONSENSUS means that all must vote that an ROI is a cell to consider it a
     cell
 
-    SOME means that only 1 must vote that an ROI is a cell to consider it a
+    ANY means that only 1 must vote that an ROI is a cell to consider it a
     cell
     """
     MAJORITY = 'majority'
     CONSENSUS = 'consensus'
-    SOME = 'some'
+    ANY = 'any'
 
 
 class CreateDatasetInputSchema(ArgSchema):
@@ -59,11 +59,11 @@ class CreateDatasetInputSchema(ArgSchema):
     vote_tallying_strategy = fields.Str(
         required=True,
         default='majority',
-        validate=OneOf(('majority', 'consensus', 'some')),
+        validate=OneOf(('majority', 'consensus', 'any')),
         description="Strategy to use for deciding on a label for an ROI. " 
                     "'Majority' will consider an ROI a cell if the majority "
                     "vote that it is a cell. 'consensus' requires that all "
-                    "vote that the ROI is a cell.' 'some' requires that only "
+                    "vote that the ROI is a cell.' 'any' requires that only "
                     "1 vote that it is a cell."
     )
     test_size = fields.Float(
@@ -266,7 +266,7 @@ def _tally_votes_for_observation(
         label = 'cell' if cell_count == len(labels) else 'not cell'
     elif vote_tallying_strategy == VoteTallyingStrategy.MAJORITY:
         label = 'cell' if cell_count / len(labels) > 0.5 else 'not cell'
-    elif vote_tallying_strategy == VoteTallyingStrategy.SOME:
+    elif vote_tallying_strategy == VoteTallyingStrategy.ANY:
         label = 'cell' if cell_count > 0 else 'not cell'
     else:
         raise ValueError(f'vote strategy {vote_tallying_strategy} not '
