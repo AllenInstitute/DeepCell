@@ -11,9 +11,10 @@ class TrainRunner(argschema.ArgSchemaParser):
     default_schema = TrainSchema
 
     def run(self):
-        print({k: v for k, v in self.args.items()
-               # Don't print this (too big)
-               if not k.endswith('model_inputs')})
+        logger = init_logger(__name__)
+        logger.info({k: v for k, v in self.args.items()
+                     # Don't print this (too big)
+                     if not k.endswith('model_inputs')})
 
         train = self.args['train_model_inputs']
         validation = self.args['validation_model_inputs']
