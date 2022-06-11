@@ -124,7 +124,8 @@ class CreateDataset(ArgSchemaParser):
             {user_id: i for i, user_id in
              enumerate(raw_labels['user_id'].unique())})
 
-        raw_labels.to_csv(output_dir / 'raw_labels.csv', index=False)
+        if labels_path.suffix == '.db':
+            raw_labels.to_csv(output_dir / 'raw_labels.csv', index=False)
 
         labels = _tally_votes(labels=raw_labels,
                               vote_tallying_strategy=vote_tallying_strategy)
