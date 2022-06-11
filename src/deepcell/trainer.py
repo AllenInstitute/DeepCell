@@ -1,6 +1,6 @@
 import contextlib
+import logging
 import os
-import time
 from pathlib import Path
 from typing import Optional, Union, List, Dict
 
@@ -328,6 +328,13 @@ class Trainer(MLFlowTrackableMixin):
             mlflow_experiment_name=mlflow_experiment_name
         )
         return trainer
+
+    def set_logger_file_handler(self, log_path: str):
+        fh = logging.FileHandler(log_path)
+        fh.setLevel(logging.INFO)
+        fh.setFormatter(logging.Formatter(
+            '%(asctime)s | %(levelname)s | %(message)s'))
+        logger.addHandler(fh)
 
     def _reset(self):
         # reset model weights

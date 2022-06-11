@@ -27,6 +27,11 @@ class BaseSchema(argschema.ArgSchema):
                     'continue training using this checkpoint. If inference, '
                     'will use this checkpoint for inference'
     )
+    log_path = argschema.fields.InputFile(
+        default=None,
+        allow_none=True,
+        description='path to write log'
+    )
 
     @marshmallow.post_load
     def model_inputs(self, data):

@@ -64,6 +64,9 @@ class TrainRunner(argschema.ArgSchemaParser):
             mlflow_server_uri=tracking_params['mlflow_server_uri'],
             mlflow_experiment_name=tracking_params['mlflow_experiment_name']
         )
+        if self.args['log_path'] is not None:
+            trainer.set_logger_file_handler(log_path=self.args['log_path'])
+            
         trainer.train(
             train_loader=train_loader, valid_loader=valid_loader,
             eval_fold=self.args['fold'],
