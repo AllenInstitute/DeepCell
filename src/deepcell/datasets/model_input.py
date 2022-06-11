@@ -97,46 +97,16 @@ class ModelInput:
             label
                 Label of roi either "cell" or "not cell".
         """
-        def get_path(data_dir: Path, artifact_type: str, experiment_id: str,
-                     roi_id: str):
-            """Checks whether path format is
-            <artifact_type>_<exp_id>_<roi_id> or
-            <artifact_type>_exp_<exp_id>_roi_<roi_id>"""
-            if (data_dir / f'{artifact_type}_{experiment_id}_'
-                           f'{roi_id}.png').exists():
-                return (data_dir / f'{artifact_type}_{experiment_id}_'
-                           f'{roi_id}.png')
-            elif (data_dir / f'{artifact_type}_exp_{experiment_id}_roi_'
-                             f'{roi_id}.png').exists():
-                return (data_dir / f'{artifact_type}_exp_{experiment_id}_roi_'
-                             f'{roi_id}.png')
-            else:
-                raise RuntimeError(f'{artifact_type} could not be found for '
-                                   f'experiment id {experiment_id}, roi id '
-                                   f'{roi_id}')
         data_dir = Path(data_dir)
 
-        try:
-            correlation_projection_path = get_path(data_dir=data_dir,
-                                                   artifact_type='correlation',
-                                                   experiment_id=experiment_id,
-                                                   roi_id=roi_id)
-        except RuntimeError:
-            # correlation projection doesn't exist
-            correlation_projection_path = None
-
-        avg_proj_path = get_path(data_dir=data_dir,
-                                 artifact_type='avg',
-                                 experiment_id=experiment_id,
-                                 roi_id=roi_id)
-        mask_path = get_path(data_dir=data_dir,
-                             artifact_type='mask',
-                             experiment_id=experiment_id,
-                             roi_id=roi_id)
-        max_path = get_path(data_dir=data_dir,
-                            artifact_type='max',
-                            experiment_id=experiment_id,
-                            roi_id=roi_id)
+        correlation_projection_path = \
+            data_dir / f'correlation_{experiment_id}_{roi_id}.png'
+        avg_proj_path = \
+            data_dir / f'avg_{experiment_id}_{roi_id}.png'
+        mask_path = \
+            data_dir / f'mask_{experiment_id}_{roi_id}.png'
+        max_path = \
+            data_dir / f'max_{experiment_id}_{roi_id}.png'
 
         return ModelInput(
             experiment_id=experiment_id,
