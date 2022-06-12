@@ -16,10 +16,6 @@ from deepcell.metrics import Metrics, CVMetrics
 from deepcell.datasets.roi_dataset import RoiDataset
 from deepcell.tracking.mlflow_utils import MLFlowTrackableMixin
 from deepcell.models.classifier import Classifier
-from deepcell.logger import init_logger
-
-
-logger = init_logger(__name__)
 
 
 class Trainer(MLFlowTrackableMixin):
@@ -65,6 +61,7 @@ class Trainer(MLFlowTrackableMixin):
         """
         super().__init__(server_uri=mlflow_server_uri,
                          experiment_name=mlflow_experiment_name)
+        self._logger = logging.getLogger(__name__)
         self.n_epochs = n_epochs
         self.model = model
         self.optimizer = optimizer
@@ -102,9 +99,9 @@ class Trainer(MLFlowTrackableMixin):
 
         for i, (train, valid) in enumerate(data_splitter.get_cross_val_split(train_dataset=train_dataset,
                                                                              n_splits=n_splits)):
-            logger.info(f'=========')
-            logger.info(f'Fold {i}')
-            logger.info(f'=========')
+            self._logger.info(f'=========')
+            self._logger.info(f'Fold {i}')
+            self._logger.info(f'=========')
 
             train_loader = DataLoader(dataset=train, shuffle=True, batch_size=batch_size, sampler=sampler)
             valid_loader = DataLoader(dataset=valid, shuffle=False, batch_size=batch_size)
@@ -234,7 +231,7 @@ class Trainer(MLFlowTrackableMixin):
                                 self.early_stopping_callback.time_since_best_epoch += 1
                                 if self.early_stopping_callback.time_since_best_epoch \
                                         > self.early_stopping_callback.patience:
-                                    logger.info('Stopping due to early stopping')
+                                    self._logger.info('Stopping due to early stopping')
                                     self._save_model_and_performance(
                                         eval_fold=eval_fold)
                                     if self._is_mlflow_tracking_enabled:
@@ -247,7 +244,7 @@ class Trainer(MLFlowTrackableMixin):
                         self.scheduler.step(epoch_val_metrics.loss)
 
                     if log_after_each_epoch:
-                        logger.info(f'Epoch: {epoch + 1}\t'
+                        self._logger.info(f'Epoch: {epoch + 1}\t'
                                     f'Train F1: {epoch_train_metrics.F1:.6f}\t'
                                     f'Val F1: {epoch_val_metrics.F1:.6f}\t'
                                     f'Train Loss: {epoch_train_metrics.loss:.6f}\t'
@@ -328,13 +325,6 @@ class Trainer(MLFlowTrackableMixin):
             mlflow_experiment_name=mlflow_experiment_name
         )
         return trainer
-
-    def set_logger_file_handler(self, log_path: str):
-        fh = logging.FileHandler(log_path)
-        fh.setLevel(logging.INFO)
-        fh.setFormatter(logging.Formatter(
-            '%(asctime)s | %(levelname)s | %(message)s'))
-        logger.addHandler(fh)
 
     def _reset(self):
         # reset model weights
