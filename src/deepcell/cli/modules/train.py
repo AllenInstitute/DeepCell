@@ -68,7 +68,8 @@ class TrainRunner(argschema.ArgSchemaParser):
             weight_decay=optimization_params['weight_decay'],
             learning_rate_scheduler=optimization_params['scheduler_params'],
             mlflow_server_uri=tracking_params['mlflow_server_uri'],
-            mlflow_experiment_name=tracking_params['mlflow_experiment_name']
+            mlflow_experiment_name=tracking_params['mlflow_experiment_name'],
+            log_path=self.args['log_path']
         )
         trainer.train(
             train_loader=train_loader, valid_loader=valid_loader,
