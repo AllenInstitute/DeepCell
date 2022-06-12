@@ -6,7 +6,7 @@ from typing import Optional, Union, List, Dict
 import numpy as np
 import torch
 import torchvision
-from deepcell.logger import init_logger
+from deepcell.logger import init_logger, Logger
 from torch.utils.data import DataLoader
 
 from deepcell.callbacks.base_callback import Callback
@@ -64,7 +64,7 @@ class Trainer(MLFlowTrackableMixin):
         """
         super().__init__(server_uri=mlflow_server_uri,
                          experiment_name=mlflow_experiment_name)
-        self._logger = init_logger(name=__name__, log_path=log_path)
+        self._logger = Logger(name=__name__, log_path=log_path)
         self.n_epochs = n_epochs
         self.model = model
         self.optimizer = optimizer

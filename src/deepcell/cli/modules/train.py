@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 
 from deepcell.cli.schemas.train import TrainSchema
 from deepcell.datasets.roi_dataset import RoiDataset
-from deepcell.logger import init_logger
+from deepcell.logger import Logger
 from deepcell.trainer import Trainer
 
 
@@ -14,8 +14,7 @@ class TrainRunner(argschema.ArgSchemaParser):
                  args: Optional[list] = None):
         super().__init__(input_data=input_data, args=args,
                          schema_type=TrainSchema)
-        self._logger = \
-            init_logger(name=__name__, log_path=self.args['log_path'])
+        self._logger = Logger(name=__name__, log_path=self.args['log_path'])
 
     def run(self):
         self._logger.info(
