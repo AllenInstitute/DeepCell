@@ -27,7 +27,7 @@ class BaseSchema(argschema.ArgSchema):
                     'continue training using this checkpoint. If inference, '
                     'will use this checkpoint for inference'
     )
-    log_path = argschema.fields.InputFile(
+    log_path = argschema.fields.OutputFile(
         default=None,
         allow_none=True,
         description='path to write log'
