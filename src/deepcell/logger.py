@@ -21,11 +21,11 @@ class Logger:
     def _write(self, level: LogLevel, message: Any):
         timestamp = datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
         to_log = f'{timestamp} | {self._name} | {level.name} | {message}'
-        if level >= self._level:
+        if level.value >= self._level.value:
             print(to_log)
             if self._log_path is not None:
                 with open(self._log_path, mode='a') as f:
-                    f.write(to_log)
+                    f.write(f'\n{to_log}')
 
     def info(self, message: Any):
         self._write(level=LogLevel.INFO, message=message)
