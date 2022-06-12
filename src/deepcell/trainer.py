@@ -1,5 +1,4 @@
 import contextlib
-import logging
 import os
 from pathlib import Path
 from typing import Optional, Union, List, Dict
@@ -7,6 +6,7 @@ from typing import Optional, Union, List, Dict
 import numpy as np
 import torch
 import torchvision
+from deepcell.logger import init_logger
 from torch.utils.data import DataLoader
 
 from deepcell.callbacks.base_callback import Callback
@@ -30,7 +30,8 @@ class Trainer(MLFlowTrackableMixin):
             callbacks: Optional[List[Callback]] = None,
             model_load_path: Optional[Union[str, Path]] = None,
             mlflow_server_uri: Optional[str] = None,
-            mlflow_experiment_name: str = 'deepcell-train'
+            mlflow_experiment_name: str = 'deepcell-train',
+            log_path: Optional[str] = None
     ):
         """
         The driver for the training and evaluation loop
@@ -58,10 +59,12 @@ class Trainer(MLFlowTrackableMixin):
             mlflow_experiment_name
                 Optional MLFlow experiment name. If not provided, will use the
                 default MLFlow experiment
+            log_path
+                Optional file to write logs
         """
         super().__init__(server_uri=mlflow_server_uri,
                          experiment_name=mlflow_experiment_name)
-        self._logger = logging.getLogger(__name__)
+        self._logger = init_logger(name=__name__, log_path=log_path)
         self.n_epochs = n_epochs
         self.model = model
         self.optimizer = optimizer
@@ -272,7 +275,8 @@ class Trainer(MLFlowTrackableMixin):
             weight_decay: float = 0.0,
             learning_rate_scheduler: Optional[Dict] = None,
             mlflow_server_uri: Optional[str] = None,
-            mlflow_experiment_name: str = 'deepcell-train'
+            mlflow_experiment_name: str = 'deepcell-train',
+            log_path: Optional[str] = None
     ) -> "Trainer":
         """
         Instantiates a Trainer. See `deepcell.trainer` constructor for
@@ -322,7 +326,8 @@ class Trainer(MLFlowTrackableMixin):
             ],
             model_load_path=model_load_path,
             mlflow_server_uri=mlflow_server_uri,
-            mlflow_experiment_name=mlflow_experiment_name
+            mlflow_experiment_name=mlflow_experiment_name,
+            log_path=log_path
         )
         return trainer
 
