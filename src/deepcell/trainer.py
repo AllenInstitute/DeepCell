@@ -6,7 +6,7 @@ from typing import Optional, Union, List, Dict
 import numpy as np
 import torch
 import torchvision
-from deepcell.logger import init_logger, Logger
+from deepcell.logger import Logger
 from torch.utils.data import DataLoader
 
 from deepcell.callbacks.base_callback import Callback
