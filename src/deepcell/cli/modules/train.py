@@ -1,3 +1,5 @@
+from typing import Optional
+
 import argschema
 from torch.utils.data import DataLoader
 
@@ -8,13 +10,18 @@ from deepcell.trainer import Trainer
 
 
 class TrainRunner(argschema.ArgSchemaParser):
-    default_schema = TrainSchema
+    def __init__(self, input_data: Optional[dict] = None,
+                 args: Optional[list] = None):
+        super().__init__(input_data=input_data, args=args,
+                         schema_type=TrainSchema)
+        self._logger = \
+            init_logger(name=__name__, log_path=self.args['log_path'])
 
     def run(self):
-        logger = init_logger(name=__name__, log_path=self.args['log_path'])
-        logger.info({k: v for k, v in self.args.items()
-                     # Don't print this (too big)
-                     if not k.endswith('model_inputs')})
+        self._logger.info(
+            {k: v for k, v in self.args.items()
+             # Don't print this (too big)
+             if not k.endswith('model_inputs')})
 
         train = self.args['train_model_inputs']
         validation = self.args['validation_model_inputs']
