@@ -61,7 +61,8 @@ def plot_confusion_matrix(classifier_scores: pd.DataFrame, label_col: str,
         cm = confusion_matrix(y_true=classifier_scores[label_col],
                               y_pred=classifier_scores[pred_col],
                               normalize=normalization)
-        disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+        disp = ConfusionMatrixDisplay(confusion_matrix=cm,
+                                      display_labels=['cell', 'not cell'])
         disp.plot(ax=axes[i])
         disp.ax_.set_title(
             f'N={classifier_scores.shape[0]}\n'
