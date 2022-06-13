@@ -61,9 +61,11 @@ class TestInferenceCli:
 
                 if mode == 'CV':
                     filename = 'cv_preds.csv'
-                elif mode == 'production':
+                elif mode == 'test':
                     filename = 'test_preds.csv'
-                else:
+                elif self.experiment_id is not None:
                     filename = f'{self.experiment_id}_inference.csv'
+                else:
+                    filename = 'preds.csv'
                 df = pd.read_csv(Path(out_dir) / filename)
                 assert df.shape[0] == len(dataset)

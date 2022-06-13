@@ -16,15 +16,13 @@ from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.lines import Line2D
 from ophys_etl.utils.rois import sanitize_extract_roi_list, \
     extract_roi_to_ophys_roi
-from sklearn.metrics import precision_score, recall_score, \
-    precision_recall_curve
+from sklearn.metrics import precision_score, recall_score
 from tqdm import tqdm
 
-from scripts.data_exploration import get_classifier_performance, \
-    _get_roi_label_agreement, _get_experiment_meta_with_depth_bin, \
+from scripts.data_exploration import _get_roi_label_agreement, _get_experiment_meta_with_depth_bin, \
     _get_experiment_meta_dataframe, _get_sorted_depth_bin_labels, \
-    _get_classifier_scores, _get_confusion_matrix, \
-    _get_confusion_matrix_by_depth
+    _get_classifier_scores, _get_confusion_matrix_by_depth
+from src.deepcell.plotting import plot_confusion_matrix, plot_pr_curve
 
 
 def get_disagreement_by_depth(labels: pd.DataFrame, targets: pd.DataFrame):
@@ -317,33 +315,12 @@ def get_human_performance(labels: pd.DataFrame, targets: pd.DataFrame):
 
     agreement['label_labeler'] = agreement.apply(get_labeler_label, axis=1)
 
-    _get_confusion_matrix(classifier_scores=agreement,
+    plot_confusion_matrix(classifier_scores=agreement,
                           label_col='label_target',
                           pred_col='label_labeler')
     _get_confusion_matrix_by_depth(classifier_scores=agreement,
                                    label_col='label_target',
                                    pred_col='label_labeler')
-
-
-def get_pr_curve(preds_path: str):
-    scores = _get_classifier_scores(preds_path=Path(preds_path))
-    scores['y_pred'] = scores['y_pred'].apply(lambda x: 'cell' if x else 'not cell')
-    scores['y_true'] = scores['y_true'].apply(lambda x: 'cell' if x else 'not cell')
-
-    precision, recall, thresholds = precision_recall_curve(
-        y_true=scores['y_true'], probas_pred=scores['y_score'],
-        pos_label='cell')
-
-    thresholds = np.concatenate([[0], thresholds])
-
-    res = pd.DataFrame(
-        {'threshold': np.concatenate([thresholds, thresholds]),
-         'value': np.concatenate([precision, recall]),
-         'metric': ['precision'] * len(precision) + ['recall'] * len(recall)})
-
-    sns.lineplot(data=res, x='threshold', y='value', hue='metric')
-    plt.title('Precision recall curve')
-    plt.show()
 
 
 def main():
@@ -379,7 +356,10 @@ def main():
     #              classifier_inputs_path=args.classifier_inputs_path,
     #              correlation_path=args.correlation_path)
     # get_human_performance(labels=labels, targets=targets)
-    get_pr_curve(preds_path=args.val_preds_path)
+
+    scores = _get_classifier_scores(preds_path=Path(args.val_preds_path))
+    plot_pr_curve(scores=scores)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

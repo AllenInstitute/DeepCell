@@ -6,7 +6,6 @@ import argschema
 import torchvision
 from torch.utils.data import DataLoader
 
-from deepcell.cli.schemas.data import ModelInputSchema
 from deepcell.cli.schemas.inference import InferenceSchema
 from deepcell.data_splitter import DataSplitter
 from deepcell.datasets.model_input import ModelInput
@@ -78,10 +77,12 @@ class InferenceModule(argschema.ArgSchemaParser):
 
         if self.args['mode'] == 'CV':
             out_filename = 'cv_preds.csv'
-        elif self.args['mode'] == 'production':
+        elif self.args['mode'] == 'test':
             out_filename = 'test_preds.csv'
-        else:
+        elif self.args['experiment_id'] is not None:
             out_filename = f'{self.args["experiment_id"]}_inference.csv'
+        else:
+            out_filename = 'preds.csv'
 
         inference_res.to_csv(Path(self.args['save_path']) / f'{out_filename}',
                              index=False)

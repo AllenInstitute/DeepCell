@@ -1,5 +1,11 @@
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import seaborn as sns
 from matplotlib import pyplot as plt
-from sklearn.metrics import precision_recall_curve
+from sklearn.metrics import precision_recall_curve, ConfusionMatrixDisplay, \
+    confusion_matrix
 
 from deepcell.metrics import CVMetrics
 
@@ -48,25 +54,43 @@ def plot_training_performance(cv_metrics: CVMetrics,
     plt.show()
 
 
-def pr_curve(probas_pred, y_true):
-    """Plots PR curve
+def plot_confusion_matrix(classifier_scores: pd.DataFrame, label_col: str,
+                          pred_col: str):
+    f, axes = plt.subplots(1, 2, figsize=(20, 10), sharey='row')
+    for i, normalization in enumerate(('true', 'pred')):
+        cm = confusion_matrix(y_true=classifier_scores[label_col],
+                              y_pred=classifier_scores[pred_col],
+                              normalize=normalization)
+        disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+        disp.plot(ax=axes[i])
+        disp.ax_.set_title(
+            f'N={classifier_scores.shape[0]}\n'
+            f'normalized by {normalization}')
+        disp.ax_.grid(False)
 
-    Args:
-        probas_pred:
-            Classification probabilities
-        y_true:
-            True labels
-    """
+        # Increase font size of values
+        for labels_ in disp.text_.ravel():
+            labels_.set_fontsize(24)
+    plt.show()
+
+
+def plot_pr_curve(scores: pd.DataFrame):
+    scores['y_pred'] = scores['y_pred'].apply(
+        lambda x: 'cell' if x else 'not cell')
+    scores['y_true'] = scores['y_true'].apply(
+        lambda x: 'cell' if x else 'not cell')
+
     precision, recall, thresholds = precision_recall_curve(
-        probas_pred=probas_pred, y_true=y_true)
-    thresholds = thresholds.tolist()
-    thresholds.append(1.0)
-    fig, ax = plt.subplots()
-    ax.plot(thresholds, precision, label='precision')
-    ax.plot(thresholds, recall, label='recall')
-    ax.set_xlabel('Threshold')
-    ax.set_ylabel('Metric')
-    ax.set_title('Precision-recall curve')
-    ax.legend()
+        y_true=scores['y_true'], probas_pred=scores['y_score'],
+        pos_label='cell')
 
-    return fig
+    thresholds = np.concatenate([[0], thresholds])
+
+    res = pd.DataFrame(
+        {'threshold': np.concatenate([thresholds, thresholds]),
+         'value': np.concatenate([precision, recall]),
+         'metric': ['precision'] * len(precision) + ['recall'] * len(recall)})
+
+    sns.lineplot(data=res, x='threshold', y='value', hue='metric')
+    plt.title('Precision recall curve')
+    plt.show()

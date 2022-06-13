@@ -18,6 +18,8 @@ from wordcloud import WordCloud
 from deepcell.data_splitter import DataSplitter
 from deepcell.datasets.exp_metadata import ExperimentMetadata
 
+from src.deepcell.plotting import plot_confusion_matrix
+
 plt.style.use('ggplot')
 
 MIN_LABELERS_PER_ROI = 3
@@ -517,7 +519,7 @@ def get_classifier_performance(preds_path: Path,
         plt.title('Classifier score distribution')
         plt.show()
 
-        _get_confusion_matrix(classifier_scores=classifier_scores,
+        plot_confusion_matrix(classifier_scores=classifier_scores,
                               label_col=label, pred_col='y_pred')
 
     precision = precision_score(y_true=classifier_scores[label], y_pred=classifier_scores['y_pred'],
@@ -708,25 +710,6 @@ def get_train_test_split(labels: pd.DataFrame, targets: pd.DataFrame):
         g.axes[0, i].set_xlabel('Number of thrice labeled regions')
         g.axes[0, i].set_ylabel('Number of FOV')
 
-    plt.show()
-
-
-def _get_confusion_matrix(classifier_scores: pd.DataFrame, label_col: str,
-                          pred_col: str):
-    for normalization in ('true', 'pred'):
-        disp = ConfusionMatrixDisplay.from_predictions(
-            y_true=classifier_scores[label_col],
-            y_pred=classifier_scores[pred_col],
-            normalize=normalization
-        )
-        disp.ax_.set_title(
-            f'N={classifier_scores.shape[0]}\n'
-            f'normalized by {normalization}')
-        disp.ax_.grid(False)
-
-        # Increase font size of values
-        for labels_ in disp.text_.ravel():
-            labels_.set_fontsize(24)
     plt.show()
 
 
