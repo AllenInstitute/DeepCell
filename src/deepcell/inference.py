@@ -69,6 +69,8 @@ def inference(model: torch.nn.Module,
         models = os.listdir(checkpoint_path)
         models = [model for model in models if model != 'model_init.pt' and
                   Path(model).suffix == '.pt']
+        if len(models) == 0:
+            raise RuntimeError('Could not find model')
     else:
         models = [f'{cv_fold}_model.pt']
 
