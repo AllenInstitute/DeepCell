@@ -16,8 +16,16 @@ class TestInferenceCli:
     def setup_class(cls):
 
         data_dir = tempfile.TemporaryDirectory()
-        train_dataset = get_test_data(write_dir=data_dir.name, is_train=True)
-        prod_dataset = get_test_data(write_dir=data_dir.name, is_train=False)
+        train_dataset = get_test_data(
+            write_dir=data_dir.name,
+            is_train=True,
+            exp_id='0'
+        )
+        prod_dataset = get_test_data(
+            write_dir=data_dir.name,
+            is_train=False,
+            exp_id='0'
+        )
 
         net = torchvision.models.vgg11_bn(pretrained=True, progress=False)
         net.classifier = torch.nn.Sequential(torch.nn.Linear(512, 1))

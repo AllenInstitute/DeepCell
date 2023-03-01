@@ -82,18 +82,11 @@ class TrainingRunner:
 
         # Update model input paths
         for model_input in model_inputs:
-            model_input['mask_path'] = (
-                str(data_dir / Path(model_input['mask_path']).name))
-            model_input['max_projection_path'] = (
-                str(data_dir / Path(model_input['max_projection_path']).name))
-            if model_input['avg_projection_path'] is not None:
-                model_input['avg_projection_path'] = (
+            for channel in model_input['channel_path_map']:
+                model_input['channel_path_map'][channel] = \
                     str(data_dir /
-                        Path(model_input['avg_projection_path']).name))
-            if model_input['correlation_projection_path'] is not None:
-                model_input['correlation_projection_path'] = (
-                    str(data_dir /
-                        Path(model_input['correlation_projection_path']).name))
+                        Path(model_input['channel_path_map'][channel]).name)
+
         model_inputs_serialized: List[ModelInput] = \
             ModelInputSchema().load(model_inputs, many=True)  # noqa
 

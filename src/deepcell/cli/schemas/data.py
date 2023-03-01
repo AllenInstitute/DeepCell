@@ -5,8 +5,17 @@ import argschema
 import marshmallow
 from marshmallow.validate import OneOf
 
+from deepcell.datasets.channel import Channel
 from deepcell.datasets.model_input import ModelInput
 from deepcell.datasets.exp_metadata import ExperimentMetadata
+
+
+class ChannelField(argschema.fields.String):
+    def _validate(self, value):
+        supported_channels = [x.value for x in Channel]
+        if value not in supported_channels:
+            raise ValueError(f'Only {supported_channels} supported. '
+                             f'You passed {value}')
 
 
 class ModelInputSchema(argschema.ArgSchema):
@@ -19,23 +28,15 @@ class ModelInputSchema(argschema.ArgSchema):
         required=True,
         description='roi id'
     )
-    correlation_projection_path = argschema.fields.InputFile(
-        default=None,
-        allow_none=True,
-        description='correlation projection path'
-    )
-    max_projection_path = argschema.fields.InputFile(
+    channel_order = argschema.fields.List(
+        ChannelField(),
         required=True,
-        description='max projection path'
+        description='Channels to use as input'
     )
-    avg_projection_path = argschema.fields.InputFile(
-        default=None,
-        allow_none=True,
-        description='avg projection path'
-    )
-    mask_path = argschema.fields.InputFile(
-        required=True,
-        description='mask path'
+    channel_path_map = argschema.fields.Dict(
+        keys=ChannelField(),
+        values=argschema.fields.InputFile(),
+        description='Map between channel and path'
     )
     label = argschema.fields.String(
         default=None,
@@ -45,12 +46,20 @@ class ModelInputSchema(argschema.ArgSchema):
     )
 
     @marshmallow.post_load
-    def make_model_input(self, data):
+    def make_model_input(self, data, **kwargs):
         data = {k: v for k, v in data.items() if k not in ('log_level',)}
         for k, v in data.items():
             if isinstance(v, str):
                 if os.path.isfile(v):
                     data[k] = Path(v)
+
+        # serialize to Channel
+        data['channel_order'] = [
+            getattr(Channel, x) for x in data['channel_order']]
+        channel_path_map = {
+            getattr(Channel, c): p
+            for c, p in data['channel_path_map'].items()}
+        data['channel_path_map'] = channel_path_map
 
         return ModelInput(**data)
 
@@ -76,7 +85,7 @@ class ExperimentMetadataSchema(argschema.ArgSchema):
     )
 
     @marshmallow.post_load
-    def make_experiment_metadata(self, data):
+    def make_experiment_metadata(self, data, **kwargs):
         data = {k: v for k, v in data.items() if k not in ('log_level',)}
         return ExperimentMetadata(**data)
 

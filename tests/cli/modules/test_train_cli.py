@@ -10,7 +10,7 @@ from deepcell.testing.util import get_test_data
 @pytest.mark.parametrize('fold', [None, 0])
 def test_train_cli(monkeypatch, fold):
     with tempfile.TemporaryDirectory() as d:
-        dataset = get_test_data(write_dir=d)
+        dataset = get_test_data(write_dir=d, exp_id='0')
 
         with tempfile.TemporaryDirectory() as temp_path:
             with open(Path(temp_path) / 'model_inputs.json', 'w') as f:

@@ -2,17 +2,17 @@ import json
 import os
 import shutil
 from pathlib import Path
-from typing import Optional, Union, List
+from typing import Optional, Union, List, Dict
+
+from deepcell.datasets.channel import Channel, channel_filename_prefix_map
 
 
 class ModelInput:
     def __init__(self,
                  roi_id: str,
                  experiment_id: str,
-                 mask_path: Path,
-                 max_projection_path: Path,
-                 avg_projection_path: Optional[Path] = None,
-                 correlation_projection_path: Optional[Path] = None,
+                 channel_path_map: Dict[Channel, Path],
+                 channel_order: List[Channel],
                  project_name: Optional[str] = None,
                  label: Optional[str] = None):
         """
@@ -23,14 +23,8 @@ class ModelInput:
                 ROI id
             experiment_id:
                 Experiment id
-            max_projection_path:
-                max projection path
-            correlation_projection_path:
-                correlation projection path
-            avg_projection_path:
-                average projection path
-            mask_path:
-                mask path
+            channel_path_map
+                Map between `deepcell.roi_dataset.Channel` to Path
             project_name:
                 optional name using to indicate a unique labeling job
                 will be None if at test time (not labeled)
@@ -38,15 +32,14 @@ class ModelInput:
                 optional label assigned to this example
                 will be None if at test time (not labeled)
         """
-        if avg_projection_path is None and correlation_projection_path is None:
-            raise ValueError('Must supply one of avg_projection_path or '
-                             'correlation_projection_path')
+        self._validate_channel_order(
+            channel_order=channel_order,
+            channel_path_map=channel_path_map
+        )
         self._roi_id = roi_id
         self._experiment_id = experiment_id
-        self._max_projection_path = max_projection_path
-        self._correlation_projection_path = correlation_projection_path
-        self._avg_projection_path = avg_projection_path
-        self._mask_path = mask_path
+        self._channel_path_map = channel_path_map
+        self._channel_order = channel_order
         self._project_name = project_name
         self._label = label
 
@@ -59,20 +52,12 @@ class ModelInput:
         return self._experiment_id
 
     @property
-    def max_projection_path(self) -> Path:
-        return self._max_projection_path
+    def channel_path_map(self) -> Dict[Channel, Path]:
+        return self._channel_path_map
 
     @property
-    def correlation_projection_path(self) -> Optional[Path]:
-        return self._correlation_projection_path
-
-    @property
-    def avg_projection_path(self) -> Optional[Path]:
-        return self._avg_projection_path
-
-    @property
-    def mask_path(self) -> Path:
-        return self._mask_path
+    def channel_order(self) -> List[Channel]:
+        return self._channel_order
 
     @property
     def label(self) -> Optional[str]:
@@ -83,8 +68,14 @@ class ModelInput:
         return self._project_name
 
     @classmethod
-    def from_data_dir(cls, data_dir: Union[str, Path], experiment_id: str,
-                      roi_id: str, label: Optional[str] = None):
+    def from_data_dir(
+            cls,
+            data_dir: Union[str, Path],
+            experiment_id: str,
+            roi_id: str,
+            channels: List[Channel],
+            label: Optional[str] = None,
+    ):
         """Instantiate a ModelInput from a data_dir.
 
         Args:
@@ -94,28 +85,33 @@ class ModelInput:
                 Experiment id
             roi_id
                 ROI id
+            channels
+                What channels to use
             label
                 Label of roi either "cell" or "not cell".
         """
         data_dir = Path(data_dir)
 
-        correlation_projection_path = \
-            data_dir / f'correlation_{experiment_id}_{roi_id}.png'
-        avg_proj_path = \
-            data_dir / f'avg_{experiment_id}_{roi_id}.png'
-        mask_path = \
-            data_dir / f'mask_{experiment_id}_{roi_id}.png'
-        max_path = \
-            data_dir / f'max_{experiment_id}_{roi_id}.png'
+        channel_filename_map = {
+            c: f'{channel_filename_prefix_map[c]}_'
+               f'{experiment_id}_{roi_id}.png'
+            for c in channels
+        }
+
+        channel_path_map = {}
+        for channel in channels:
+            path = data_dir / channel_filename_map[channel]
+            if not path.exists():
+                raise ValueError(f'Expected channel {channel} to exist at '
+                                 f'{path} but it did not')
+            channel_path_map[channel] = path
 
         return ModelInput(
             experiment_id=experiment_id,
-            avg_projection_path=avg_proj_path,
-            mask_path=mask_path,
-            correlation_projection_path=correlation_projection_path,
-            max_projection_path=max_path,
+            channel_path_map=channel_path_map,
             roi_id=roi_id,
-            label=label
+            label=label,
+            channel_order=channels
         )
 
     def copy(self, destination: Path) -> None:
@@ -131,27 +127,35 @@ class ModelInput:
         None
 
         """
-        shutil.copy(self.mask_path, destination)
-        shutil.copy(self.max_projection_path, destination)
-        if self.correlation_projection_path is not None:
-            shutil.copy(self.correlation_projection_path, destination)
-        if self.avg_projection_path is not None:
-            shutil.copy(self.avg_projection_path, destination)
+        for _, path in self.channel_path_map.items():
+            shutil.copy(path, destination)
 
     def to_dict(self) -> dict:
+        # deserialize from Channel to str so it can be json.dump
+        channel_order = [x.value for x in self._channel_order]
+        channel_path_map = {
+            c.value: str(p) for c, p in self._channel_path_map.items()
+        }
+
         return {
             'experiment_id': self._experiment_id,
             'roi_id': self._roi_id,
-            'mask_path': str(self._mask_path),
-            'max_projection_path': str(self._max_projection_path),
-            'avg_projection_path':
-                str(self._avg_projection_path) if self._avg_projection_path
-                else None,
-            'correlation_projection_path':
-                str(self._correlation_projection_path) if
-                self._correlation_projection_path else None,
+            'channel_order': channel_order,
+            'channel_path_map': channel_path_map,
             'label': self._label
         }
+
+    @staticmethod
+    def _validate_channel_order(
+            channel_order: List[Channel],
+            channel_path_map: Dict[Channel, Path]):
+
+        for channel in channel_order:
+            if channel not in channel_path_map:
+                raise ValueError(
+                    f'All channels in channel_order need to be in '
+                    f'channel_path_map. {channel} not found in '
+                    f'{channel_path_map}')
 
 
 def write_model_input_metadata_to_disk(model_inputs: List[ModelInput],

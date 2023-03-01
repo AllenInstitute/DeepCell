@@ -4,15 +4,15 @@ from typing import Optional, List, Dict
 
 import pandas as pd
 from pathlib import Path
-import sqlalchemy as db
 
+import requests
 from argschema import ArgSchema, ArgSchemaParser, fields
-from cell_labeling_app.database.schemas import JobRegion, UserLabels
+from deepcell.datasets.channel import Channel
 from marshmallow.validate import OneOf
 
 from deepcell.data_splitter import DataSplitter
 from deepcell.datasets.model_input import ModelInput
-from deepcell.cli.schemas.data import ExperimentMetadataSchema
+from deepcell.cli.schemas.data import ExperimentMetadataSchema, ChannelField
 
 
 class VoteTallyingStrategy(Enum):
@@ -35,15 +35,35 @@ class VoteTallyingStrategy(Enum):
 
 class CreateDatasetInputSchema(ArgSchema):
     labels_path = fields.InputFile(
-        required=True,
-        description="Path to labels. Must either be sqlite database "
-                    "containing all labels or already preprocessed labels "
-                    "in csv format"
+        required=False,
+        allow_none=True,
+        default=None,
+        description="Path to labels. Must be already preprocessed labels "
+                    "in csv format. Either this or cell_labeling_app host and "
+                    "port need to be given"
+    )
+    cell_labeling_app_host = fields.String(
+        required=False,
+        allow_none=True,
+        default=None,
+        description='Cell labeling app host'
+    )
+    cell_labeling_app_port = fields.Int(
+        required=False,
+        allow_none=True,
+        default=None,
+        description='Cell labeling app port'
     )
     artifact_dir = fields.InputDir(
         required=True,
         description="Directory containing image artifacts for all labeled "
                     "ROIs.",
+    )
+    channels = fields.List(
+        ChannelField(),
+        required=True,
+        # only 3 input channels currently supported
+        validate=lambda value: len(value) == 3
     )
     experiment_metadata = fields.InputFile(
         required=True,
@@ -97,25 +117,41 @@ class CreateDataset(ArgSchemaParser):
     default_schema = CreateDatasetInputSchema
 
     def run(self):
-        labels_path = Path(self.args['labels_path'])
+        labels_path = Path(self.args['labels_path']) \
+            if self.args['labels_path'] is not None else None
+        cell_labeling_app_host = self.args['cell_labeling_app_host']
+        cell_labeling_app_port = self.args['cell_labeling_app_port']
         output_dir = Path(self.args['output_dir'])
         vote_tallying_strategy = VoteTallyingStrategy(
             self.args['vote_tallying_strategy'])
 
-        if labels_path.suffix not in ('.db', '.csv'):
-            raise ValueError(f'Expected labels_path to be a db or csv but got '
-                             f'file with suffix {labels_path.suffix}')
+        if labels_path is not None and (
+                cell_labeling_app_host is not None and
+                cell_labeling_app_port is not None):
+            raise ValueError('Provide either labels_path or cell_labeling_app '
+                             'connection details, not both')
 
-        if labels_path.suffix == '.db':
-            raw_labels = construct_dataset(
-                label_db_path=self.args['labels_path'],
-                min_labelers_per_roi=(
-                    self.args['min_labelers_required_per_region']),
-                raw=True)
-        else:
+        if labels_path is not None:
+            if labels_path.suffix != '.csv':
+                raise ValueError(f'Expected labels_path to be a csv but got '
+                                 f'file with suffix {labels_path.suffix}')
+
             raw_labels = pd.read_csv(self.args['labels_path'],
                                      dtype={'experiment_id': str,
                                             'roi_id': str})
+        elif (cell_labeling_app_host is not None and
+              cell_labeling_app_port is not None):
+            raw_labels = construct_dataset(
+                cell_labeling_app_host=cell_labeling_app_host,
+                cell_labeling_app_port=cell_labeling_app_port,
+                min_labelers_per_roi=(
+                    self.args['min_labelers_required_per_region']),
+                raw=True)
+            raw_labels.to_csv(output_dir / 'raw_labels.csv', index=False)
+        else:
+            raise ValueError('Either provide labels_path or cell_labeling_app '
+                             'connection details')
+
         raw_labels = raw_labels[['experiment_id', 'roi_id', 'user_id',
                                  'label']]
 
@@ -123,9 +159,6 @@ class CreateDataset(ArgSchemaParser):
         raw_labels['user_id'] = raw_labels['user_id'].map(
             {user_id: i for i, user_id in
              enumerate(raw_labels['user_id'].unique())})
-
-        if labels_path.suffix == '.db':
-            raw_labels.to_csv(output_dir / 'raw_labels.csv', index=False)
 
         labels = _tally_votes(labels=raw_labels,
                               vote_tallying_strategy=vote_tallying_strategy)
@@ -135,7 +168,9 @@ class CreateDataset(ArgSchemaParser):
                 data_dir=self.args['artifact_dir'],
                 experiment_id=row.experiment_id,
                 roi_id=row.roi_id,
-                label=row.label
+                label=row.label,
+                channels=[getattr(Channel, x)
+                          for x in self.args['channels']]
             )
             for row in labels.itertuples(index=False)
         ]
@@ -145,8 +180,10 @@ class CreateDataset(ArgSchemaParser):
                 experiment_ids=labels['experiment_id'].unique(),
                 experiment_metadata_path=self.args['experiment_metadata'])
 
-        splitter = DataSplitter(model_inputs=model_inputs,
-                                seed=self.args['seed'])
+        splitter = DataSplitter(
+            model_inputs=model_inputs,
+            seed=self.args['seed']
+        )
         train_rois, test_rois = splitter.get_train_test_split(
             test_size=self.args['test_size'],
             full_dataset=model_inputs,
@@ -165,7 +202,8 @@ class CreateDataset(ArgSchemaParser):
 
 
 def construct_dataset(
-        label_db_path: str,
+        cell_labeling_app_host: str,
+        cell_labeling_app_port: int,
         min_labelers_per_roi: int,
         vote_tallying_strategy: Optional[VoteTallyingStrategy] = None,
         raw: bool = False
@@ -173,7 +211,8 @@ def construct_dataset(
     """
     Create labeled dataset from label db
 
-    @param label_db_path: Path to label database
+    @param cell_labeling_app_host: Cell labeling app host
+    @param cell_labeling_app_port: Cell labeling app port
     @param min_labelers_per_roi: minimum number of labelers required to have
     seen a given ROI
     @param vote_tallying_strategy: VoteTallyingStrategy
@@ -183,7 +222,10 @@ def construct_dataset(
     if not raw and vote_tallying_strategy is None:
         raise ValueError('vote_strategy required if tallying votes')
 
-    user_labels = _get_raw_user_labels(label_db_path=label_db_path)
+    user_labels = _get_raw_user_labels(
+        cell_labeling_app_host=cell_labeling_app_host,
+        cell_labeling_app_port=cell_labeling_app_port
+    )
     user_labels['labels'] = user_labels['labels'].apply(
         lambda x: json.loads(x))
 
@@ -191,7 +233,7 @@ def construct_dataset(
     user_ids = []
     for row in user_labels.itertuples(index=False):
         labels = pd.DataFrame(row.labels)
-        labels = labels[labels['is_segmented']]
+        labels = labels[~labels['is_user_added']]
 
         if not labels.empty:
             experiment_ids += [row.experiment_id] * labels.shape[0]
@@ -200,7 +242,7 @@ def construct_dataset(
     labels = pd.concat([pd.DataFrame(x) for x in user_labels['labels']],
                        ignore_index=True)
 
-    labels = labels[labels['is_segmented']].copy()
+    labels = labels[~labels['is_user_added']].copy()
 
     labels['experiment_id'] = experiment_ids
     labels['user_id'] = user_ids
@@ -276,20 +318,21 @@ def _tally_votes_for_observation(
     return label
 
 
-def _get_raw_user_labels(label_db_path: str) -> pd.DataFrame:
+def _get_raw_user_labels(
+    cell_labeling_app_host: str,
+    cell_labeling_app_port: int,
+) -> pd.DataFrame:
     """
     Queries label database for user labels
-    @param label_db_path: Path to label database
+    @param cell_labeling_app_host: Cell labeling app host
+    @param cell_labeling_app_port: Cell labeling app port
     @return: pd.DataFrame
     """
-    db_engine = db.create_engine(f"sqlite:///{label_db_path}")
-    query = (db.select([JobRegion.experiment_id,
-                        UserLabels.labels,
-                        UserLabels.user_id])
-             .select_from(UserLabels).join(JobRegion,
-                                           JobRegion.id ==
-                                           UserLabels.region_id))
-    labels = pd.read_sql(sql=query, con=db_engine)
+    url = f'http://{cell_labeling_app_host}:{cell_labeling_app_port}' \
+          f'/get_all_labels'
+    r = requests.get(url)
+    labels = r.json()
+    labels = pd.DataFrame(labels)
     return labels
 
 
@@ -311,6 +354,7 @@ def _get_experiment_metadata(experiment_ids: List,
                  equipment=meta['equipment'],
                  problem_experiment=meta['problem_experiment'])))
     return output_exp_metas
+
 
 if __name__ == "__main__":
     create_test_train_split = CreateDataset()

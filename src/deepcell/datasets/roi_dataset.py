@@ -2,6 +2,7 @@ from typing import List, Tuple
 
 from PIL import Image
 import numpy as np
+from deepcell.datasets.channel import Channel
 from torch.utils.data import Dataset
 from torchvision import transforms
 import imgaug.augmenters as iaa
@@ -23,9 +24,7 @@ class RoiDataset(Dataset):
                  transform: Transform = None,
                  debug=False,
                  cre_line=None,
-                 exclude_mask=False,
                  mask_out_projections=False,
-                 use_correlation_projection=True,
                  center_roi_centroid=False,
                  centroid_brightness_quantile=0.8,
                  centroid_use_mask=False):
@@ -44,13 +43,9 @@ class RoiDataset(Dataset):
                 records in the dataset to only a single example from each class
             cre_line:
                 Whether to limit to a cre_line
-            exclude_mask:
-                Whether to exclude the mask from input to the model
             mask_out_projections:
                 Whether to mask out projections to only include pixels in
                 the mask
-            use_correlation_projection
-                Whether to use correlation projection instead of avg projection
             center_roi_centroid
                 The classifier has poor performance with a soma that is not
                 centered in frame. Find the ROI centroid and use that to
@@ -68,10 +63,8 @@ class RoiDataset(Dataset):
         self._model_inputs = model_inputs
         self._image_dim = image_dim
         self.transform = transform
-        self._exclude_mask = exclude_mask
         self._mask_out_projections = mask_out_projections
         self._y = self.get_numeric_labels(model_inputs=model_inputs)
-        self._use_correlation_projection = use_correlation_projection
         self._center_roi_centroid = center_roi_centroid
         self._centroid_brightness_quantile = centroid_brightness_quantile
         self._centroid_use_mask = centroid_use_mask
@@ -180,16 +173,12 @@ class RoiDataset(Dataset):
         input = self._construct_input(obs=obs)
 
         if self.transform:
-            avg, max_, mask = input[:, :, 0], input[:, :, 1], input[:, :, 2]
-            if self.transform.avg_transform:
-                avg = self.transform.avg_transform(avg)
-                input[:, :, 0] = avg
-            if self.transform.max_transform:
-                max_ = self.transform.max_transform(max_)
-                input[:, :, 1] = max_
-            if self.transform.mask_transform:
-                mask = self.transform.mask_transform(mask)
-                input[:, :, 2] = mask
+            if (
+                    self.transform.avg_transform or
+                    self.transform.max_transform or
+                    self.transform.mask_transform):
+                raise NotImplementedError('Transform on individual channels '
+                                          'not supported anymore')
 
             if self.transform.all_transform:
                 input = self.transform.all_transform(input)
@@ -207,47 +196,34 @@ class RoiDataset(Dataset):
         Construct a single input
 
         Returns:
-            A numpy array of type uint8 and shape *dim, 3
+            A numpy array of type uint8 and shape *dim, n_channels
         """
-        res = np.zeros((*self._image_dim, 3), dtype=np.uint8)
+        n_channels = len(obs.channel_order)
+        res = np.zeros((*self._image_dim, n_channels), dtype=np.uint8)
 
-        if self._use_correlation_projection:
-            if obs.correlation_projection_path is not None:
-                with open(obs.correlation_projection_path, 'rb') as f:
-                    corr = Image.open(f)
-                    corr = np.array(corr)
-                    res[:, :, 0] = corr
-            else:
-                raise RuntimeError('Expected to find a correlation projection '
-                                   f'for exp {obs.experiment_id}, '
-                                   f'{obs.roi_id}')
-        else:
-            with open(obs.avg_projection_path, 'rb') as f:
-                avg = Image.open(f)
-                avg = np.array(avg)
-                res[:, :, 0] = avg
+        for i, channel in enumerate(obs.channel_order):
+            path = obs.channel_path_map[channel]
 
-        with open(obs.max_projection_path, 'rb') as f:
-            max = Image.open(f)
-            max = np.array(max)
-            res[:, :, 1] = max
-
-        with open(obs.mask_path, 'rb') as f:
-            mask = Image.open(f)
-            mask = np.array(mask)
-
-            if self._exclude_mask:
-                res[:, :, 2] = max
-            else:
+            with open(path, 'rb') as f:
+                img = Image.open(f)
+                img = np.array(img)
+            if channel == Channel.MASK:
                 try:
-                    res[:, :, 2] = mask
+                    res[:, :, i] = img
                 except ValueError:
                     # TODO fix this issue
                     pass
+            else:
+                res[:, :, i] = img
 
         if self._mask_out_projections:
-            res[:, :, 0][np.where(mask == 0)] = 0
-            res[:, :, 1][np.where(mask == 0)] = 0
+            # making plural since in theory could be multiple channels
+            masks = [i for i, channel in enumerate(obs.channel_order)
+                     if channel == Channel.MASK]
+            if len(masks) != 0:
+                for i, channel_name in enumerate(obs.channel_order):
+                    if channel_name != Channel.MASK:
+                        res[:, :, i][np.where(masks[0] == 0)] = 0
 
         if self._center_roi_centroid:
             res = center_roi(

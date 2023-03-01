@@ -17,7 +17,7 @@ class TestTrainCLI:
     def setup_class(cls):
         data_dir = tempfile.TemporaryDirectory()
 
-        cls.dataset = get_test_data(write_dir=data_dir.name)
+        cls.dataset = get_test_data(write_dir=data_dir.name, exp_id='0')
         cls.data_dir = data_dir
 
     def teardown_class(self):
