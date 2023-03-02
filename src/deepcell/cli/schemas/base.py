@@ -34,7 +34,7 @@ class BaseSchema(argschema.ArgSchema):
     )
 
     @marshmallow.post_load
-    def model_inputs(self, data):
+    def model_inputs(self, data, **kwargs):
         for key in ('model_inputs_path', 'train_model_inputs_path',
                     'validation_model_inputs_path'):
             if key not in data:

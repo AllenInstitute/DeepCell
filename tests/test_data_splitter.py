@@ -3,6 +3,7 @@ from pathlib import Path
 import numpy as np
 
 from deepcell.data_splitter import DataSplitter
+from deepcell.datasets.channel import Channel
 from deepcell.datasets.model_input import ModelInput
 from deepcell.datasets.exp_metadata import ExperimentMetadata
 
@@ -15,9 +16,15 @@ def test_ids_different():
     4. Val CV split / Test"""
     model_inputs = [ModelInput(roi_id=f'{i}',
                                experiment_id=f'{i%10}',
-                               mask_path=Path('foo'),
-                               max_projection_path=Path('foo'),
-                               avg_projection_path=Path('foo')
+                               channel_path_map={
+                                   Channel.MASK: Path('foo'),
+                                   Channel.MAX_PROJECTION: Path('foo'),
+                                   Channel.AVG_PROJECTION: Path('foo')
+                               },
+                               channel_order=[
+                                   Channel.MASK,
+                                   Channel.MAX_PROJECTION,
+                                   Channel.AVG_PROJECTION]
                                ) for i in range(5000)]
     exp_inputs = [ExperimentMetadata(experiment_id=idx,
                                      imaging_depth=idx % 2,
@@ -48,9 +55,15 @@ def test_dataset_is_shuffled():
     shuffled"""
     model_inputs = [ModelInput(roi_id=f'{i}',
                                experiment_id=f'{i%10}',
-                               mask_path=Path('foo'),
-                               max_projection_path=Path('foo'),
-                               avg_projection_path=Path('foo')
+                               channel_path_map={
+                                   Channel.MASK: Path('foo'),
+                                   Channel.MAX_PROJECTION: Path('foo'),
+                                   Channel.AVG_PROJECTION: Path('foo')
+                               },
+                               channel_order=[
+                                   Channel.MASK,
+                                   Channel.MAX_PROJECTION,
+                                   Channel.AVG_PROJECTION]
                                ) for i in range(5000)]
     data_splitter = \
         DataSplitter(model_inputs=model_inputs,
@@ -71,9 +84,15 @@ def test_experiment_binning():
     # Just need model inputs for the class init.
     model_inputs = [ModelInput(roi_id=f'{i}',
                                experiment_id=f'{i%10}',
-                               mask_path=Path('foo'),
-                               max_projection_path=Path('foo'),
-                               avg_projection_path=Path('foo')
+                               channel_path_map={
+                                   Channel.MASK: Path('foo'),
+                                   Channel.MAX_PROJECTION: Path('foo'),
+                                   Channel.AVG_PROJECTION: Path('foo')
+                               },
+                               channel_order=[
+                                   Channel.MASK,
+                                   Channel.MAX_PROJECTION,
+                                   Channel.AVG_PROJECTION]
                                ) for i in range(5)]
     # Create 2 sets of experiments. 2P at various depths identified as 
     # special or "problem" experiments and a set of special experiments.
@@ -107,9 +126,15 @@ def test_convert_exp_index_to_roi_index():
     """
     model_inputs = [ModelInput(roi_id=f'{i}',
                                experiment_id=f'{i%10}',
-                               mask_path=Path('foo'),
-                               max_projection_path=Path('foo'),
-                               avg_projection_path=Path('foo')
+                               channel_path_map={
+                                   Channel.MASK: Path('foo'),
+                                   Channel.MAX_PROJECTION: Path('foo'),
+                                   Channel.AVG_PROJECTION: Path('foo')
+                               },
+                               channel_order=[
+                                   Channel.MASK,
+                                   Channel.MAX_PROJECTION,
+                                   Channel.AVG_PROJECTION]
                                ) for i in range(10)]
     # Just need some experiment inputs here.
     exp_inputs = [ExperimentMetadata(experiment_id=idx,

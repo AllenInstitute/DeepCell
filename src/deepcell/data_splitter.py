@@ -1,6 +1,7 @@
 from typing import List, Optional, Tuple, Iterator
 
 import numpy as np
+from deepcell.datasets.channel import Channel
 from sklearn.model_selection import StratifiedShuffleSplit, StratifiedKFold
 
 from deepcell.datasets.model_input import ModelInput
@@ -13,10 +14,11 @@ class DataSplitter:
     def __init__(self,
                  model_inputs: List[ModelInput],
                  train_transform=None,
-                 test_transform=None, seed=None,
-                 cre_line=None, exclude_mask=False,
-                 mask_out_projections=False, image_dim=(128, 128),
-                 use_correlation_projection=True,
+                 test_transform=None,
+                 seed=None,
+                 cre_line=None,
+                 mask_out_projections=False,
+                 image_dim=(128, 128),
                  center_roi_centroid=False,
                  centroid_brightness_quantile=0.8,
                  centroid_use_mask=False):
@@ -34,14 +36,10 @@ class DataSplitter:
                 Seed for random shuffling
             cre_line:
                 Whether to filter to cre_line
-            exclude_mask:
-                Whether to exclude the mask from input
             mask_out_projections:
                 Whether to mask out the projections using the segmentation mask
             image_dim:
                 Input image dimension
-            use_correlation_projection:
-                Whether to use correlation projection instead of avg
             center_roi_centroid
                 See `RoiDataset.center_roi_centroid`.
                 Valid values are "test", True or False
@@ -59,10 +57,8 @@ class DataSplitter:
         self.test_transform = test_transform
         self.seed = seed
         self.cre_line = cre_line
-        self.exclude_mask = exclude_mask
         self.mask_out_projections = mask_out_projections
         self.image_dim = image_dim
-        self._use_correlation_projection = use_correlation_projection
         self._centroid_brightness_quantile = centroid_brightness_quantile
         self._centroid_use_mask = centroid_use_mask
 
@@ -276,10 +272,8 @@ class DataSplitter:
         return RoiDataset(
             model_inputs=artifacts,
             transform=transform,
-            exclude_mask=self.exclude_mask,
             mask_out_projections=self.mask_out_projections,
             image_dim=self.image_dim,
-            use_correlation_projection=self._use_correlation_projection,
             center_roi_centroid=center_roi_centroid,
             centroid_brightness_quantile=self._centroid_brightness_quantile,
             centroid_use_mask=self._centroid_use_mask
