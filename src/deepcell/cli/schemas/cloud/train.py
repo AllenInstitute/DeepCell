@@ -70,6 +70,7 @@ class CloudKFoldTrainSchema(argschema.ArgSchema):
 
     instance_type = argschema.fields.Str(
         required=True,
+        default='ml.p2.xlarge',
         description='EC2 instance type. For local mode '
                     '(train locally, useful for debugging), set to "local"'
     )
