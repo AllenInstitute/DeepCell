@@ -1,6 +1,8 @@
 import contextlib
+import datetime
 import json
 import logging
+import os
 import tempfile
 import time
 from pathlib import Path
@@ -83,6 +85,9 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
         self._output_dir = output_dir
         self._seed = seed
         self._logger = logging.getLogger(__name__)
+        self._input_data_root_dir = os.path.join(
+            'input_data',
+            datetime.datetime.now().strftime('%Y-%m-%d_%H:%m:%S-%f'))
 
         if mlflow_server_uri is not None:
             mlflow.set_tracking_uri(mlflow_server_uri)
@@ -143,7 +148,7 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
         else:
             mlflow_run = contextlib.nullcontext()
 
-        s3_uri = f's3://{self._bucket_name}/input_data' \
+        s3_uri = f's3://{self._bucket_name}/{self._input_data_root_dir}' \
             if load_data_from_s3 else None
         if load_data_from_s3:
             model_inputs = self._get_model_inputs_from_s3(s3_uri=s3_uri)
@@ -158,7 +163,7 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
                     )
                     self._sagemaker_session.upload_data(
                         path=str(Path(temp_dir) / 'all' / 'model_inputs.json'),
-                        key_prefix='input_data/all',
+                        key_prefix=f'{self._input_data_root_dir}/all',
                         bucket=self._bucket_name)
         channels = ('train', 'validation')
 
@@ -275,7 +280,7 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
         for channel in local_data_path:
             s3_path = self._sagemaker_session.upload_data(
                 path=str(local_data_path[channel]),
-                key_prefix=f'input_data/{channel}/{k}',
+                key_prefix=f'{self._input_data_root_dir}/{channel}/{k}',
                 bucket=self._bucket_name)
             s3_paths[channel] = s3_path
 
