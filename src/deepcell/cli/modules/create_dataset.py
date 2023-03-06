@@ -231,9 +231,15 @@ def construct_dataset(
 
     experiment_ids = []
     user_ids = []
+
+    def _get_is_user_added_mask(labels: pd.DataFrame):
+        # is_segmented is old key, is_user_added is new one
+        return ~labels['is_user_added'] if 'is_user_added' in labels else \
+            labels['is_segmented']
+
     for row in user_labels.itertuples(index=False):
         labels = pd.DataFrame(row.labels)
-        labels = labels[~labels['is_user_added']]
+        labels = labels[_get_is_user_added_mask(labels=labels)]
 
         if not labels.empty:
             experiment_ids += [row.experiment_id] * labels.shape[0]
@@ -242,7 +248,7 @@ def construct_dataset(
     labels = pd.concat([pd.DataFrame(x) for x in user_labels['labels']],
                        ignore_index=True)
 
-    labels = labels[~labels['is_user_added']].copy()
+    labels = labels[_get_is_user_added_mask(labels=labels)].copy()
 
     labels['experiment_id'] = experiment_ids
     labels['user_id'] = user_ids
