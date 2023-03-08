@@ -109,6 +109,8 @@ class TrainingRunner:
             self._get_input_argument(name='sagemaker_job_name')
         self._train_cfg['tracking_params']['parent_run_id'] = \
             self._get_input_argument(name='mlflow_parent_run_id')
+        self._train_cfg['tracking_params']['mlflow_server_uri'] = \
+            self._get_input_argument(name='mlflow_server_uri')
 
     def _get_input_argument(self, name):
         """

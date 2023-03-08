@@ -8,6 +8,11 @@ from deepcell.cli.schemas.train import TrainSchema
 from deepcell.cloud.ecr import ECRUploader
 from deepcell.cloud.train import KFoldTrainingJobRunner
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
 
 class CloudKFoldTrainRunner(argschema.ArgSchemaParser):
     default_schema = CloudKFoldTrainSchema
@@ -16,15 +21,6 @@ class CloudKFoldTrainRunner(argschema.ArgSchemaParser):
         Path(__file__).parent.parent.parent.parent / 'cloud' / 'container'
 
     def run(self):
-        logger = logging.getLogger('root')
-        logger.setLevel(level=logging.INFO)
-        sh = logging.StreamHandler()
-        sh.setLevel(level=logging.INFO)
-        sh.setFormatter(logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        ))
-        logger.addHandler(sh)
-
         repository_name = self.args['docker_params']['repository_name']
         image_tag = self.args['docker_params']['image_tag']
 
@@ -48,6 +44,7 @@ class CloudKFoldTrainRunner(argschema.ArgSchemaParser):
         tracking_params = self.args['train_params']['tracking_params']
         runner = KFoldTrainingJobRunner(
             bucket_name=self.args['s3_params']['bucket_name'],
+            s3_data_key=self.args['s3_params']['data_key'],
             image_uri=image_uri,
             profile_name=self.args['profile_name'],
             instance_type=self.args['instance_type'],
@@ -61,7 +58,6 @@ class CloudKFoldTrainRunner(argschema.ArgSchemaParser):
         )
         runner.run(
             model_inputs=self.args['train_params']['model_inputs'],
-            load_data_from_s3=self.args['train_params']['load_data_from_s3'],
             k_folds=self.args['train_params']['n_folds'],
             train_params=self.args['train_params'],
             is_trial_run=self.args['is_trial_run']

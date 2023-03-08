@@ -38,7 +38,9 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
                  output_dir: Optional[Union[Path, str]] = None,
                  seed=None,
                  mlflow_server_uri=None,
-                 mlflow_experiment_name: str = 'deepcell-train'):
+                 mlflow_experiment_name: str = 'deepcell-train',
+                 s3_data_key: Optional[str] = None,
+                 ):
         """
         Parameters
         ----------
@@ -67,6 +69,9 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
         mlflow_experiment_name
             MLFlow experiment name to create runs under.
             Only used if mlflow_server_uri provided.
+        s3_data_key: If provided, loads data from this key rather than
+            uploading new data
+            This is only used if not in "local mode"
         """
         super().__init__(server_uri=mlflow_server_uri,
                          experiment_name=mlflow_experiment_name)
@@ -85,8 +90,10 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
         self._output_dir = output_dir
         self._seed = seed
         self._logger = logging.getLogger(__name__)
+        self._s3_data_key = s3_data_key
         self._input_data_root_dir = os.path.join(
             'input_data',
+            s3_data_key if s3_data_key is not None else
             datetime.datetime.now().strftime('%Y-%m-%d_%H:%m:%S-%f'))
 
         if mlflow_server_uri is not None:
@@ -100,7 +107,6 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
     def run(self,
             train_params: dict,
             model_inputs: Optional[List[ModelInput]] = None,
-            load_data_from_s3: bool = True,
             k_folds=5,
             is_trial_run=False):
         """
@@ -110,9 +116,6 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
         ----------
         model_inputs: the input data. If provided, data_load_path should not be
         train_params: Training parameters to log to MLFlow
-        load_data_from_s3: Whether to load data from S3
-            If provided, model_inputs should not be.
-            This is only used if not in "local mode"
         k_folds: The number of CV splits.
         is_trial_run: Set this to True to only run on a single fold. Useful
                     for trying out a new idea without running on every fold
@@ -124,33 +127,18 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
         if self._local_mode:
             if model_inputs is None:
                 raise ValueError('model_inputs is required in local mode')
-        if model_inputs is not None and load_data_from_s3:
-            raise ValueError('Supply either `model_inputs` or set '
-                             '`load_data_from_s3` to `True`, but not both')
-        if model_inputs is None and not load_data_from_s3:
-            raise ValueError('Supply one of `model_inputs` or set '
-                             '`load_data_from_s3` to `True`')
+        if model_inputs is not None and self._s3_data_key is not None:
+            raise ValueError('Supply either `model_inputs` or s3_data_key, '
+                             'but not both')
+        if model_inputs is None and self._s3_data_key is None:
+            raise ValueError('Supply one of `model_inputs` or s3_data_key')
         sagemaker_session = None if self._local_mode else \
             self._sagemaker_session
 
         sagemaker_role_arn = get_sagemaker_execution_role_arn()
 
-        if self._is_mlflow_tracking_enabled:
-            mlflow_run = self._create_parent_mlflow_run(
-                run_name=f'CV-{int(time.time())}',
-                hyperparameters=train_params,
-                hyperparameters_exclude_keys=['tracking_params', 'save_path',
-                                              'model_load_path',
-                                              'model_inputs_path',
-                                              'model_inputs', 'n_folds',
-                                              'data_load_path',
-                                              'load_data_from_s3'])
-        else:
-            mlflow_run = contextlib.nullcontext()
-
-        s3_uri = f's3://{self._bucket_name}/{self._input_data_root_dir}' \
-            if load_data_from_s3 else None
-        if load_data_from_s3:
+        s3_uri = f's3://{self._bucket_name}/{self._input_data_root_dir}'
+        if self._s3_data_key is not None:
             model_inputs = self._get_model_inputs_from_s3(s3_uri=s3_uri)
         else:
             if not self._local_mode:
@@ -165,6 +153,29 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
                         path=str(Path(temp_dir) / 'all' / 'model_inputs.json'),
                         key_prefix=f'{self._input_data_root_dir}/all',
                         bucket=self._bucket_name)
+
+        if self._is_mlflow_tracking_enabled:
+            def _get_channel_order(model_inputs: List[ModelInput]):
+                channel_order = set(tuple(x.channel_order)
+                                    for x in model_inputs)
+                if len(channel_order) != 1:
+                    raise ValueError(f'Expected to find 1 channel order but '
+                                     f'found {channel_order}')
+                return list(channel_order)[0]
+
+            train_params['data_params']['channel_order'] = \
+                _get_channel_order(model_inputs=model_inputs)
+            mlflow_run = self._create_parent_mlflow_run(
+                run_name=f'CV-{int(time.time())}',
+                hyperparameters=train_params,
+                hyperparameters_exclude_keys=['tracking_params', 'save_path',
+                                              'model_load_path',
+                                              'model_inputs_path',
+                                              'model_inputs', 'n_folds',
+                                              'data_load_path',
+                                              's3_data_key'])
+        else:
+            mlflow_run = contextlib.nullcontext()
         channels = ('train', 'validation')
 
         training_jobs = []
@@ -201,7 +212,7 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
                 with tempfile.TemporaryDirectory() as temp_dir:
                     local_data_path = {c: Path(temp_dir) / c / str(k)
                                        for c in channels}
-                    if not load_data_from_s3:
+                    if self._s3_data_key is None:
                         self._logger.info(f'Copying train model inputs to '
                                           f'{local_data_path["train"]}')
                         copy_model_inputs_to_dir(
@@ -219,7 +230,7 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
                         # In local mode, we are just reading local data
                         data_path = {k: f'file://{v}'
                                      for k, v in local_data_path.items()}
-                    elif not load_data_from_s3:
+                    elif self._s3_data_key is None:
                         # If not reading data from S3,
                         # we need to upload data to s3
                         data_path = self._upload_local_data_to_s3(
