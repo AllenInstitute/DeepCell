@@ -45,7 +45,7 @@ class TrainingRunner:
         for data_dir in (TRAINING_DATA_DIR, VALIDATION_DATA_DIR):
             logger.info(f'Unpacking {data_dir / self._fold}')
             shutil.unpack_archive(
-                filename=data_dir / self._fold,
+                filename=f'{data_dir / self._fold}.tar.gz',
                 extract_dir=data_dir
             )
             logger.info(f'Done unpacking {data_dir / self._fold}')
