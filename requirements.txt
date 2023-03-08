@@ -20,4 +20,4 @@ docker
 mlflow
 protobuf
 requests
-awscli
+awscli~=1.27.0
