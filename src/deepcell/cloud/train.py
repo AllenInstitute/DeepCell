@@ -3,6 +3,7 @@ import datetime
 import json
 import logging
 import os
+import shutil
 import tempfile
 import time
 from pathlib import Path
@@ -282,15 +283,23 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
         -------
         Dict mapping channel name to path on s3
         """
-        self._logger.info('Uploading input data to S3')
         create_bucket_if_not_exists(
             bucket=self._bucket_name,
             region_name=self._sagemaker_session.boto_session
             .region_name)
         s3_paths = {}
         for channel in local_data_path:
+            self._logger.info(f'Compressing {local_data_path[channel]}')
+            compressed = shutil.make_archive(
+                base_name=str(local_data_path[channel]),
+                format='gztar',
+                root_dir=str(local_data_path[channel])
+            )
+            self._logger.info(f'Done compressing {local_data_path[channel]}')
+
+            self._logger.info(f'Uploading {compressed} to S3')
             s3_path = self._sagemaker_session.upload_data(
-                path=str(local_data_path[channel]),
+                path=compressed,
                 key_prefix=f'{self._input_data_root_dir}/{channel}/{k}',
                 bucket=self._bucket_name)
             s3_paths[channel] = s3_path

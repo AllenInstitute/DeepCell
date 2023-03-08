@@ -5,6 +5,7 @@ import json
 import logging
 import argparse
 import os
+import shutil
 import sys
 from pathlib import Path
 from typing import List
@@ -40,6 +41,14 @@ class TrainingRunner:
 
         if self._fold is None:
             raise ValueError('Could not get fold from hyperparams or env.')
+
+        for data_dir in (TRAINING_DATA_DIR, VALIDATION_DATA_DIR):
+            logger.info(f'Unpacking {data_dir / self._fold}')
+            shutil.unpack_archive(
+                filename=data_dir / self._fold,
+                extract_dir=data_dir
+            )
+            logger.info(f'Done unpacking {data_dir / self._fold}')
 
     def run(self):
         self._update_train_cfg()
