@@ -91,6 +91,12 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
         self._output_dir = output_dir
         self._seed = seed
         self._logger = logging.getLogger(__name__)
+        sh = logging.StreamHandler()
+        sh.setLevel(level=logging.INFO)
+        sh.setFormatter(fmt=logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+        self._logger.addHandler(sh)
+
         self._s3_data_key = s3_data_key
         self._input_data_root_dir = os.path.join(
             'input_data',
@@ -297,10 +303,12 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
             )
             self._logger.info(f'Done compressing {local_data_path[channel]}')
 
-            self._logger.info(f'Uploading {compressed} to S3')
+            s3_key_prefix = f'{self._input_data_root_dir}/{channel}/{k}'
+            self._logger.info(f'Uploading {compressed} to '
+                              f's3://{self._bucket_name}/{s3_key_prefix}')
             s3_path = self._sagemaker_session.upload_data(
                 path=compressed,
-                key_prefix=f'{self._input_data_root_dir}/{channel}/{k}',
+                key_prefix=s3_key_prefix,
                 bucket=self._bucket_name)
             s3_paths[channel] = s3_path
 
