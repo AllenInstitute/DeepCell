@@ -59,7 +59,7 @@ class InferenceModule(argschema.ArgSchemaParser):
                 has_labels=self.args['mode'] == 'test',
                 checkpoint_path=str(self.args['model_load_path']))
         else:
-            if type(model_inputs[0]) == list:
+            if len(model_inputs) > 1:
                 # Just passing the raw split validation model inputs
                 data_splitter = None
             else:

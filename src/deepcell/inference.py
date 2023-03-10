@@ -200,9 +200,11 @@ def cv_performance(
                            'a single validation set')
     if data_splitter is None and test_transform is None:
         raise ValueError('Pass test_transform if no data splitter')
-    if data_splitter is not None and type(model_inputs[0]) == list:
-        raise RuntimeError('If a data splitter is passed, a list '
-                           'of ModelInput is expected')
+    if data_splitter is not None and len(model_inputs) != 1:
+        raise RuntimeError('If a data splitter is passed, there should be a '
+                           'single list of model inputs')
+    if data_splitter is not None:
+        model_inputs = model_inputs[0]
 
     def get_validation_set():
         if data_splitter is None:
