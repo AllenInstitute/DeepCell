@@ -47,7 +47,6 @@ class TestTrainCLI:
                 train_params = {
                     'n_folds': 2,
                     'model_inputs_path': f.name,
-                    'load_data_from_s3': False,
                     'save_path': temp_path,
                     'optimization_params': {
                         'n_epochs': 3
