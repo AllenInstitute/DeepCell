@@ -24,11 +24,13 @@ class TestTrainTestSplitCli:
         cls.n_experiments = 2
         cls.experiment_ids = list(range(cls.n_experiments))
         cls.n_rois = 4
-        cls.exp_metas = dict([(str(idx), {'experiment_id': str(idx),
-                                          'imaging_depth': 1,
-                                          'equipment': '2P',
-                                          'problem_experiment': False})
-                              for idx in range(cls.n_experiments)])
+        cls.exp_metas = [{
+                'experiment_id': str(idx),
+                'imaging_depth': 1,
+                'equipment': '2P',
+                'problem_experiment': False
+        }
+            for idx in range(cls.n_experiments)]
         cls.exp_meta_file = tempfile.NamedTemporaryFile('w', suffix='.json')
         with open(cls.exp_meta_file.name, 'w') as jfile:
             json.dump(cls.exp_metas, jfile, indent=2)
@@ -65,7 +67,9 @@ class TestTrainTestSplitCli:
         return json.dumps(output)
 
     @patch('deepcell.cli.modules.create_dataset._get_raw_user_labels')
-    def test_create_train_test_split(self, mock_get_raw_user_labels):
+    @patch('deepcell.cli.modules.create_dataset._get_experiment_metadata')
+    def test_create_train_test_split(self, mock_get_experiment_metadata,
+                                     mock_get_raw_user_labels):
         """Test that the class loads the data and labels cells properly.
         """
         args = {
@@ -75,10 +79,11 @@ class TestTrainTestSplitCli:
                 Channel.CORRELATION_PROJECTION.value
             ],
             'cell_labeling_app_host': 'foo',
+            'lims_db_username': 'foo',
+            'lims_db_password': 'foo',
             "artifact_dir": {
                 str(exp_id): str(self.artifact_dir.name)
                 for exp_id in self.experiment_ids},
-            "experiment_metadata": str(self.exp_meta_file.name),
             "min_labelers_required_per_region": 2,
             "vote_tallying_strategy": 'consensus',
             "test_size": 0.50,
@@ -113,6 +118,7 @@ class TestTrainTestSplitCli:
         })
 
         mock_get_raw_user_labels.return_value = labels
+        mock_get_experiment_metadata.return_value = self.exp_metas
 
         train_test = CreateDataset(args=[], input_data=args)
         train_test.run()

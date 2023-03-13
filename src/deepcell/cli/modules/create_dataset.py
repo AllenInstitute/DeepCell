@@ -7,12 +7,14 @@ from pathlib import Path
 
 import requests
 from argschema import ArgSchema, ArgSchemaParser, fields
+from sqlalchemy import URL, create_engine
+
 from deepcell.datasets.channel import Channel
 from marshmallow.validate import OneOf
 
 from deepcell.data_splitter import DataSplitter
 from deepcell.datasets.model_input import ModelInput
-from deepcell.cli.schemas.data import ExperimentMetadataSchema, ChannelField
+from deepcell.cli.schemas.data import ChannelField
 
 
 class VoteTallyingStrategy(Enum):
@@ -38,6 +40,14 @@ class CreateDatasetInputSchema(ArgSchema):
         required=True,
         description='Cell labeling app host name'
     )
+    lims_db_username = fields.String(
+        required=True,
+        description='LIMS DB username'
+    )
+    lims_db_password = fields.String(
+        required=True,
+        description='LIMS DB password'
+    )
     artifact_dir = fields.Dict(
         keys=fields.Str(),
         values=fields.InputDir(),
@@ -50,11 +60,6 @@ class CreateDatasetInputSchema(ArgSchema):
         required=True,
         # only 3 input channels currently supported
         validate=lambda value: len(value) == 3
-    )
-    experiment_metadata = fields.InputFile(
-        required=True,
-        description="File containing metadata relating the the experiments "
-                    "from which the labeled ROIs were drawn."
     )
     min_labelers_required_per_region = fields.Int(
         required=True,
@@ -140,8 +145,10 @@ class CreateDataset(ArgSchemaParser):
 
         experiment_metadata = \
             _get_experiment_metadata(
-                experiment_ids=labels['experiment_id'].unique(),
-                experiment_metadata_path=self.args['experiment_metadata'])
+                experiment_ids=sorted(labels['experiment_id'].unique()),
+                lims_db_username=self.args['lims_db_username'],
+                lims_db_password=self.args['lims_db_password']
+            )
 
         splitter = DataSplitter(
             model_inputs=model_inputs,
@@ -299,24 +306,45 @@ def _get_raw_user_labels(
     return labels
 
 
-def _get_experiment_metadata(experiment_ids: List,
-                             experiment_metadata_path: str) -> List[Dict]:
+def _get_experiment_metadata(
+    experiment_ids: List,
+    lims_db_username: str,
+    lims_db_password: str
+) -> List[Dict]:
     """Load experiment metadata for `experiment_ids`
     @param experiment_ids: List of experiment ids to get metadata for
-    @param experiment_metadata_path: Path to experiment metadata
+    @param lims_db_username: LIMS DB username
+    @param lims_db_password: LIMS DB password
     @return: List of experiment metadata
     """
-    with open(experiment_metadata_path, 'r') as f:
-        exp_metas = json.load(f)
-    output_exp_metas = []
-    for exp_id in experiment_ids:
-        meta = exp_metas[exp_id]
-        output_exp_metas.append(ExperimentMetadataSchema().load(
-            dict(experiment_id=str(exp_id),
-                 imaging_depth=meta['imaging_depth'],
-                 equipment=meta['equipment'],
-                 problem_experiment=meta['problem_experiment'])))
-    return output_exp_metas
+    url = URL.create(
+        drivername='postgresql+pg8000',
+        username=lims_db_username,
+        password=lims_db_password,
+        host='limsdb2',
+        database='lims2',
+    )
+    query = f'''
+SELECT 
+    oe.id as ophys_experiment_id, 
+    imaging_depths.depth as imaging_depth, 
+    equipment.name as equipment
+FROM ophys_experiments oe
+JOIN imaging_depths on imaging_depths.id = oe.imaging_depth_id
+JOIN ophys_sessions os on os.id = oe.ophys_session_id
+JOIN equipment on equipment.id = os.equipment_id
+WHERE oe.id in {tuple(experiment_ids)}
+    '''
+
+    engine = create_engine(url=url)
+    with engine.connect() as conn:
+        res = conn.execute(query=query)
+    columns = res.keys()
+    values = res.all()
+
+    res = [dict(zip(columns, x)) for x in values]
+
+    return res
 
 
 if __name__ == "__main__":

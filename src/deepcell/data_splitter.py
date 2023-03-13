@@ -1,7 +1,6 @@
 from typing import List, Optional, Tuple, Iterator
 
 import numpy as np
-from deepcell.datasets.channel import Channel
 from sklearn.model_selection import StratifiedShuffleSplit, StratifiedKFold
 
 from deepcell.datasets.model_input import ModelInput
