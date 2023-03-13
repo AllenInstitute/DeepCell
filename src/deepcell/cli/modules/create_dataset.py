@@ -48,12 +48,6 @@ class CreateDatasetInputSchema(ArgSchema):
         default=None,
         description='Cell labeling app host'
     )
-    cell_labeling_app_port = fields.Int(
-        required=False,
-        allow_none=True,
-        default=None,
-        description='Cell labeling app port'
-    )
     artifact_dir = fields.InputDir(
         required=True,
         description="Directory containing image artifacts for all labeled "
@@ -120,14 +114,11 @@ class CreateDataset(ArgSchemaParser):
         labels_path = Path(self.args['labels_path']) \
             if self.args['labels_path'] is not None else None
         cell_labeling_app_host = self.args['cell_labeling_app_host']
-        cell_labeling_app_port = self.args['cell_labeling_app_port']
         output_dir = Path(self.args['output_dir'])
         vote_tallying_strategy = VoteTallyingStrategy(
             self.args['vote_tallying_strategy'])
 
-        if labels_path is not None and (
-                cell_labeling_app_host is not None and
-                cell_labeling_app_port is not None):
+        if labels_path is not None and cell_labeling_app_host is not None:
             raise ValueError('Provide either labels_path or cell_labeling_app '
                              'connection details, not both')
 
@@ -139,11 +130,9 @@ class CreateDataset(ArgSchemaParser):
             raw_labels = pd.read_csv(self.args['labels_path'],
                                      dtype={'experiment_id': str,
                                             'roi_id': str})
-        elif (cell_labeling_app_host is not None and
-              cell_labeling_app_port is not None):
+        elif cell_labeling_app_host is not None:
             raw_labels = construct_dataset(
                 cell_labeling_app_host=cell_labeling_app_host,
-                cell_labeling_app_port=cell_labeling_app_port,
                 min_labelers_per_roi=(
                     self.args['min_labelers_required_per_region']),
                 raw=True)
@@ -203,8 +192,7 @@ class CreateDataset(ArgSchemaParser):
 
 def construct_dataset(
         cell_labeling_app_host: str,
-        cell_labeling_app_port: int,
-        min_labelers_per_roi: int,
+        min_labelers_per_roi: int = 3,
         vote_tallying_strategy: Optional[VoteTallyingStrategy] = None,
         raw: bool = False
 ) -> pd.DataFrame:
@@ -212,7 +200,6 @@ def construct_dataset(
     Create labeled dataset from label db
 
     @param cell_labeling_app_host: Cell labeling app host
-    @param cell_labeling_app_port: Cell labeling app port
     @param min_labelers_per_roi: minimum number of labelers required to have
     seen a given ROI
     @param vote_tallying_strategy: VoteTallyingStrategy
@@ -224,7 +211,6 @@ def construct_dataset(
 
     user_labels = _get_raw_user_labels(
         cell_labeling_app_host=cell_labeling_app_host,
-        cell_labeling_app_port=cell_labeling_app_port
     )
     user_labels['labels'] = user_labels['labels'].apply(
         lambda x: json.loads(x))
@@ -326,16 +312,13 @@ def _tally_votes_for_observation(
 
 def _get_raw_user_labels(
     cell_labeling_app_host: str,
-    cell_labeling_app_port: int,
 ) -> pd.DataFrame:
     """
     Queries label database for user labels
     @param cell_labeling_app_host: Cell labeling app host
-    @param cell_labeling_app_port: Cell labeling app port
     @return: pd.DataFrame
     """
-    url = f'http://{cell_labeling_app_host}:{cell_labeling_app_port}' \
-          f'/get_all_labels'
+    url = f'http://{cell_labeling_app_host}/get_all_labels'
     r = requests.get(url)
     labels = r.json()
     labels = pd.DataFrame(labels)

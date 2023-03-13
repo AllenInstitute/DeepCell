@@ -74,7 +74,6 @@ class TestTrainTestSplitCli:
                 Channel.CORRELATION_PROJECTION.value
             ],
             'cell_labeling_app_host': 'foo',
-            'cell_labeling_app_port': 8080,
             "artifact_dir": str(self.artifact_dir.name),
             "experiment_metadata": str(self.exp_meta_file.name),
             "min_labelers_required_per_region": 2,
