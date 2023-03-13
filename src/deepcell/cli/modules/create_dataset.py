@@ -34,24 +34,16 @@ class VoteTallyingStrategy(Enum):
 
 
 class CreateDatasetInputSchema(ArgSchema):
-    labels_path = fields.InputFile(
-        required=False,
-        allow_none=True,
-        default=None,
-        description="Path to labels. Must be already preprocessed labels "
-                    "in csv format. Either this or cell_labeling_app host and "
-                    "port need to be given"
-    )
     cell_labeling_app_host = fields.String(
-        required=False,
-        allow_none=True,
-        default=None,
-        description='Cell labeling app host'
-    )
-    artifact_dir = fields.InputDir(
         required=True,
-        description="Directory containing image artifacts for all labeled "
-                    "ROIs.",
+        description='Cell labeling app host name'
+    )
+    artifact_dir = fields.Dict(
+        keys=fields.Str(),
+        values=fields.InputDir(),
+        required=True,
+        description="Map between ophys experiment id and "
+                    "directory containing image artifacts for this experiment",
     )
     channels = fields.List(
         ChannelField(),
@@ -111,35 +103,17 @@ class CreateDataset(ArgSchemaParser):
     default_schema = CreateDatasetInputSchema
 
     def run(self):
-        labels_path = Path(self.args['labels_path']) \
-            if self.args['labels_path'] is not None else None
         cell_labeling_app_host = self.args['cell_labeling_app_host']
         output_dir = Path(self.args['output_dir'])
         vote_tallying_strategy = VoteTallyingStrategy(
             self.args['vote_tallying_strategy'])
 
-        if labels_path is not None and cell_labeling_app_host is not None:
-            raise ValueError('Provide either labels_path or cell_labeling_app '
-                             'connection details, not both')
-
-        if labels_path is not None:
-            if labels_path.suffix != '.csv':
-                raise ValueError(f'Expected labels_path to be a csv but got '
-                                 f'file with suffix {labels_path.suffix}')
-
-            raw_labels = pd.read_csv(self.args['labels_path'],
-                                     dtype={'experiment_id': str,
-                                            'roi_id': str})
-        elif cell_labeling_app_host is not None:
-            raw_labels = construct_dataset(
-                cell_labeling_app_host=cell_labeling_app_host,
-                min_labelers_per_roi=(
-                    self.args['min_labelers_required_per_region']),
-                raw=True)
-            raw_labels.to_csv(output_dir / 'raw_labels.csv', index=False)
-        else:
-            raise ValueError('Either provide labels_path or cell_labeling_app '
-                             'connection details')
+        raw_labels = construct_dataset(
+            cell_labeling_app_host=cell_labeling_app_host,
+            min_labelers_per_roi=(
+                self.args['min_labelers_required_per_region']),
+            raw=True)
+        raw_labels.to_csv(output_dir / 'raw_labels.csv', index=False)
 
         raw_labels = raw_labels[['experiment_id', 'roi_id', 'user_id',
                                  'label']]
@@ -154,7 +128,7 @@ class CreateDataset(ArgSchemaParser):
 
         model_inputs = [
             ModelInput.from_data_dir(
-                data_dir=self.args['artifact_dir'],
+                data_dir=self.args['artifact_dir'][row.experiment_id],
                 experiment_id=row.experiment_id,
                 roi_id=row.roi_id,
                 label=row.label,

@@ -22,6 +22,7 @@ class TestTrainTestSplitCli:
         cls.artifact_dir = tempfile.TemporaryDirectory()
 
         cls.n_experiments = 2
+        cls.experiment_ids = list(range(cls.n_experiments))
         cls.n_rois = 4
         cls.exp_metas = dict([(str(idx), {'experiment_id': str(idx),
                                           'imaging_depth': 1,
@@ -74,7 +75,9 @@ class TestTrainTestSplitCli:
                 Channel.CORRELATION_PROJECTION.value
             ],
             'cell_labeling_app_host': 'foo',
-            "artifact_dir": str(self.artifact_dir.name),
+            "artifact_dir": {
+                str(exp_id): str(self.artifact_dir.name)
+                for exp_id in self.experiment_ids},
             "experiment_metadata": str(self.exp_meta_file.name),
             "min_labelers_required_per_region": 2,
             "vote_tallying_strategy": 'consensus',
