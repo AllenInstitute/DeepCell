@@ -172,8 +172,13 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
 
             train_params['data_params']['channel_order'] = \
                 _get_channel_order(model_inputs=model_inputs)
+            run_name = (
+                f'CV-{int(time.time())}'
+                if train_params['tracking_params']['mlflow_run_name'] is None
+                else train_params['tracking_params']['mlflow_run_name']
+            )
             mlflow_run = self._create_parent_mlflow_run(
-                run_name=f'CV-{int(time.time())}',
+                run_name=run_name,
                 hyperparameters=train_params,
                 hyperparameters_exclude_keys=['tracking_params', 'save_path',
                                               'model_load_path',

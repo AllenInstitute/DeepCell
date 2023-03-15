@@ -14,6 +14,12 @@ class TrackingSchema(argschema.ArgSchema):
         description='If mlflow_server_uri provided, which experiment to use '
                     'for tracking'
     )
+    mlflow_run_name = argschema.fields.String(
+        default=None,
+        allow_none=True,
+        description='If mlflow_server_uri provided, run name to use. If None,'
+                    'a default value is used'
+    )
     sagemaker_job_name = argschema.fields.String(
         default=None,
         allow_none=True,
