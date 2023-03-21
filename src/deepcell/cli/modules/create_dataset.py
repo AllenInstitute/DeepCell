@@ -7,7 +7,8 @@ from pathlib import Path
 
 import requests
 from argschema import ArgSchema, ArgSchemaParser, fields
-from sqlalchemy import URL, create_engine
+from sqlalchemy import create_engine
+from sqlalchemy.engine import URL
 
 from deepcell.datasets.channel import Channel
 from marshmallow.validate import OneOf
