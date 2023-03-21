@@ -15,9 +15,10 @@ pytest
 argschema
 marshmallow
 sagemaker
-opencv-python
+opencv-python-headless
 docker
 mlflow
 protobuf
 requests
+sqlalchemy
 awscli~=1.27.0
