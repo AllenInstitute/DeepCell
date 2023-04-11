@@ -77,7 +77,7 @@ class ModelInput:
         """
         data_dir = Path(data_dir)
 
-        path = data_dir / f'{experiment_id}_{roi_id}.npy'
+        path = data_dir / f'{experiment_id}' / f'{experiment_id}_{roi_id}.npy'
         if not path.exists():
             raise ValueError(f'{path} does not exist')
 
