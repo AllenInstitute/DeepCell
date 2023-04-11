@@ -1,7 +1,6 @@
 from typing import List, Tuple
 
 import torch
-from PIL import Image
 import numpy as np
 
 # This private module provides useful transforms for video.
@@ -9,14 +8,12 @@ import numpy as np
 # Easier than reimplementing here
 import torchvision.transforms._transforms_video as transforms_video
 
-from deepcell.datasets.channel import Channel
 from torch.utils.data import Dataset
 from torchvision import transforms
 from torchvision.models.video import S3D_Weights
 
 from deepcell.datasets.model_input import ModelInput
 from deepcell.datasets.transforms import RandomRotate90
-from deepcell.datasets.util import center_roi
 from deepcell.transform import Transform
 from deepcell.util import get_experiment_genotype_map
 
