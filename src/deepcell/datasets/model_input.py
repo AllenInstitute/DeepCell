@@ -2,17 +2,14 @@ import json
 import os
 import shutil
 from pathlib import Path
-from typing import Optional, Union, List, Dict
-
-from deepcell.datasets.channel import Channel, channel_filename_prefix_map
+from typing import Optional, Union, List
 
 
 class ModelInput:
     def __init__(self,
                  roi_id: str,
                  experiment_id: str,
-                 channel_path_map: Dict[Channel, Path],
-                 channel_order: List[Channel],
+                 path: Path,
                  project_name: Optional[str] = None,
                  label: Optional[str] = None):
         """
@@ -23,8 +20,8 @@ class ModelInput:
                 ROI id
             experiment_id:
                 Experiment id
-            channel_path_map
-                Map between `deepcell.roi_dataset.Channel` to Path
+            path
+                Path to input for this ROI
             project_name:
                 optional name using to indicate a unique labeling job
                 will be None if at test time (not labeled)
@@ -32,14 +29,9 @@ class ModelInput:
                 optional label assigned to this example
                 will be None if at test time (not labeled)
         """
-        self._validate_channel_order(
-            channel_order=channel_order,
-            channel_path_map=channel_path_map
-        )
         self._roi_id = roi_id
         self._experiment_id = experiment_id
-        self._channel_path_map = channel_path_map
-        self._channel_order = channel_order
+        self._path = path
         self._project_name = project_name
         self._label = label
 
@@ -52,12 +44,8 @@ class ModelInput:
         return self._experiment_id
 
     @property
-    def channel_path_map(self) -> Dict[Channel, Path]:
-        return self._channel_path_map
-
-    @property
-    def channel_order(self) -> List[Channel]:
-        return self._channel_order
+    def path(self) -> Path:
+        return self._path
 
     @property
     def label(self) -> Optional[str]:
@@ -73,7 +61,6 @@ class ModelInput:
             data_dir: Union[str, Path],
             experiment_id: str,
             roi_id: str,
-            channels: List[Channel],
             label: Optional[str] = None,
     ):
         """Instantiate a ModelInput from a data_dir.
@@ -85,33 +72,20 @@ class ModelInput:
                 Experiment id
             roi_id
                 ROI id
-            channels
-                What channels to use
             label
                 Label of roi either "cell" or "not cell".
         """
         data_dir = Path(data_dir)
 
-        channel_filename_map = {
-            c: f'{channel_filename_prefix_map[c]}_'
-               f'{experiment_id}_{roi_id}.png'
-            for c in channels
-        }
-
-        channel_path_map = {}
-        for channel in channels:
-            path = data_dir / channel_filename_map[channel]
-            if not path.exists():
-                raise ValueError(f'Expected channel {channel} to exist at '
-                                 f'{path} but it did not')
-            channel_path_map[channel] = path
+        path = data_dir / f'{experiment_id}_{roi_id}.npy'
+        if not path.exists():
+            raise ValueError(f'{path} does not exist')
 
         return ModelInput(
             experiment_id=experiment_id,
-            channel_path_map=channel_path_map,
             roi_id=roi_id,
             label=label,
-            channel_order=channels
+            path=path
         )
 
     def copy(self, destination: Path) -> None:
@@ -127,35 +101,17 @@ class ModelInput:
         None
 
         """
-        for _, path in self.channel_path_map.items():
-            shutil.copy(path, destination)
+        shutil.copy(self._path, destination)
 
     def to_dict(self) -> dict:
         # deserialize from Channel to str so it can be json.dump
-        channel_order = [x.value for x in self._channel_order]
-        channel_path_map = {
-            c.value: str(p) for c, p in self._channel_path_map.items()
-        }
 
         return {
             'experiment_id': self._experiment_id,
             'roi_id': self._roi_id,
-            'channel_order': channel_order,
-            'channel_path_map': channel_path_map,
+            'path': str(self._path),
             'label': self._label
         }
-
-    @staticmethod
-    def _validate_channel_order(
-            channel_order: List[Channel],
-            channel_path_map: Dict[Channel, Path]):
-
-        for channel in channel_order:
-            if channel not in channel_path_map:
-                raise ValueError(
-                    f'All channels in channel_order need to be in '
-                    f'channel_path_map. {channel} not found in '
-                    f'{channel_path_map}')
 
 
 def write_model_input_metadata_to_disk(model_inputs: List[ModelInput],
