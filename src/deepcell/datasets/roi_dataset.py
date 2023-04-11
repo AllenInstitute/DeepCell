@@ -169,7 +169,7 @@ class RoiDataset(Dataset):
     def __getitem__(self, index):
         obs = self._model_inputs[index]
 
-        input = self._construct_input(obs=obs)
+        input = np.load(str(obs.path))
 
         if self.transform:
             if (
@@ -189,48 +189,6 @@ class RoiDataset(Dataset):
 
     def __len__(self):
         return len(self._model_inputs)
-
-    def _construct_input(self, obs: ModelInput) -> np.ndarray:
-        """
-        Construct a single input
-
-        Returns:
-            A numpy array of type uint8 and shape *dim, n_channels
-        """
-        n_channels = len(obs.channel_order)
-        res = np.zeros((*self._image_dim, n_channels), dtype=np.uint8)
-
-        for i, channel in enumerate(obs.channel_order):
-            path = obs.channel_path_map[channel]
-
-            with open(path, 'rb') as f:
-                img = Image.open(f)
-                img = np.array(img)
-            if channel == Channel.MASK:
-                try:
-                    res[:, :, i] = img
-                except ValueError:
-                    # TODO fix this issue
-                    pass
-            else:
-                res[:, :, i] = img
-
-        if self._mask_out_projections:
-            # making plural since in theory could be multiple channels
-            masks = [i for i, channel in enumerate(obs.channel_order)
-                     if channel == Channel.MASK]
-            if len(masks) != 0:
-                for i, channel_name in enumerate(obs.channel_order):
-                    if channel_name != Channel.MASK:
-                        res[:, :, i][np.where(masks[0] == 0)] = 0
-
-        if self._center_roi_centroid:
-            res = center_roi(
-                image=res, brightness_quantile=self._centroid_brightness_quantile,
-                use_mask=self._centroid_use_mask
-            )
-
-        return res
 
     def _filter_by_cre_line(self, experiment_genotype_map, cre_line):
         """
