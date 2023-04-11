@@ -1,20 +1,24 @@
 from typing import List, Tuple
 
+import torch
 from PIL import Image
 import numpy as np
+
+# This private module provides useful transforms for video.
+# Available as of torchvision 0.15
+# Easier than reimplementing here
+import torchvision.transforms._transforms_video as transforms_video
+
 from deepcell.datasets.channel import Channel
 from torch.utils.data import Dataset
 from torchvision import transforms
-import imgaug.augmenters as iaa
+from torchvision.models.video import S3D_Weights
 
 from deepcell.datasets.model_input import ModelInput
+from deepcell.datasets.transforms import RandomRotate90
 from deepcell.datasets.util import center_roi
 from deepcell.transform import Transform
 from deepcell.util import get_experiment_genotype_map
-
-# See https://pytorch.org/vision/stable/models.html
-IMAGENET_CHANNELWISE_MEANS = [0.485, 0.456, 0.406]
-IMAGENET_CHANNELWISE_STDS = [0.229, 0.224, 0.225]
 
 
 class RoiDataset(Dataset):
@@ -109,45 +113,40 @@ class RoiDataset(Dataset):
         means
             Channel-wise means to standardize data
             (after converting to [0, 1] range).
-            The defaults are the ImageNet published channel-wise means
+            The defaults are the channel-wise means on kinetics-400
         stds
             Channel-wise stds to standardize data
             (after converting to [0, 1] range)
-            The defaults are the ImageNet published channel-wise stds
+            The defaults are the channel-wise stds on kinetics-400
         Returns
         -------
         Transform
         """
+        # loading the data distribution from a pretrained video model
+        # in case means and stds not passed
         if means is None:
-            means = IMAGENET_CHANNELWISE_MEANS
+            means = S3D_Weights.DEFAULT.transforms().mean
         if stds is None:
-            stds = IMAGENET_CHANNELWISE_STDS
+            stds = S3D_Weights.DEFAULT.transforms().std
 
-        width, height = crop_size
         if is_train:
             all_transform = transforms.Compose([
-                iaa.Sequential([
-                    iaa.Affine(
-                        rotate=[0, 90, 180, 270, -90, -180, -270], order=0
-                    ),
-                    iaa.Fliplr(0.5),
-                    iaa.Flipud(0.5),
-                    iaa.CenterCropToFixedSize(height=height, width=width),
-                ]).augment_image,
-                transforms.ToTensor(),
-                transforms.Normalize(mean=means,
-                                     std=stds)
+                lambda x: torch.tensor(x),
+                transforms_video.ToTensorVideo(),
+                RandomRotate90(),
+                transforms.RandomHorizontalFlip(p=0.5),
+                transforms.RandomVerticalFlip(p=0.5),
+                transforms.CenterCrop(size=crop_size),
+                transforms_video.NormalizeVideo(mean=means, std=stds)
             ])
 
             return Transform(all_transform=all_transform)
         else:
             all_transform = transforms.Compose([
-                iaa.Sequential([
-                    iaa.CenterCropToFixedSize(height=height, width=width)
-                ]).augment_image,
-                transforms.ToTensor(),
-                transforms.Normalize(mean=means,
-                                     std=stds)
+                lambda x: torch.tensor(x),
+                transforms_video.ToTensorVideo(),
+                transforms.CenterCrop(size=crop_size),
+                transforms_video.NormalizeVideo(mean=means, std=stds)
             ])
 
             return Transform(all_transform=all_transform)

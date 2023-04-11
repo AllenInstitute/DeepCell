@@ -1,10 +1,9 @@
 setuptools
 torch
-torchvision
+torchvision~=0.15.1
 numpy
 pillow
 scikit-learn
-imgaug
 pandas
 matplotlib
 jsonlines
