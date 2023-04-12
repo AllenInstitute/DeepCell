@@ -96,7 +96,7 @@ class DataSplitter:
             # separately. This can be anything from identifying a set that have
             # problematic segmentation or have some other special attribute
             # we would like to sample fairly in the train/test split.
-            if exp_meta['problem_experiment']:
+            if exp_meta.get('problem_experiment'):
                 exp_bin_ids[idx] = 0
             depths[idx] = exp_meta['imaging_depth']
 
