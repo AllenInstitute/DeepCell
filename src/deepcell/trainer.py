@@ -6,6 +6,8 @@ from typing import Optional, Union, List, Dict
 import numpy as np
 import torch
 import torchvision
+from tqdm import tqdm
+
 from deepcell.logger import Logger
 from torch.utils.data import DataLoader
 
@@ -179,7 +181,10 @@ class Trainer(MLFlowTrackableMixin):
                     epoch_val_metrics = Metrics()
 
                     self.model.train()
-                    for batch_idx, (data, target) in enumerate(train_loader):
+                    for batch_idx, (data, target) in tqdm(
+                            enumerate(train_loader),
+                            desc='train',
+                            total=len(train_loader)):
                         # move to GPU
                         if self.use_cuda:
                             data, target = data.cuda(), target.cuda()
@@ -199,7 +204,11 @@ class Trainer(MLFlowTrackableMixin):
 
                     if valid_loader:
                         self.model.eval()
-                        for batch_idx, (data, target) in enumerate(valid_loader):
+                        for batch_idx, (data, target) in tqdm(
+                            enumerate(valid_loader),
+                            desc='valid',
+                            total=len(valid_loader)
+                        ):
                             # move to GPU
                             if self.use_cuda:
                                 data, target = data.cuda(), target.cuda()
