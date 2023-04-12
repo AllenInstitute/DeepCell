@@ -159,7 +159,7 @@ class DataSplitter:
         exp_metas : RoiDataset
             Set of experiment metadatas to stratify.
         n_depth_bins
-            Number of of bins to split by experiment depth. Bins are
+            Number of bins to split by experiment depth. Bins are
             selected to have an equal number of experiments in each bin.
 
         Returns
@@ -167,7 +167,7 @@ class DataSplitter:
         train_test_indices : Tuple[RoiDataset, RoiDataset]
             Datasets split by train/test.
         """
-        exp_ids = np.array([int(exp_meta['experiment_id'])
+        exp_ids = np.array([int(exp_meta['ophys_experiment_id'])
                             for exp_meta in exp_metas], dtype='uint64')
         exp_bin_ids, _ = self._get_experiment_groups_for_stratified_split(
             experiment_metadatas=exp_metas, n_depth_bins=n_depth_bins)
