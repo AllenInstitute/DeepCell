@@ -1,5 +1,6 @@
 import contextlib
 import os
+import time
 from pathlib import Path
 from typing import Optional, Union, List, Dict
 
@@ -130,7 +131,9 @@ class Trainer(MLFlowTrackableMixin):
               valid_loader: DataLoader = None,
               log_after_each_epoch=True,
               sagemaker_job_name: Optional[str] = None,
-              mlflow_parent_run_id: Optional[str] = None) -> None:
+              mlflow_parent_run_id: Optional[str] = None,
+              hyperparameters_to_log: Optional[dict] = None
+              ) -> None:
         """
         Runs the training loop
         @param train_loader: train dataloader
@@ -141,6 +144,8 @@ class Trainer(MLFlowTrackableMixin):
         @param sagemaker_job_name: If running via sagemaker, pass a job name
             to log
         @param mlflow_parent_run_id: Optional MLFlow run id to resume it
+        @param hyperparameters_to_log: Optional hyperparameters to log using
+            mlflow
         @return: None
         """
         if self.model_load_path is not None:
@@ -163,13 +168,16 @@ class Trainer(MLFlowTrackableMixin):
 
         if self._is_mlflow_tracking_enabled:
             if mlflow_parent_run_id is None:
-                raise NotImplementedError()
+                mlflow_parent_run = self._create_parent_mlflow_run(
+                    run_name=f'{int(time.time())}',
+                    hyperparameters=hyperparameters_to_log
+                )
             else:
                 mlflow_parent_run = self._resume_parent_mlflow_run(
                     run_id=mlflow_parent_run_id)
-                mlflow_run = self._create_nested_mlflow_run(
-                    run_name=f'fold-{eval_fold}',
-                    sagemaker_job_name=sagemaker_job_name)
+            mlflow_run = self._create_nested_mlflow_run(
+                run_name=f'fold-{eval_fold}',
+                sagemaker_job_name=sagemaker_job_name)
         else:
             mlflow_parent_run = contextlib.nullcontext()
             mlflow_run = contextlib.nullcontext()
