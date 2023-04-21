@@ -132,7 +132,8 @@ class Trainer(MLFlowTrackableMixin):
               log_after_each_epoch=True,
               sagemaker_job_name: Optional[str] = None,
               mlflow_parent_run_id: Optional[str] = None,
-              hyperparameters_to_log: Optional[dict] = None
+              hyperparameters_to_log: Optional[dict] = None,
+              log_best_epoch_metrics_to_parent_run: bool = False
               ) -> None:
         """
         Runs the training loop
@@ -146,6 +147,10 @@ class Trainer(MLFlowTrackableMixin):
         @param mlflow_parent_run_id: Optional MLFlow run id to resume it
         @param hyperparameters_to_log: Optional hyperparameters to log using
             mlflow
+        @param log_best_epoch_metrics_to_parent_run: Whether to log best
+            epoch metrics to parent run. If using a CLI, this is done after
+            k-fold to get mean metrics across runs. If running `train`
+            by itself, might need to set this to True
         @return: None
         """
         if self.model_load_path is not None:
@@ -275,6 +280,9 @@ class Trainer(MLFlowTrackableMixin):
                                 val_metrics=epoch_val_metrics,
                                 epoch=epoch)
                 self._save_model_and_performance(eval_fold=eval_fold)
+            if self.early_stopping_callback is not None:
+                if log_best_epoch_metrics_to_parent_run:
+                    self._log_cross_validation_end_metrics_to_mlflow()
 
     @staticmethod
     def from_model(
