@@ -64,8 +64,8 @@ class Classifier(torch.nn.Module):
             dropout_prob=dropout_prob)
 
     def forward(self, x):
-        x = self.features(x)
-        x = self.avgpool(x)
+        x = self.features(x)    # N, D, H', W'
+        x = self.avgpool(x)     # N, D
         x = x.reshape(x.size(0), -1)
         x = self.classifier(x)
         return x

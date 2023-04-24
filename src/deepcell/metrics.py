@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Optional
 
 import numpy as np
 import torch
@@ -65,8 +65,18 @@ class Metrics:
         self.y_scores += preds
         self.y_trues += y_true
 
-    def update_loss(self, loss, num_batches):
-        self.loss += loss / num_batches  # loss*num_batches/N = (Sum of all l)/N
+    def update_loss(
+            self,
+            loss,
+            num_batches,
+            sample_weight: Optional[torch.tensor] = None
+    ):
+        if sample_weight is not None:
+            if not isinstance(loss, torch.Tensor):
+                raise ValueError('Use reduction="None" if using a sample '
+                                 'weight')
+            loss = (loss * sample_weight).mean()
+        self.loss += loss / num_batches  # (Sum of all l)/N
 
     def _increment_TP(self, y_pred, y_true):
         self.TP += ((y_true == 1) & (y_pred == 1)).sum().item()

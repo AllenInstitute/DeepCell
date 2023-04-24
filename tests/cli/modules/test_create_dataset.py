@@ -8,7 +8,10 @@ import tempfile
 
 
 from deepcell.cli.modules.create_dataset import \
-    CreateDataset, _tally_votes_for_observation, VoteTallyingStrategy
+    CreateDataset
+from deepcell.util.construct_dataset.vote_tallying_strategy import \
+    VoteTallyingStrategy
+from deepcell.util.construct_dataset.construct_dataset_utils import _tally_votes_for_observation
 from deepcell.datasets.channel import Channel
 from deepcell.testing.util import get_test_data
 

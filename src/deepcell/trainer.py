@@ -194,13 +194,15 @@ class Trainer(MLFlowTrackableMixin):
                     epoch_val_metrics = Metrics()
 
                     self.model.train()
-                    for batch_idx, (data, target) in tqdm(
+                    for batch_idx, (data, target, sample_weight) in tqdm(
                             enumerate(train_loader),
                             desc='train',
                             total=len(train_loader)):
                         # move to GPU
                         if self.use_cuda:
                             data, target = data.cuda(), target.cuda()
+                            if sample_weight is not None:
+                                sample_weight = sample_weight.cuda()
 
                         self.optimizer.zero_grad()
                         output = self.model(data)
@@ -209,7 +211,11 @@ class Trainer(MLFlowTrackableMixin):
                         loss.backward()
                         self.optimizer.step()
 
-                        epoch_train_metrics.update_loss(loss=loss.item(), num_batches=len(train_loader))
+                        epoch_train_metrics.update_loss(
+                            loss=loss.item(),
+                            num_batches=len(train_loader),
+                            sample_weight=sample_weight
+                        )
                         epoch_train_metrics.update_outputs(y_true=target, y_out=output)
 
                     self._callback_metrics['loss'][epoch] = epoch_train_metrics.loss
@@ -217,7 +223,7 @@ class Trainer(MLFlowTrackableMixin):
 
                     if valid_loader:
                         self.model.eval()
-                        for batch_idx, (data, target) in tqdm(
+                        for batch_idx, (data, target, sample_weight) in tqdm(
                             enumerate(valid_loader),
                             desc='valid',
                             total=len(valid_loader)
@@ -225,6 +231,8 @@ class Trainer(MLFlowTrackableMixin):
                             # move to GPU
                             if self.use_cuda:
                                 data, target = data.cuda(), target.cuda()
+                                if sample_weight is not None:
+                                    sample_weight = sample_weight.cuda()
 
                             # update the average validation loss
                             with torch.no_grad():
@@ -232,7 +240,11 @@ class Trainer(MLFlowTrackableMixin):
                                 output = output.squeeze()
                                 loss = self.criterion(output, target.float())
 
-                                epoch_val_metrics.update_loss(loss=loss.item(), num_batches=len(valid_loader))
+                                epoch_val_metrics.update_loss(
+                                    loss=loss.item(),
+                                    num_batches=len(valid_loader),
+                                    sample_weight=sample_weight
+                                )
                                 epoch_val_metrics.update_outputs(y_true=target, y_out=output)
 
                         self._callback_metrics['val_loss'][epoch] = \

@@ -1,5 +1,6 @@
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
+import pandas as pd
 import torch
 import numpy as np
 
@@ -12,10 +13,12 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 from torchvision.models.video import S3D_Weights
 
+from deepcell.util.construct_dataset.vote_tallying_strategy import \
+    VoteTallyingStrategy
+from deepcell.util.construct_dataset.construct_dataset_utils import construct_dataset
 from deepcell.datasets.model_input import ModelInput
 from deepcell.datasets.transforms import RandomRotate90
 from deepcell.transform import Transform
-from deepcell.util import get_experiment_genotype_map
 
 
 class RoiDataset(Dataset):
@@ -24,11 +27,13 @@ class RoiDataset(Dataset):
                  image_dim=(128, 128),
                  transform: Transform = None,
                  debug=False,
-                 cre_line=None,
                  mask_out_projections=False,
                  center_roi_centroid=False,
                  centroid_brightness_quantile=0.8,
-                 centroid_use_mask=False):
+                 centroid_use_mask=False,
+                 weight_samples_by_labeler_confidence: bool = False,
+                 cell_labeling_app_host: Optional[str] = None
+                 ):
         """
         A dataset of segmentation masks as identified by Suite2p with
         binary label "cell" or "not cell"
@@ -42,8 +47,6 @@ class RoiDataset(Dataset):
             debug:
                 Whether in debug mode. This will limit the number of
                 records in the dataset to only a single example from each class
-            cre_line:
-                Whether to limit to a cre_line
             mask_out_projections:
                 Whether to mask out projections to only include pixels in
                 the mask
@@ -58,6 +61,11 @@ class RoiDataset(Dataset):
             centroid_use_mask
                 Used if center_roi_centroid is True. See `use_mask` arg in
                 `deepcell.datasets.util.calc_roi_centroid`
+            weight_samples_by_labeler_confidence
+                Weight each sample by labeler confidence in the
+                training/validation loss function
+            cell_labeling_app_host
+                Needed to pull labels if weight_samples_by_labeler_confidence
         """
         super().__init__()
 
@@ -70,11 +78,14 @@ class RoiDataset(Dataset):
         self._centroid_brightness_quantile = centroid_brightness_quantile
         self._centroid_use_mask = centroid_use_mask
 
-        if cre_line:
-            experiment_genotype_map = get_experiment_genotype_map()
-            self._filter_by_cre_line(
-                experiment_genotype_map=experiment_genotype_map,
-                cre_line=cre_line)
+        if weight_samples_by_labeler_confidence:
+            if cell_labeling_app_host is None:
+                raise ValueError('need cell_labeling_app_host if '
+                                 'weight_samples_by_labeler_confidence')
+            self._sample_weights = self._get_labeler_agreement(
+                cell_labeling_app_host=cell_labeling_app_host)
+        else:
+            self._sample_weights = None
 
         if debug:
             not_cell_idx = np.argwhere(self._y == 0)[0][0]
@@ -182,23 +193,38 @@ class RoiDataset(Dataset):
         # TODO collate_fn should be used instead
         target = self._y[index]
 
-        return input, target
+        if self._sample_weights is not None:
+            sample_weight = self._sample_weights.loc[
+                (obs.experiment_id, obs.roi_id)]['agreement']
+        else:
+            sample_weight = None
+
+        return input, target, sample_weight
 
     def __len__(self):
         return len(self._model_inputs)
 
-    def _filter_by_cre_line(self, experiment_genotype_map, cre_line):
+    @staticmethod
+    def _get_labeler_agreement(
+        cell_labeling_app_host: str
+    ) -> pd.DataFrame:
+        """For each ROI, calculates labeler agreement with the majority label
         """
-        Modifies dataset by filtering by creline
+        raw_labels = construct_dataset(
+            cell_labeling_app_host=cell_labeling_app_host,
+            raw=True
+        )
+        majority_labels = construct_dataset(
+            cell_labeling_app_host=cell_labeling_app_host,
+            vote_tallying_strategy=VoteTallyingStrategy.MAJORITY
+        )
+        majority_labels = majority_labels.set_index(
+            ['experiment_id', 'roi_id'])
+        agreement = raw_labels.groupby(['experiment_id', 'roi_id'])['label'] \
+            .apply(lambda x: (
+                x == majority_labels.loc[x.name]['label']).mean()) \
+            .reset_index() \
+            .rename(columns={'label': 'agreement'})
 
-        Args:
-            experiment_genotype_map:
-                Maps experiment to genotype
-            cre_line:
-                Cre_line to filter by
-        Returns:
-            None, modifies inplace
-        """
-        self._model_inputs = [
-            x for x in self._model_inputs if experiment_genotype_map[
-                x.experiment_id].startswith(cre_line)]
+        agreement = agreement.set_index(['experiment_id', 'roi_id'])
+        return agreement

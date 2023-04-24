@@ -20,7 +20,10 @@ class DataSplitter:
                  image_dim=(128, 128),
                  center_roi_centroid=False,
                  centroid_brightness_quantile=0.8,
-                 centroid_use_mask=False):
+                 centroid_use_mask=False,
+                 weight_samples_by_labeler_confidence: bool = False,
+                 cell_labeling_app_host: Optional[str] = None
+                 ):
         """
         Does splitting of data into train/test or train/validation
 
@@ -50,6 +53,11 @@ class DataSplitter:
             centroid_use_mask
                 See `use_mask` arg in
                 `deepcell.datasets.util.calc_roi_centroid`
+            weight_samples_by_labeler_confidence
+                Weight each sample by labeler confidence in the
+                training/validation loss function
+            cell_labeling_app_host
+                Needed to pull labels if weight_samples_by_labeler_confidence
         """
         self._model_inputs = model_inputs
         self.train_transform = train_transform
@@ -60,6 +68,9 @@ class DataSplitter:
         self.image_dim = image_dim
         self._centroid_brightness_quantile = centroid_brightness_quantile
         self._centroid_use_mask = centroid_use_mask
+        self._weight_samples_by_labeler_confidence = \
+            weight_samples_by_labeler_confidence
+        self._cell_labeling_app_host = cell_labeling_app_host
 
         if center_roi_centroid not in ('test', True, False):
             raise ValueError('Invalid value for center_soma. Valid '
@@ -275,5 +286,8 @@ class DataSplitter:
             image_dim=self.image_dim,
             center_roi_centroid=center_roi_centroid,
             centroid_brightness_quantile=self._centroid_brightness_quantile,
-            centroid_use_mask=self._centroid_use_mask
+            centroid_use_mask=self._centroid_use_mask,
+            weight_samples_by_labeler_confidence=(
+                self._weight_samples_by_labeler_confidence),
+            cell_labeling_app_host=self._cell_labeling_app_host
         )
