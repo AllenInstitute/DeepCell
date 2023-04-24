@@ -68,15 +68,20 @@ class Metrics:
     def update_loss(
             self,
             loss,
-            num_batches,
-            sample_weight: Optional[torch.tensor] = None
+            num_batches
     ):
-        if sample_weight is not None:
-            if not isinstance(loss, torch.Tensor):
-                raise ValueError('Use reduction="None" if using a sample '
-                                 'weight')
-            loss = (loss * sample_weight).mean()
         self.loss += loss / num_batches  # (Sum of all l)/N
+
+    @staticmethod
+    def calc_weighted_loss(
+        loss,
+        sample_weight: Optional[torch.tensor] = None
+    ):
+        if not isinstance(loss, torch.Tensor):
+            raise ValueError('Use reduction="None" if using a sample '
+                             'weight')
+        loss = (loss * sample_weight).mean()
+        return loss
 
     def _increment_TP(self, y_pred, y_true):
         self.TP += ((y_true == 1) & (y_pred == 1)).sum().item()

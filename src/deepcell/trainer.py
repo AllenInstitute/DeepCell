@@ -9,6 +9,7 @@ import torch
 import torchvision
 from tqdm import tqdm
 
+from deepcell import metrics
 from deepcell.logger import Logger
 from torch.utils.data import DataLoader
 
@@ -208,13 +209,17 @@ class Trainer(MLFlowTrackableMixin):
                         output = self.model(data)
                         output = output.squeeze()
                         loss = self.criterion(output, target.float())
+                        if sample_weight is not None:
+                            loss = metrics.Metrics.calc_weighted_loss(
+                                loss=loss,
+                                sample_weight=sample_weight
+                            )
                         loss.backward()
                         self.optimizer.step()
 
                         epoch_train_metrics.update_loss(
                             loss=loss.item(),
-                            num_batches=len(train_loader),
-                            sample_weight=sample_weight
+                            num_batches=len(train_loader)
                         )
                         epoch_train_metrics.update_outputs(y_true=target, y_out=output)
 
@@ -240,10 +245,15 @@ class Trainer(MLFlowTrackableMixin):
                                 output = output.squeeze()
                                 loss = self.criterion(output, target.float())
 
+                                if sample_weight is not None:
+                                    loss = metrics.Metrics.calc_weighted_loss(
+                                        loss=loss,
+                                        sample_weight=sample_weight
+                                    )
+
                                 epoch_val_metrics.update_loss(
                                     loss=loss.item(),
-                                    num_batches=len(valid_loader),
-                                    sample_weight=sample_weight
+                                    num_batches=len(valid_loader)
                                 )
                                 epoch_val_metrics.update_outputs(y_true=target, y_out=output)
 
