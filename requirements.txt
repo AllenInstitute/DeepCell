@@ -22,4 +22,4 @@ requests
 sqlalchemy
 awscli~=1.27.0
 pg8000
-ophys_etl @ git+https://github.com/AllenInstitute/ophys_etl_pipelines.git@video_classifier
+ophys_etl_pipelines @ git+https://github.com/AllenInstitute/ophys_etl_pipelines.git@video_classifier
