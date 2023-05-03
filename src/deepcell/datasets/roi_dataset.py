@@ -1,5 +1,8 @@
+import random
 from typing import List, Tuple, Optional
 
+import cv2
+import h5py
 import pandas as pd
 import torch
 import numpy as np
@@ -8,6 +11,8 @@ import numpy as np
 # Available as of torchvision 0.15
 # Easier than reimplementing here
 import torchvision.transforms._transforms_video as transforms_video
+from ophys_etl.types import OphysROI
+from ophys_etl.utils.array_utils import normalize_array
 
 from torch.utils.data import Dataset
 from torchvision import transforms
@@ -21,9 +26,15 @@ from deepcell.datasets.transforms import RandomRotate90
 from deepcell.transform import Transform
 
 
+class _EmptyMaskException(Exception):
+    """Raised if mask is empty"""
+    pass
+
+
 class RoiDataset(Dataset):
     def __init__(self,
                  model_inputs: List[ModelInput],
+                 is_train: bool,
                  image_dim=(128, 128),
                  transform: Transform = None,
                  debug=False,
@@ -32,7 +43,11 @@ class RoiDataset(Dataset):
                  centroid_brightness_quantile=0.8,
                  centroid_use_mask=False,
                  weight_samples_by_labeler_confidence: bool = False,
-                 cell_labeling_app_host: Optional[str] = None
+                 cell_labeling_app_host: Optional[str] = None,
+                 n_frames: int = 16,
+                 temporal_downsampling_factor: int = 1,
+                 test_use_highest_peak: bool = True,
+                 limit_to_n_highest_peaks: int = 5
                  ):
         """
         A dataset of segmentation masks as identified by Suite2p with
@@ -40,6 +55,10 @@ class RoiDataset(Dataset):
         Args:
             model_inputs:
                 A set of records in this dataset
+            is_train
+                Whether we are training or doing inference. If training,
+                we will randomly sample a peak to construct the frames
+                If inference, we will use a specific peak
             image_dim:
                 Dimensions of artifacts
             transform:
@@ -66,9 +85,30 @@ class RoiDataset(Dataset):
                 training/validation loss function
             cell_labeling_app_host
                 Needed to pull labels if weight_samples_by_labeler_confidence
+            n_frames
+                Number of frames to use for the clip
+            temporal_downsampling_factor
+                Evenly sample every nth frame so that we
+                have `n_frames` total frames. I.e. If it is 4, then
+                we start with 4 * `n_frames` frames around peak and
+                sample every 4th frame
+            test_use_highest_peak
+                If this is a test set, whether to use the highest peak from
+                the list of peaks for this ROI. If not, we will get predictions
+                for all peaks and average the results
+            limit_to_n_highest_peaks
+                For training, only sample the n highest peaks
         """
         super().__init__()
 
+        if not is_train:
+            if test_use_highest_peak:
+                for model_input in model_inputs:
+                    model_input.peak = model_input.get_n_highest_peaks(n=1)[0]
+            else:
+                raise NotImplementedError
+
+        self._is_train = is_train
         self._model_inputs = model_inputs
         self._image_dim = image_dim
         self.transform = transform
@@ -77,6 +117,9 @@ class RoiDataset(Dataset):
         self._center_roi_centroid = center_roi_centroid
         self._centroid_brightness_quantile = centroid_brightness_quantile
         self._centroid_use_mask = centroid_use_mask
+        self._n_frames = n_frames
+        self._temporal_downsampling_factor = temporal_downsampling_factor
+        self._limit_to_n_highest_peaks = limit_to_n_highest_peaks
 
         if weight_samples_by_labeler_confidence:
             if cell_labeling_app_host is None:
@@ -177,7 +220,28 @@ class RoiDataset(Dataset):
     def __getitem__(self, index):
         obs = self._model_inputs[index]
 
-        input = np.load(str(obs.path))
+        if self._is_train:
+            if obs.peaks is None:
+                raise ValueError('Expected the model_input to contain peaks')
+            peak = random.choice(
+                obs.get_n_highest_peaks(n=self._limit_to_n_highest_peaks))
+        else:
+            if obs.peak is None:
+                raise ValueError('Expected the model_input to contain peak')
+            peak = obs.peak
+
+        n_frames = self._n_frames * self._temporal_downsampling_factor
+        nframes_before_after = int(n_frames/2)
+
+        with h5py.File(obs.ophys_movie_path, 'r') as f:
+            frames = f['data'][max(0, peak - nframes_before_after):
+                               peak + nframes_before_after]
+
+        input = self._get_video_clip_for_roi(
+            frames=frames,
+            fov_shape=f['data'].shape[1:],
+            roi=obs.roi
+        )
 
         if self.transform:
             if (
@@ -195,7 +259,7 @@ class RoiDataset(Dataset):
 
         if self._sample_weights is not None:
             sample_weight = self._sample_weights.loc[
-                (obs.experiment_id, obs.roi_id)]['agreement']
+                (obs.experiment_id, obs.roi.roi_id)]['agreement']
         else:
             sample_weight = None
 
@@ -228,3 +292,159 @@ class RoiDataset(Dataset):
 
         agreement = agreement.set_index(['experiment_id', 'roi_id'])
         return agreement
+
+    def _get_video_clip_for_roi(
+            self,
+            frames: np.ndarray,
+            roi: OphysROI,
+            fov_shape: Tuple[int, int],
+            normalize_quantiles: Tuple[float, float] = (0.2, 0.99)
+    ):
+        frames = _pad_frames(
+            desired_seq_len=self._n_frames,
+            frames=frames
+        )
+
+        frames = _crop_frames(
+            frames=frames,
+            roi=roi,
+            desired_shape=self._image_dim
+        )
+
+        frames = _downsample_frames(
+            frames=frames,
+            downsampling_factor=self._temporal_downsampling_factor
+        )
+
+        frames = normalize_array(
+            array=frames,
+            lower_cutoff=np.quantile(frames, normalize_quantiles[0]),
+            upper_cutoff=np.quantile(frames, normalize_quantiles[1])
+        )
+
+        frames = _draw_mask_outline_on_frames(
+            roi=roi,
+            cutout_size=self._image_dim[0],
+            fov_shape=fov_shape,
+            frames=frames
+        )
+        return frames
+
+
+def _generate_mask_image(
+    fov_shape: Tuple[int, int],
+    roi: OphysROI,
+    cutout_size: int,
+) -> np.ndarray:
+    """
+    Generate mask image from `roi`, cropped to cutout_size X cutout_size
+
+    Parameters
+    ----------
+    roi
+        `OphysROI`
+
+    Returns
+    -------
+    uint8 np.ndarray with masked region set to 255
+    """
+    pixel_array = roi.global_pixel_array.transpose()
+
+    mask = np.zeros(fov_shape, dtype=np.uint8)
+    mask[pixel_array[0], pixel_array[1]] = 255
+
+    mask = roi.get_centered_cutout(
+            image=mask,
+            height=cutout_size,
+            width=cutout_size,
+            pad_mode='constant'
+    )
+
+    if mask.sum() == 0:
+        raise _EmptyMaskException(f'Mask for roi {roi.roi_id} is empty')
+
+    return mask
+
+
+def _pad_frames(
+    desired_seq_len: int,
+    frames: np.ndarray,
+) -> np.ndarray:
+    """
+    If the peak activation frame happens too close to the beginning
+    or end of the movie, then we pad with black in order to have
+    self.args['n_frames'] total frames
+
+    Parameters
+    ----------
+    desired_seq_len
+        Desired number of frames surrounding `peak_activation_frame_idx`
+    frames
+        Frames
+    Returns
+    -------
+    frames, potentially padded
+    """
+    n_pad = desired_seq_len - len(frames)
+    frames = np.concatenate([
+        frames,
+        np.zeros((n_pad, *frames.shape[1:]), dtype=frames.dtype),
+    ])
+    return frames
+
+
+def _draw_mask_outline_on_frames(
+    roi: OphysROI,
+    frames: np.ndarray,
+    fov_shape: Tuple[int, int],
+    cutout_size: int,
+    color: Tuple[int, int, int] = (0, 255, 0)
+) -> np.ndarray:
+    mask = _generate_mask_image(
+        fov_shape=fov_shape,
+        roi=roi,
+        cutout_size=cutout_size
+    )
+    contours, _ = cv2.findContours(mask,
+                                   cv2.RETR_EXTERNAL,
+                                   cv2.CHAIN_APPROX_NONE)
+
+    if frames.shape[-1] != 3:
+        # Make it into 3 channels, to draw a colored contour on it
+        frames = np.stack([frames, frames, frames], axis=-1)
+
+    for frame in frames:
+        cv2.drawContours(frame, contours, -1,
+                         color=color,
+                         thickness=1)
+    return frames
+
+
+def _crop_frames(
+    frames: np.ndarray,
+    roi: OphysROI,
+    desired_shape: Tuple[int, int]
+) -> np.ndarray:
+    frames_cropped = np.zeros_like(frames,
+                                   shape=(frames.shape[0], *desired_shape))
+    for i, frame in enumerate(frames):
+        frames_cropped[i] = roi.get_centered_cutout(
+            image=frames[i],
+            height=desired_shape[0],
+            width=desired_shape[1],
+            pad_mode='symmetric'
+        )
+    return frames_cropped
+
+
+def _downsample_frames(
+    frames: np.ndarray,
+    downsampling_factor: int
+) -> np.ndarray:
+    """Samples every `downsampling_factor` frame from `frames`"""
+    frames = frames[
+        np.arange(0,
+                  len(frames),
+                  downsampling_factor)
+    ]
+    return frames

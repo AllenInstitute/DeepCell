@@ -22,7 +22,9 @@ class DataSplitter:
                  centroid_brightness_quantile=0.8,
                  centroid_use_mask=False,
                  weight_samples_by_labeler_confidence: bool = False,
-                 cell_labeling_app_host: Optional[str] = None
+                 cell_labeling_app_host: Optional[str] = None,
+                 n_frames: int = 16,
+                 temporal_downsampling_factor: int = 1
                  ):
         """
         Does splitting of data into train/test or train/validation
@@ -58,6 +60,10 @@ class DataSplitter:
                 training/validation loss function
             cell_labeling_app_host
                 Needed to pull labels if weight_samples_by_labeler_confidence
+            n_frames
+                See `RoiDataset.n_frames`
+            temporal_downsampling_factor
+                See `RoiDataset.temporal_downsampling_factor`
         """
         self._model_inputs = model_inputs
         self.train_transform = train_transform
@@ -71,6 +77,8 @@ class DataSplitter:
         self._weight_samples_by_labeler_confidence = \
             weight_samples_by_labeler_confidence
         self._cell_labeling_app_host = cell_labeling_app_host
+        self._n_frames = n_frames
+        self._temporal_downsampling_factor = temporal_downsampling_factor
 
         if center_roi_centroid not in ('test', True, False):
             raise ValueError('Invalid value for center_soma. Valid '
@@ -289,5 +297,8 @@ class DataSplitter:
             centroid_use_mask=self._centroid_use_mask,
             weight_samples_by_labeler_confidence=(
                 self._weight_samples_by_labeler_confidence),
-            cell_labeling_app_host=self._cell_labeling_app_host
+            cell_labeling_app_host=self._cell_labeling_app_host,
+            is_train=is_train,
+            n_frames=self._n_frames,
+            temporal_downsampling_factor=self._temporal_downsampling_factor
         )

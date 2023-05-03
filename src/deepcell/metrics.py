@@ -78,7 +78,7 @@ class Metrics:
         sample_weight: Optional[torch.tensor] = None
     ):
         if not isinstance(loss, torch.Tensor):
-            raise ValueError('Use reduction="None" if using a sample '
+            raise ValueError('Use reduction="none" if using a sample '
                              'weight')
         loss = (loss * sample_weight).mean()
         return loss
