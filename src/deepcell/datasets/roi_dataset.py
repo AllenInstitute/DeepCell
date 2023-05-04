@@ -316,10 +316,11 @@ class RoiDataset(Dataset):
             desired_shape=self._image_dim
         )
 
-        frames = _downsample_frames(
-            frames=frames,
-            downsampling_factor=self._temporal_downsampling_factor
-        )
+        if self._temporal_downsampling_factor > 1:
+            frames = _downsample_frames(
+                frames=frames,
+                downsampling_factor=self._temporal_downsampling_factor
+            )
 
         frames = normalize_array(
             array=frames,
