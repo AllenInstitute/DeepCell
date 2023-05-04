@@ -97,7 +97,7 @@ class RoiDataset(Dataset):
                 the list of peaks for this ROI. If not, we will get predictions
                 for all peaks and average the results
             limit_to_n_highest_peaks
-                For training, only sample the n highest peaks
+                For testing, only sample the n highest peaks
         """
         super().__init__()
 
@@ -223,8 +223,7 @@ class RoiDataset(Dataset):
         if self._is_train:
             if obs.peaks is None:
                 raise ValueError('Expected the model_input to contain peaks')
-            peak = random.choice(
-                obs.get_n_highest_peaks(n=self._limit_to_n_highest_peaks))
+            peak = random.choice(obs.peaks)
         else:
             if obs.peak is None:
                 raise ValueError('Expected the model_input to contain peak')
