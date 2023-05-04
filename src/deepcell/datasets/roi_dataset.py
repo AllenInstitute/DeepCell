@@ -359,7 +359,7 @@ def _generate_mask_image(
     mask = np.zeros(fov_shape, dtype=np.uint8)
     mask[pixel_array[0], pixel_array[1]] = 255
 
-    mask = roi.get_centered_cutout(
+    mask = roi.get_centered_cutout_for_image(
             image=mask,
             height=cutout_size,
             width=cutout_size,
@@ -431,7 +431,7 @@ def _crop_frames(
     roi: OphysROI,
     desired_shape: Tuple[int, int]
 ) -> np.ndarray:
-    frames = roi.get_centered_cutout(
+    frames = roi.get_centered_cutout_for_frames(
         frames=frames,
         height=desired_shape[0],
         width=desired_shape[1],
