@@ -195,10 +195,17 @@ class Trainer(MLFlowTrackableMixin):
                     epoch_val_metrics = Metrics()
 
                     self.model.train()
-                    for batch_idx, (data, target, sample_weight) in tqdm(
+                    for batch_idx, batch in tqdm(
                             enumerate(train_loader),
                             desc='train',
                             total=len(train_loader)):
+                        if len(batch) == 2:
+                            data, target = batch
+                            sample_weight = None
+                        elif len(batch) == 3:
+                            data, target, sample_weight = batch
+                        else:
+                            raise ValueError('Unknown batch length')
                         # move to GPU
                         if self.use_cuda:
                             data, target = data.cuda(), target.cuda()
@@ -228,11 +235,19 @@ class Trainer(MLFlowTrackableMixin):
 
                     if valid_loader:
                         self.model.eval()
-                        for batch_idx, (data, target, sample_weight) in tqdm(
+                        for batch_idx, batch in tqdm(
                             enumerate(valid_loader),
                             desc='valid',
                             total=len(valid_loader)
                         ):
+                            if len(batch) == 2:
+                                data, target = batch
+                                sample_weight = None
+                            elif len(batch) == 3:
+                                data, target, sample_weight = batch
+                            else:
+                                raise ValueError('Unknown batch length')
+                            
                             # move to GPU
                             if self.use_cuda:
                                 data, target = data.cuda(), target.cuda()

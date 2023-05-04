@@ -264,7 +264,10 @@ class RoiDataset(Dataset):
         else:
             sample_weight = None
 
-        return input, target, sample_weight
+        if sample_weight is None:
+            return input, target
+        else:
+            return input, target, sample_weight
 
     def __len__(self):
         return len(self._model_inputs)
