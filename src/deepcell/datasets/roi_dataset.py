@@ -429,16 +429,13 @@ def _crop_frames(
     roi: OphysROI,
     desired_shape: Tuple[int, int]
 ) -> np.ndarray:
-    frames_cropped = np.zeros_like(frames,
-                                   shape=(frames.shape[0], *desired_shape))
-    for i, frame in enumerate(frames):
-        frames_cropped[i] = roi.get_centered_cutout(
-            image=frames[i],
-            height=desired_shape[0],
-            width=desired_shape[1],
-            pad_mode='symmetric'
-        )
-    return frames_cropped
+    frames = roi.get_centered_cutout(
+        frames=frames,
+        height=desired_shape[0],
+        width=desired_shape[1],
+        pad_mode='symmetric'
+    )
+    return frames
 
 
 def _downsample_frames(
