@@ -10,19 +10,22 @@ import seaborn as sns
 
 import pandas as pd
 from PIL import Image
-from deepcell.cli.modules.create_dataset import construct_dataset
 from matplotlib import pyplot as plt
+
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.lines import Line2D
-from ophys_etl.utils.rois import sanitize_extract_roi_list, \
-    extract_roi_to_ophys_roi
+# from ophys_etl.utils.rois import sanitize_extract_roi_list, \
+#     extract_roi_to_ophys_roi
 from sklearn.metrics import precision_score, recall_score
 from tqdm import tqdm
+
+import sys
+sys.path.append("/home/adam.amster/DeepCell")
 
 from scripts.data_exploration import _get_roi_label_agreement, _get_experiment_meta_with_depth_bin, \
     _get_experiment_meta_dataframe, _get_sorted_depth_bin_labels, \
     _get_classifier_scores, _get_confusion_matrix_by_depth
-from src.deepcell.plotting import plot_confusion_matrix, plot_pr_curve
+from src.deepcell.plotting import plot_confusion_matrix
 
 
 def get_disagreement_by_depth(labels: pd.DataFrame, targets: pd.DataFrame):
@@ -324,18 +327,18 @@ def get_human_performance(labels: pd.DataFrame, targets: pd.DataFrame):
 
 
 def main():
-    labels = construct_dataset(
-        label_db_path=args.labels_db_path,
-        min_labelers_per_roi=MIN_LABELERS_PER_ROI,
-        vote_threshold=args.vote_threshold,
-        raw=True
-    )
-    targets = construct_dataset(
-        label_db_path=args.labels_db_path,
-        min_labelers_per_roi=MIN_LABELERS_PER_ROI,
-        vote_threshold=args.vote_threshold,
-        raw=False
-    )
+    # labels = construct_dataset(
+    #     label_db_path=args.labels_db_path,
+    #     min_labelers_per_roi=MIN_LABELERS_PER_ROI,
+    #     vote_threshold=args.vote_threshold,
+    #     raw=True
+    # )
+    # targets = construct_dataset(
+    #     label_db_path=args.labels_db_path,
+    #     min_labelers_per_roi=MIN_LABELERS_PER_ROI,
+    #     vote_threshold=args.vote_threshold,
+    #     raw=False
+    # )
     # get_classifier_performance(
     #     preds_path=args.test_preds_path,
     #     labels=labels,
@@ -352,25 +355,25 @@ def main():
     # get_preds_by_fov_pdf(rois_path=args.rois_path,
     #                      preds_path=args.val_preds_path,
     #                      projections_path=args.projections_path)
-    # get_mistakes(preds_path=args.val_preds_path,
-    #              classifier_inputs_path=args.classifier_inputs_path,
-    #              correlation_path=args.correlation_path)
+    get_mistakes(preds_path=args.val_preds_path,
+                 classifier_inputs_path=args.classifier_inputs_path,
+                 correlation_path=args.correlation_path)
     # get_human_performance(labels=labels, targets=targets)
 
-    scores = _get_classifier_scores(preds_path=Path(args.val_preds_path))
-    plot_pr_curve(scores=scores)
+    #scores = _get_classifier_scores(preds_path=Path(args.val_preds_path))
+    #plot_pr_curve(scores=scores)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--test_preds_path', required=True)
+    #parser.add_argument('--test_preds_path', required=True)
     parser.add_argument('--val_preds_path', required=True)
-    parser.add_argument('--rois_path', required=True)
-    parser.add_argument('--projections_path', required=True)
+    #parser.add_argument('--rois_path', required=True)
+    #parser.add_argument('--projections_path', required=True)
     parser.add_argument('--classifier_inputs_path', required=True)
     parser.add_argument('--correlation_path', required=True)
-    parser.add_argument('--labels_db_path', required=True)
-    parser.add_argument('--vote_threshold', default=0.5, type=float)
+    #parser.add_argument('--labels_db_path', required=True)
+    #parser.add_argument('--vote_threshold', default=0.5, type=float)
     args = parser.parse_args()
     MIN_LABELERS_PER_ROI = 3
     main()
