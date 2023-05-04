@@ -234,8 +234,8 @@ class RoiDataset(Dataset):
         nframes_before_after = int(n_frames/2)
 
         with h5py.File(obs.ophys_movie_path, 'r') as f:
-            frames = f['data'][max(0, peak - nframes_before_after):
-                               peak + nframes_before_after]
+            frames = f['data'][max(0, peak.peak - nframes_before_after):
+                               peak.peak + nframes_before_after]
 
         input = self._get_video_clip_for_roi(
             frames=frames,
