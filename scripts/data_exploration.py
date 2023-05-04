@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from deepcell.util.construct_dataset.construct_dataset_utils import construct_dataset
+from deepcell.cli.modules.create_dataset import construct_dataset
 from matplotlib import pyplot as plt
 from scipy.stats import pearsonr
 from sklearn.metrics import precision_score, recall_score, \
