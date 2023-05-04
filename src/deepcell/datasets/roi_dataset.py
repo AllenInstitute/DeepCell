@@ -304,10 +304,11 @@ class RoiDataset(Dataset):
             fov_shape: Tuple[int, int],
             normalize_quantiles: Tuple[float, float] = (0.2, 0.99)
     ):
-        frames = _pad_frames(
-            desired_seq_len=self._n_frames,
-            frames=frames
-        )
+        if len(frames) < self._n_frames:
+            frames = _pad_frames(
+                desired_seq_len=self._n_frames,
+                frames=frames
+            )
 
         frames = _crop_frames(
             frames=frames,
