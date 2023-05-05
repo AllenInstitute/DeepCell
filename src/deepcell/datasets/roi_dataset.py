@@ -12,7 +12,8 @@ import numpy as np
 # Easier than reimplementing here
 import torchvision.transforms._transforms_video as transforms_video
 from ophys_etl.types import OphysROI
-from ophys_etl.utils.array_utils import normalize_array
+from ophys_etl.utils.array_utils import normalize_array, get_cutout_indices, \
+    get_cutout_padding
 
 from torch.utils.data import Dataset
 from torchvision import transforms
@@ -47,7 +48,8 @@ class RoiDataset(Dataset):
                  n_frames: int = 16,
                  temporal_downsampling_factor: int = 1,
                  test_use_highest_peak: bool = True,
-                 limit_to_n_highest_peaks: int = 5
+                 limit_to_n_highest_peaks: int = 5,
+                 fov_shape: Tuple[int, int] = (512, 512)
                  ):
         """
         A dataset of segmentation masks as identified by Suite2p with
@@ -98,6 +100,8 @@ class RoiDataset(Dataset):
                 for all peaks and average the results
             limit_to_n_highest_peaks
                 For testing, only sample the n highest peaks
+            fov_shape
+                FOV shape
         """
         super().__init__()
 
@@ -120,6 +124,7 @@ class RoiDataset(Dataset):
         self._n_frames = n_frames
         self._temporal_downsampling_factor = temporal_downsampling_factor
         self._limit_to_n_highest_peaks = limit_to_n_highest_peaks
+        self._fov_shape = fov_shape
 
         if weight_samples_by_labeler_confidence:
             if cell_labeling_app_host is None:
@@ -232,17 +237,27 @@ class RoiDataset(Dataset):
         n_frames = self._n_frames * self._temporal_downsampling_factor
         nframes_before_after = int(n_frames/2)
 
+        row_indices = get_cutout_indices(
+            center_dim=obs.roi.bounding_box_center_y,
+            image_dim=self._fov_shape[0],
+            cutout_dim=self._image_dim[0])
+        col_indices = get_cutout_indices(
+            center_dim=obs.roi.bounding_box_center_x,
+            image_dim=self._fov_shape[0],
+            cutout_dim=self._image_dim[0])
+
         with h5py.File(obs.ophys_movie_path, 'r') as f:
             frames = f['data'][
                 np.arange(max(0, peak.peak - nframes_before_after),
                           peak.peak + nframes_before_after,
-                          self._temporal_downsampling_factor)
+                          self._temporal_downsampling_factor),
+                row_indices[0]:row_indices[1],
+                col_indices[0]:col_indices[1]
             ]
-            fov_shape = f['data'].shape[1:]
 
         input = self._get_video_clip_for_roi(
             frames=frames,
-            fov_shape=fov_shape,
+            fov_shape=self._fov_shape,
             roi=obs.roi
         )
 
@@ -307,17 +322,19 @@ class RoiDataset(Dataset):
             normalize_quantiles: Tuple[float, float] = (0.2, 0.99)
     ):
         if len(frames) < self._n_frames:
-            frames = _pad_frames(
+            frames = _temporal_pad_frames(
                 desired_seq_len=self._n_frames,
                 frames=frames
             )
 
-        frames = _crop_frames(
-            frames=frames,
-            roi=roi,
-            desired_shape=self._image_dim
-        )
-
+        if frames.shape[1:] != self._image_dim:
+            frames = _pad_cutout(
+                frames=frames,
+                roi=roi,
+                desired_shape=self._image_dim,
+                fov_shape=self._fov_shape,
+                pad_mode='symmetric'
+            )
 
         frames = normalize_array(
             array=frames,
@@ -337,7 +354,7 @@ class RoiDataset(Dataset):
 def _generate_mask_image(
     fov_shape: Tuple[int, int],
     roi: OphysROI,
-    cutout_size: int,
+    cutout_size: int
 ) -> np.ndarray:
     """
     Generate mask image from `roi`, cropped to cutout_size X cutout_size
@@ -356,12 +373,24 @@ def _generate_mask_image(
     mask = np.zeros(fov_shape, dtype=np.uint8)
     mask[pixel_array[0], pixel_array[1]] = 255
 
-    mask = roi.get_centered_cutout_for_image(
-            image=mask,
-            height=cutout_size,
-            width=cutout_size,
-            pad_mode='constant'
-    )
+    row_indices = get_cutout_indices(
+        center_dim=roi.bounding_box_center_y,
+        image_dim=fov_shape[0],
+        cutout_dim=cutout_size)
+    col_indices = get_cutout_indices(
+        center_dim=roi.bounding_box_center_x,
+        image_dim=fov_shape[0],
+        cutout_dim=cutout_size)
+
+    mask = mask[row_indices[0]:row_indices[1], col_indices[0]:col_indices[1]]
+    if mask.shape != (cutout_size, cutout_size):
+        mask = _pad_cutout(
+            frames=mask,
+            desired_shape=(cutout_size, cutout_size),
+            fov_shape=fov_shape,
+            pad_mode='constant',
+            roi=roi
+        )
 
     if mask.sum() == 0:
         raise _EmptyMaskException(f'Mask for roi {roi.roi_id} is empty')
@@ -369,7 +398,7 @@ def _generate_mask_image(
     return mask
 
 
-def _pad_frames(
+def _temporal_pad_frames(
     desired_seq_len: int,
     frames: np.ndarray,
 ) -> np.ndarray:
@@ -423,18 +452,35 @@ def _draw_mask_outline_on_frames(
     return frames
 
 
-def _crop_frames(
+def _pad_cutout(
     frames: np.ndarray,
     roi: OphysROI,
-    desired_shape: Tuple[int, int]
+    desired_shape: Tuple[int, int],
+    fov_shape: Tuple[int, int],
+    pad_mode: str
 ) -> np.ndarray:
-    frames = roi.get_centered_cutout_for_frames(
-        frames=frames,
-        height=desired_shape[0],
-        width=desired_shape[1],
-        pad_mode='symmetric'
-    )
-    return frames
+    """If the ROI is too close to the edge of the FOV, then we pad in order
+    to have frames of the desired shape"""
+    row_pad = get_cutout_padding(
+        dim_center=roi.bounding_box_center_y,
+        image_dim_size=fov_shape[0],
+        cutout_dim=desired_shape[0])
+    col_pad = get_cutout_padding(
+        dim_center=roi.bounding_box_center_x,
+        image_dim_size=fov_shape[0],
+        cutout_dim=desired_shape[0])
+
+    if len(frames.shape) == 3:
+        # Don't pad temporal dimension
+        pad_width = ((0, 0), row_pad, col_pad)
+    else:
+        pad_width = (row_pad, col_pad)
+    kwargs = {'constant_values': 0} if pad_mode == 'constant' else {}
+    return np.pad(frames,
+                  pad_width=pad_width,
+                  mode=pad_mode,
+                  **kwargs
+                  )
 
 
 def _downsample_frames(
