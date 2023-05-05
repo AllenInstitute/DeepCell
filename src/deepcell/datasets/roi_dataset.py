@@ -248,9 +248,10 @@ class RoiDataset(Dataset):
 
         with h5py.File(obs.ophys_movie_path, 'r') as f:
             frames = f['data'][
-                np.arange(max(0, peak.peak - nframes_before_after),
-                          peak.peak + nframes_before_after,
-                          self._temporal_downsampling_factor),
+                np.arange(
+                    max(0, peak.peak - nframes_before_after),
+                    min(f['data'].shape[0], peak.peak + nframes_before_after),
+                    self._temporal_downsampling_factor),
                 row_indices[0]:row_indices[1],
                 col_indices[0]:col_indices[1]
             ]
