@@ -233,8 +233,11 @@ class RoiDataset(Dataset):
         nframes_before_after = int(n_frames/2)
 
         with h5py.File(obs.ophys_movie_path, 'r') as f:
-            frames = f['data'][max(0, peak.peak - nframes_before_after):
-                               peak.peak + nframes_before_after]
+            frames = f['data'][
+                np.arange(max(0, peak.peak - nframes_before_after),
+                          peak.peak + nframes_before_after,
+                          self._temporal_downsampling_factor)
+            ]
             fov_shape = f['data'].shape[1:]
 
         input = self._get_video_clip_for_roi(
@@ -315,11 +318,6 @@ class RoiDataset(Dataset):
             desired_shape=self._image_dim
         )
 
-        if self._temporal_downsampling_factor > 1:
-            frames = _downsample_frames(
-                frames=frames,
-                downsampling_factor=self._temporal_downsampling_factor
-            )
 
         frames = normalize_array(
             array=frames,
