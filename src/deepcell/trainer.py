@@ -134,7 +134,8 @@ class Trainer(MLFlowTrackableMixin):
               sagemaker_job_name: Optional[str] = None,
               mlflow_parent_run_id: Optional[str] = None,
               hyperparameters_to_log: Optional[dict] = None,
-              log_best_epoch_metrics_to_parent_run: bool = False
+              log_best_epoch_metrics_to_parent_run: bool = False,
+              mlflow_child_run_id: Optional[str] = None
               ) -> None:
         """
         Runs the training loop
@@ -146,12 +147,15 @@ class Trainer(MLFlowTrackableMixin):
         @param sagemaker_job_name: If running via sagemaker, pass a job name
             to log
         @param mlflow_parent_run_id: Optional MLFlow run id to resume it
+        @param mlflow_child_run_id: Resume this mlflow child run for
+            continuing training
         @param hyperparameters_to_log: Optional hyperparameters to log using
             mlflow
         @param log_best_epoch_metrics_to_parent_run: Whether to log best
             epoch metrics to parent run. If using a CLI, this is done after
             k-fold to get mean metrics across runs. If running `train`
             by itself, might need to set this to True
+
         @return: None
         """
         if self.model_load_path is not None:
@@ -179,11 +183,15 @@ class Trainer(MLFlowTrackableMixin):
                     hyperparameters=hyperparameters_to_log
                 )
             else:
-                mlflow_parent_run = self._resume_parent_mlflow_run(
+                mlflow_parent_run = self._resume_mlflow_run(
                     run_id=mlflow_parent_run_id)
-            mlflow_run = self._create_nested_mlflow_run(
-                run_name=f'fold-{eval_fold}',
-                sagemaker_job_name=sagemaker_job_name)
+            if mlflow_child_run_id:
+                mlflow_run = self._resume_mlflow_run(
+                    run_id=mlflow_child_run_id, nested=True)
+            else:
+                mlflow_run = self._create_nested_mlflow_run(
+                    run_name=f'fold-{eval_fold}',
+                    sagemaker_job_name=sagemaker_job_name)
         else:
             mlflow_parent_run = contextlib.nullcontext()
             mlflow_run = contextlib.nullcontext()
@@ -247,7 +255,7 @@ class Trainer(MLFlowTrackableMixin):
                                 data, target, sample_weight = batch
                             else:
                                 raise ValueError('Unknown batch length')
-                            
+
                             # move to GPU
                             if self.use_cuda:
                                 data, target = data.cuda(), target.cuda()

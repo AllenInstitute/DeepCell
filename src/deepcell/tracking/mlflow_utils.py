@@ -84,15 +84,17 @@ class MLFlowTrackableMixin:
         return run
 
     @staticmethod
-    def _resume_parent_mlflow_run(run_id: str) -> mlflow.ActiveRun:
+    def _resume_mlflow_run(
+            run_id: str,
+            nested: bool = False
+    ) -> mlflow.ActiveRun:
         """
-        If there is an active parent run, resume it. Needed if
-        nested run is started on a
-        different node (distributed training)
+        Resume an mlflow run.
+        @param nested: Set to true if this is a nested child run
         @return: ActiveRun
         """
-        parent_run = mlflow.start_run(run_id=run_id)
-        return parent_run
+        run = mlflow.start_run(run_id=run_id, nested=nested)
+        return run
 
     def _create_nested_mlflow_run(
             self, run_name: str,
