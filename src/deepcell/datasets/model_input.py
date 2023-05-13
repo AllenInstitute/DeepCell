@@ -155,7 +155,7 @@ class ModelInput:
             'label': self._label
         }
 
-    def get_n_highest_peaks(self, n: int):
+    def get_n_highest_peaks(self, n: int) -> List[_Peak]:
         """Gets the n highest peaks by trace value"""
         peak_indxs_sorted = np.argsort([-x.trace for x in self.peaks])
         return [self.peaks[i] for i in peak_indxs_sorted[:n]]
