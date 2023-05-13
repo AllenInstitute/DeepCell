@@ -257,6 +257,9 @@ class RoiDataset(Dataset):
                              self._temporal_downsampling_factor)
             frame_idxs += idxs.tolist()
 
+        # h5py doesn't allow an index to be repeated
+        frame_idxs = list(set(frame_idxs))
+
         frame_idxs = sorted(frame_idxs)
 
         with h5py.File(obs.ophys_movie_path, 'r') as f:
@@ -332,9 +335,10 @@ class RoiDataset(Dataset):
             fov_shape: Tuple[int, int],
             normalize_quantiles: Tuple[float, float] = (0.2, 0.99)
     ):
-        if len(frames) < self._n_frames:
+        if len(frames) < self._n_frames * self._limit_to_n_highest_peaks:
             frames = _temporal_pad_frames(
-                desired_seq_len=self._n_frames,
+                desired_seq_len=(
+                        self._n_frames * self._limit_to_n_highest_peaks),
                 frames=frames
             )
 
@@ -414,14 +418,12 @@ def _temporal_pad_frames(
     frames: np.ndarray,
 ) -> np.ndarray:
     """
-    If the peak activation frame happens too close to the beginning
-    or end of the movie, then we pad with black in order to have
-    self.args['n_frames'] total frames
+    Pad the frames so that the len equals desired_seq_len
 
     Parameters
     ----------
     desired_seq_len
-        Desired number of frames surrounding `peak_activation_frame_idx`
+        Desired number of frames
     frames
         Frames
     Returns
@@ -429,10 +431,8 @@ def _temporal_pad_frames(
     frames, potentially padded
     """
     n_pad = desired_seq_len - len(frames)
-    frames = np.concatenate([
-        frames,
-        np.zeros((n_pad, *frames.shape[1:]), dtype=frames.dtype),
-    ])
+    frames = np.pad(frames, mode='edge',
+                    pad_width=((0, n_pad), (0, 0), (0, 0)))
     return frames
 
 
