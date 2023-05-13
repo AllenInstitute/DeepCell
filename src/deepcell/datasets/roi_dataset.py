@@ -48,7 +48,7 @@ class RoiDataset(Dataset):
                  n_frames: int = 16,
                  temporal_downsampling_factor: int = 1,
                  test_use_highest_peak: bool = True,
-                 limit_to_n_highest_peaks: int = 5,
+                 limit_to_n_highest_peaks: Optional[int] = None,
                  fov_shape: Tuple[int, int] = (512, 512)
                  ):
         """
@@ -228,7 +228,12 @@ class RoiDataset(Dataset):
         if self._is_train:
             if obs.peaks is None:
                 raise ValueError('Expected the model_input to contain peaks')
-            peak = random.choice(obs.peaks)
+            if self._limit_to_n_highest_peaks is not None:
+                peaks = obs.get_n_highest_peaks(
+                    n=self._limit_to_n_highest_peaks)
+            else:
+                peaks = obs.peaks
+            peak = random.choice(peaks)
         else:
             if obs.peak is None:
                 raise ValueError('Expected the model_input to contain peak')
@@ -247,10 +252,16 @@ class RoiDataset(Dataset):
             cutout_dim=self._image_dim[0])
 
         with h5py.File(obs.ophys_movie_path, 'r') as f:
+            mov_len = f['data'].shape[0]
+
+        start_index = max(0, peak.peak - nframes_before_after)
+        end_index = min(mov_len, peak.peak + nframes_before_after)
+        if self._n_frames == 1:
+            end_index += 1
+
+        with h5py.File(obs.ophys_movie_path, 'r') as f:
             frames = f['data'][
-                np.arange(
-                    max(0, peak.peak - nframes_before_after),
-                    min(f['data'].shape[0], peak.peak + nframes_before_after),
+                np.arange(start_index, end_index,
                     self._temporal_downsampling_factor),
                 row_indices[0]:row_indices[1],
                 col_indices[0]:col_indices[1]
