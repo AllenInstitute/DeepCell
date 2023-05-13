@@ -257,6 +257,8 @@ class RoiDataset(Dataset):
                              self._temporal_downsampling_factor)
             frame_idxs += idxs.tolist()
 
+        frame_idxs = sorted(frame_idxs)
+
         with h5py.File(obs.ophys_movie_path, 'r') as f:
             frames = f['data'][
                      frame_idxs,
