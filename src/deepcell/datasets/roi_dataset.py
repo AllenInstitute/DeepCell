@@ -109,8 +109,6 @@ class RoiDataset(Dataset):
             if test_use_highest_peak:
                 for model_input in model_inputs:
                     model_input.peak = model_input.get_n_highest_peaks(n=1)[0]
-            else:
-                raise NotImplementedError
 
         self._is_train = is_train
         self._model_inputs = model_inputs
