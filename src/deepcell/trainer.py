@@ -311,7 +311,12 @@ class Trainer(MLFlowTrackableMixin):
                                     return
 
                     if self.scheduler is not None:
-                        self.scheduler.step(epoch_val_metrics.loss)
+                        if isinstance(
+                                self.scheduler,
+                                torch.optim.lr_scheduler.ReduceLROnPlateau):
+                            self.scheduler.step(epoch_val_metrics.loss)
+                        else:
+                            self.scheduler.step()
 
                     if log_after_each_epoch:
                         self._logger.info(f'Epoch: {epoch + 1}\t'
