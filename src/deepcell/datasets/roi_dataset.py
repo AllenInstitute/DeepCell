@@ -47,8 +47,8 @@ class RoiDataset(Dataset):
                  cell_labeling_app_host: Optional[str] = None,
                  n_frames: int = 16,
                  temporal_downsampling_factor: int = 1,
-                 test_use_highest_peak: bool = True,
-                 limit_to_n_highest_peaks: Optional[int] = None,
+                 test_use_highest_peak: bool = False,
+                 limit_to_n_highest_peaks: Optional[int] = 5,
                  fov_shape: Tuple[int, int] = (512, 512)
                  ):
         """
@@ -225,19 +225,13 @@ class RoiDataset(Dataset):
     def __getitem__(self, index):
         obs = self._model_inputs[index]
 
-        if self._is_train:
-            if obs.peaks is None:
-                raise ValueError('Expected the model_input to contain peaks')
-            if self._limit_to_n_highest_peaks is not None:
-                peaks = obs.get_n_highest_peaks(
-                    n=self._limit_to_n_highest_peaks)
-            else:
-                peaks = obs.peaks
-            peak = random.choice(peaks)
+        if obs.peaks is None:
+            raise ValueError('Expected the model_input to contain peaks')
+        if self._limit_to_n_highest_peaks is not None:
+            peaks = obs.get_n_highest_peaks(
+                n=self._limit_to_n_highest_peaks)
         else:
-            if obs.peak is None:
-                raise ValueError('Expected the model_input to contain peak')
-            peak = obs.peak
+            peaks = obs.peaks
 
         n_frames = self._n_frames * self._temporal_downsampling_factor
         nframes_before_after = int(n_frames/2)
@@ -254,18 +248,23 @@ class RoiDataset(Dataset):
         with h5py.File(obs.ophys_movie_path, 'r') as f:
             mov_len = f['data'].shape[0]
 
-        start_index = max(0, peak.peak - nframes_before_after)
-        end_index = min(mov_len, peak.peak + nframes_before_after)
-        if self._n_frames == 1:
-            end_index += 1
+        peaks = sorted(peaks, key=lambda x: x.peak)
+        frame_idxs = []
+        for peak in peaks:
+            start_index = max(0, peak.peak - nframes_before_after)
+            end_index = min(mov_len, peak.peak + nframes_before_after)
+            if self._n_frames == 1:
+                end_index += 1
+            idxs = np.arange(start_index, end_index,
+                             self._temporal_downsampling_factor)
+            frame_idxs += idxs.tolist()
 
         with h5py.File(obs.ophys_movie_path, 'r') as f:
             frames = f['data'][
-                np.arange(start_index, end_index,
-                    self._temporal_downsampling_factor),
-                row_indices[0]:row_indices[1],
-                col_indices[0]:col_indices[1]
-            ]
+                     frame_idxs,
+                     row_indices[0]:row_indices[1],
+                     col_indices[0]:col_indices[1]
+                     ]
 
         input = self._get_video_clip_for_roi(
             frames=frames,
