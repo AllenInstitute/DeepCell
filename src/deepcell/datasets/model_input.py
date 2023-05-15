@@ -18,7 +18,9 @@ class ModelInput:
     def __init__(self,
                  roi: OphysROI,
                  experiment_id: str,
-                 ophys_movie_path: Path,
+                 ophys_movie_path: Optional[Path] = None,
+                 clip_path: Optional[Path] = None,
+                 brightest_peak_idx: Optional[int] = None,
                  peaks: Optional[List[Dict]] = None,
                  peak: Optional[int] = None,
                  project_name: Optional[str] = None,
@@ -33,6 +35,10 @@ class ModelInput:
                 Experiment id
             ophys_movie_path
                 Path to ophys movie for this ROI
+            clip_path
+                Path to clip for this ROI
+            brightest_peak_idx
+                Brightest peak idx for the clip
             peaks
                 List of peak activation indices for this ROI
                 Calculated using 
@@ -53,9 +59,21 @@ class ModelInput:
         if peaks is None and peak is None:
             raise ValueError('Provide peak or peaks, neither provided')
 
+        if ophys_movie_path is not None and clip_path is not None:
+            raise ValueError('Provide ophys_movie_path or clip_path, not both')
+        if ophys_movie_path is None and clip_path is None:
+            raise ValueError('Provide ophys_movie_path or clip_path, '
+                             'neither provided')
+
+        if clip_path is not None and brightest_peak_idx is None:
+            raise ValueError('Must provide brightest_peak_idx if using '
+                             'clip_path')
+
         self._roi = roi
         self._experiment_id = experiment_id
         self._ophys_movie_path = ophys_movie_path
+        self._clip_path = clip_path
+        self._brightest_peak_idx = brightest_peak_idx
         self._peaks = [_Peak(**x) for x in peaks]
         self._peak = peak
         self._project_name = project_name
@@ -70,8 +88,16 @@ class ModelInput:
         return self._experiment_id
 
     @property
-    def ophys_movie_path(self) -> Path:
+    def ophys_movie_path(self) -> Optional[Path]:
         return self._ophys_movie_path
+
+    @property
+    def clip_path(self) -> Optional[Path]:
+        return self._clip_path
+
+    @property
+    def brightest_peak_idx(self) -> Optional[int]:
+        return self._brightest_peak_idx
 
     @property
     def peaks(self) -> Optional[List[_Peak]]:

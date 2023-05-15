@@ -50,7 +50,8 @@ class RoiDataset(Dataset):
                  temporal_downsampling_factor: int = 1,
                  test_use_highest_peak: bool = False,
                  limit_to_n_highest_peaks: Optional[int] = 5,
-                 fov_shape: Tuple[int, int] = (512, 512)
+                 fov_shape: Tuple[int, int] = (512, 512),
+                 read_clip_from_full_movie: bool = False
                  ):
         """
         A dataset of segmentation masks as identified by Suite2p with
@@ -103,6 +104,10 @@ class RoiDataset(Dataset):
                 For testing, only sample the n highest peaks
             fov_shape
                 FOV shape
+            read_clip_from_full_movie
+                Whether to construct the clip from the full movie
+                If not, we expect the clip to be provided
+
         """
         super().__init__()
 
@@ -124,6 +129,7 @@ class RoiDataset(Dataset):
         self._temporal_downsampling_factor = temporal_downsampling_factor
         self._limit_to_n_highest_peaks = limit_to_n_highest_peaks
         self._fov_shape = fov_shape
+        self._read_clip_from_full_movie = read_clip_from_full_movie
 
         if weight_samples_by_labeler_confidence:
             if cell_labeling_app_host is None:
@@ -226,6 +232,48 @@ class RoiDataset(Dataset):
     def __getitem__(self, index):
         obs = self._model_inputs[index]
 
+        if self._read_clip_from_full_movie:
+            input, brightest_peak_idx = self._construct_clip(obs=obs)
+        else:
+            input = np.load(str(obs.clip_path))
+            brightest_peak_idx = obs.brightest_peak_idx
+
+        if self.transform:
+            if (
+                    self.transform.avg_transform or
+                    self.transform.max_transform or
+                    self.transform.mask_transform):
+                raise NotImplementedError('Transform on individual channels '
+                                          'not supported anymore')
+
+            if self.transform.all_transform:
+                if isinstance(self.transform.all_transform(input), Callable):
+                    # For testing, we require to pass brightest_peak_idx
+                    # to obtain the clip
+                    input = self.transform.all_transform(input)(
+                        brightest_peak_idx=brightest_peak_idx)
+                else:
+                    input = self.transform.all_transform(input)
+
+        # TODO collate_fn should be used instead
+        target = self._y[index]
+
+        if self._sample_weights is not None:
+            sample_weight = self._sample_weights.loc[
+                (obs.experiment_id, obs.roi.roi_id)]['agreement']
+        else:
+            sample_weight = None
+
+        if sample_weight is None:
+            return input, target
+        else:
+            return input, target, sample_weight
+
+    def __len__(self):
+        return len(self._model_inputs)
+
+    def _construct_clip(self, obs: ModelInput) -> Tuple[np.ndarray, int]:
+        """Constructs clip from full movie"""
         if obs.peaks is None:
             raise ValueError('Expected the model_input to contain peaks')
         if self._limit_to_n_highest_peaks is not None:
@@ -278,41 +326,10 @@ class RoiDataset(Dataset):
             roi=obs.roi
         )
 
-        if self.transform:
-            if (
-                    self.transform.avg_transform or
-                    self.transform.max_transform or
-                    self.transform.mask_transform):
-                raise NotImplementedError('Transform on individual channels '
-                                          'not supported anymore')
+        brightest_peak_idx = \
+            frame_idxs.index(obs.get_n_highest_peaks(n=1)[0].peak)
+        return input, brightest_peak_idx
 
-            if self.transform.all_transform:
-                if isinstance(self.transform.all_transform(input), Callable):
-                    # For testing, we require to pass brightest_peak_idx
-                    # to obtain the clip
-                    brightest_peak_idx = \
-                        frame_idxs.index(obs.get_n_highest_peaks(n=1)[0].peak)
-                    input = self.transform.all_transform(input)(
-                        brightest_peak_idx=brightest_peak_idx)
-                else:
-                    input = self.transform.all_transform(input)
-
-        # TODO collate_fn should be used instead
-        target = self._y[index]
-
-        if self._sample_weights is not None:
-            sample_weight = self._sample_weights.loc[
-                (obs.experiment_id, obs.roi.roi_id)]['agreement']
-        else:
-            sample_weight = None
-
-        if sample_weight is None:
-            return input, target
-        else:
-            return input, target, sample_weight
-
-    def __len__(self):
-        return len(self._model_inputs)
 
     @staticmethod
     def _get_labeler_agreement(
