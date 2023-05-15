@@ -186,7 +186,7 @@ class RoiDataset(Dataset):
         if is_train:
             all_transform = transforms.Compose([
                 ReverseVideo(p=0.5),
-                lambda x: torch.tensor(x),
+                lambda x: torch.tensor(x.copy()),
                 transforms_video.ToTensorVideo(),
                 RandomRotate90(),
                 transforms.RandomHorizontalFlip(p=0.5),
