@@ -23,7 +23,7 @@ from deepcell.util.construct_dataset.vote_tallying_strategy import \
     VoteTallyingStrategy
 from deepcell.util.construct_dataset.construct_dataset_utils import construct_dataset
 from deepcell.datasets.model_input import ModelInput
-from deepcell.datasets.transforms import RandomRotate90
+from deepcell.datasets.transforms import RandomRotate90, ReverseVideo
 from deepcell.transform import Transform
 
 
@@ -185,6 +185,7 @@ class RoiDataset(Dataset):
 
         if is_train:
             all_transform = transforms.Compose([
+                ReverseVideo(p=0.5),
                 lambda x: torch.tensor(x),
                 transforms_video.ToTensorVideo(),
                 RandomRotate90(),
