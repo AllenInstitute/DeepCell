@@ -1,5 +1,5 @@
 import random
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Callable
 
 import cv2
 import h5py
@@ -23,7 +23,8 @@ from deepcell.util.construct_dataset.vote_tallying_strategy import \
     VoteTallyingStrategy
 from deepcell.util.construct_dataset.construct_dataset_utils import construct_dataset
 from deepcell.datasets.model_input import ModelInput
-from deepcell.datasets.transforms import RandomRotate90, ReverseVideo
+from deepcell.datasets.transforms import RandomRotate90, ReverseVideo, \
+    RandomRollVideo, RandomClip, SubselectClip
 from deepcell.transform import Transform
 
 
@@ -152,6 +153,7 @@ class RoiDataset(Dataset):
     def get_default_transforms(
             crop_size: Tuple[int, int],
             is_train: bool,
+            clip_len: int = 64 * 3,
             means: List[float] = None,
             stds: List[float] = None
     ) -> Transform:
@@ -167,42 +169,42 @@ class RoiDataset(Dataset):
         means
             Channel-wise means to standardize data
             (after converting to [0, 1] range).
-            The defaults are the channel-wise means on kinetics-400
         stds
             Channel-wise stds to standardize data
             (after converting to [0, 1] range)
-            The defaults are the channel-wise stds on kinetics-400
+        clip_len
+            Clip length to subselect. In tran mode, this will be a randomly
+            selected clip. In test mode, this will be around the brightest
+            peak
         Returns
         -------
         Transform
         """
-        # loading the data distribution from a pretrained video model
-        # in case means and stds not passed
-        if means is None:
-            means = S3D_Weights.DEFAULT.transforms().mean
-        if stds is None:
-            stds = S3D_Weights.DEFAULT.transforms().std
-
         if is_train:
             all_transform = transforms.Compose([
                 ReverseVideo(p=0.5),
+                RandomRollVideo(p=0.5),
+                RandomClip(len=clip_len),
                 lambda x: torch.tensor(x.copy()),
                 transforms_video.ToTensorVideo(),
                 RandomRotate90(),
                 transforms.RandomHorizontalFlip(p=0.5),
                 transforms.RandomVerticalFlip(p=0.5),
-                transforms.CenterCrop(size=crop_size),
                 transforms_video.NormalizeVideo(mean=means, std=stds)
             ])
 
             return Transform(all_transform=all_transform)
         else:
-            all_transform = transforms.Compose([
-                lambda x: torch.tensor(x),
-                transforms_video.ToTensorVideo(),
-                transforms.CenterCrop(size=crop_size),
-                transforms_video.NormalizeVideo(mean=means, std=stds)
-            ])
+            def all_transform(brightest_peak_idx: int):
+                return transforms.Compose([
+                    lambda x: SubselectClip(
+                        len=clip_len,
+                        start_idx=brightest_peak_idx - int(clip_len / 2)
+                    ),
+                    lambda x: torch.tensor(x),
+                    transforms_video.ToTensorVideo(),
+                    transforms_video.NormalizeVideo(mean=means, std=stds)
+                ])
 
             return Transform(all_transform=all_transform)
 
@@ -285,7 +287,15 @@ class RoiDataset(Dataset):
                                           'not supported anymore')
 
             if self.transform.all_transform:
-                input = self.transform.all_transform(input)
+                if isinstance(self.transform.all_transform(input), Callable):
+                    # For testing, we require to pass brightest_peak_idx
+                    # to obtain the clip
+                    brightest_peak_idx = \
+                        frame_idxs.index(obs.get_n_highest_peaks(n=1)[0].peak)
+                    input = self.transform.all_transform(input)(
+                        brightest_peak_idx=brightest_peak_idx)
+                else:
+                    input = self.transform.all_transform(input)
 
         # TODO collate_fn should be used instead
         target = self._y[index]
