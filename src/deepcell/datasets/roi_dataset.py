@@ -205,7 +205,7 @@ class RoiDataset(Dataset):
                     lambda x: SubselectClip(
                         len=clip_len,
                         start_idx=max(0, brightest_peak_idx - int(clip_len / 2))
-                    ),
+                    )(x),
                     transforms_video.ToTensorVideo(),
                     transforms_video.NormalizeVideo(mean=means, std=stds)
                 ])
@@ -248,14 +248,13 @@ class RoiDataset(Dataset):
                                           'not supported anymore')
 
             if self.transform.all_transform:
-                transformed = self.transform.all_transform(input)
-                if isinstance(transformed, Callable):
+                if self._is_train:
+                    input = self.transform.all_transform(input)
+                else:
                     # For testing, we require to pass brightest_peak_idx
                     # to obtain the clip
-                    input = transformed(
-                        brightest_peak_idx=brightest_peak_idx)
-                else:
-                    input = transformed
+                    input = self.transform.all_transform(
+                        brightest_peak_idx=brightest_peak_idx)(input)
 
         # TODO collate_fn should be used instead
         target = self._y[index]
