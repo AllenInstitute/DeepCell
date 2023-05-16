@@ -1,6 +1,3 @@
-from typing import Optional
-
-import numpy as np
 import torch
 import torchvision.transforms.functional as TF
 import random
@@ -19,9 +16,9 @@ class ReverseVideo:
     def __init__(self, p):
         self._p = p
 
-    def __call__(self, x: np.ndarray):
+    def __call__(self, x: torch.tensor):
         if random.random() < self._p:
-            return np.flip(x, 0)
+            return torch.flip(x, dims=(0,))
         else:
             return x
 
@@ -32,10 +29,10 @@ class RandomRollVideo:
     def __init__(self, p):
         self._p = p
 
-    def __call__(self, x: np.ndarray):
+    def __call__(self, x: torch.tensor):
         if random.random() < self._p:
             shift = random.choice(range(len(x)))
-            return np.roll(x, shift=shift, axis=0)
+            return torch.roll(x, shifts=shift, dims=0)
         else:
             return x
 
@@ -45,11 +42,11 @@ class RandomClip:
     def __init__(self, len: int):
         self._len = len
 
-    def __call__(self, x: np.ndarray):
-        if self._len >= x.shape[0]:
+    def __call__(self, x: torch.tensor):
+        if self._len > x.shape[0]:
             raise ValueError(f'len {self._len} must be less than n frames in '
                              f'array')
-        start = random.choice(range(len(x) - self._len))
+        start = random.choice(range(len(x) - self._len + 1))
         return x[start:start+self._len]
 
 
@@ -59,16 +56,16 @@ class SubselectClip:
         self._len = len
         self._start_idx = start_idx
 
-    def __call__(self, x: np.ndarray):
-        if self._len >= x.shape[0]:
+    def __call__(self, x: torch.tensor):
+        if self._len > x.shape[0]:
             raise ValueError(f'len {self._len} must be less than n frames in '
                              f'array')
-        x = x[self._start_idx + self._start_idx + self._len]
+        x = x[self._start_idx:self._start_idx + self._len]
 
         # if length of array too short
         if len(x) < self._len:
             # take frames from beginning
             wrap_len = self._len - len(x)
-            x = np.concatenate([x[:wrap_len], x])
+            x = torch.concatenate([x[:wrap_len], x])
 
         return x

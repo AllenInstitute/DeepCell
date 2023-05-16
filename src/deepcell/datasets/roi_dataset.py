@@ -4,12 +4,12 @@ from typing import List, Tuple, Optional, Callable
 import cv2
 import h5py
 import pandas as pd
-import torch
 import numpy as np
 
 # This private module provides useful transforms for video.
 # Available as of torchvision 0.15
 # Easier than reimplementing here
+import torch
 import torchvision.transforms._transforms_video as transforms_video
 from ophys_etl.types import OphysROI
 from ophys_etl.utils.array_utils import normalize_array, get_cutout_indices, \
@@ -17,7 +17,7 @@ from ophys_etl.utils.array_utils import normalize_array, get_cutout_indices, \
 
 from torch.utils.data import Dataset
 from torchvision import transforms
-from torchvision.models.video import S3D_Weights
+from torchvision.io import read_video
 
 from deepcell.util.construct_dataset.vote_tallying_strategy import \
     VoteTallyingStrategy
@@ -191,7 +191,6 @@ class RoiDataset(Dataset):
                 ReverseVideo(p=0.5),
                 RandomRollVideo(p=0.5),
                 RandomClip(len=clip_len),
-                lambda x: torch.tensor(x.copy()),
                 transforms_video.ToTensorVideo(),
                 RandomRotate90(),
                 transforms.RandomHorizontalFlip(p=0.5),
@@ -207,7 +206,6 @@ class RoiDataset(Dataset):
                         len=clip_len,
                         start_idx=brightest_peak_idx - int(clip_len / 2)
                     ),
-                    lambda x: torch.tensor(x),
                     transforms_video.ToTensorVideo(),
                     transforms_video.NormalizeVideo(mean=means, std=stds)
                 ])
@@ -233,9 +231,12 @@ class RoiDataset(Dataset):
         obs = self._model_inputs[index]
 
         if self._read_clip_from_full_movie:
+            if obs.ophys_movie_path is None:
+                raise ValueError('Must provide ophys_movie_path if '
+                                 'read_clip_from_full_movie is True')
             input, brightest_peak_idx = self._construct_clip(obs=obs)
         else:
-            input = np.load(str(obs.clip_path))
+            input = read_video(filename=str(obs.clip_path), pts_unit='sec')[0]
             brightest_peak_idx = obs.brightest_peak_idx
 
         if self.transform:
@@ -247,13 +248,14 @@ class RoiDataset(Dataset):
                                           'not supported anymore')
 
             if self.transform.all_transform:
-                if isinstance(self.transform.all_transform(input), Callable):
+                transformed = self.transform.all_transform(input)
+                if isinstance(transformed, Callable):
                     # For testing, we require to pass brightest_peak_idx
                     # to obtain the clip
-                    input = self.transform.all_transform(input)(
+                    input = transformed(
                         brightest_peak_idx=brightest_peak_idx)
                 else:
-                    input = self.transform.all_transform(input)
+                    input = transformed
 
         # TODO collate_fn should be used instead
         target = self._y[index]
@@ -272,7 +274,7 @@ class RoiDataset(Dataset):
     def __len__(self):
         return len(self._model_inputs)
 
-    def _construct_clip(self, obs: ModelInput) -> Tuple[np.ndarray, int]:
+    def _construct_clip(self, obs: ModelInput) -> Tuple[torch.tensor, int]:
         """Constructs clip from full movie"""
         if obs.peaks is None:
             raise ValueError('Expected the model_input to contain peaks')
@@ -325,6 +327,7 @@ class RoiDataset(Dataset):
             fov_shape=self._fov_shape,
             roi=obs.roi
         )
+        input = torch.tensor(input, dtype=torch.uint8)
 
         brightest_peak_idx = \
             frame_idxs.index(obs.get_n_highest_peaks(n=1)[0].peak)
