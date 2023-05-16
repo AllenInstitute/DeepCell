@@ -204,7 +204,7 @@ class RoiDataset(Dataset):
                 return transforms.Compose([
                     lambda x: SubselectClip(
                         len=clip_len,
-                        start_idx=brightest_peak_idx - int(clip_len / 2)
+                        start_idx=max(0, brightest_peak_idx - int(clip_len / 2))
                     ),
                     transforms_video.ToTensorVideo(),
                     transforms_video.NormalizeVideo(mean=means, std=stds)
