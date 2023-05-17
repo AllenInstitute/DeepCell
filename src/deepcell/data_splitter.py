@@ -24,7 +24,8 @@ class DataSplitter:
                  weight_samples_by_labeler_confidence: bool = False,
                  cell_labeling_app_host: Optional[str] = None,
                  n_frames: int = 16,
-                 temporal_downsampling_factor: int = 1
+                 temporal_downsampling_factor: int = 1,
+                 clip_len: int = 32
                  ):
         """
         Does splitting of data into train/test or train/validation
@@ -64,6 +65,8 @@ class DataSplitter:
                 See `RoiDataset.n_frames`
             temporal_downsampling_factor
                 See `RoiDataset.temporal_downsampling_factor`
+            clip_len
+                Length of subclip
         """
         self._model_inputs = model_inputs
         self.train_transform = train_transform
@@ -79,6 +82,7 @@ class DataSplitter:
         self._cell_labeling_app_host = cell_labeling_app_host
         self._n_frames = n_frames
         self._temporal_downsampling_factor = temporal_downsampling_factor
+        self._clip_len = clip_len
 
         if center_roi_centroid not in ('test', True, False):
             raise ValueError('Invalid value for center_soma. Valid '
@@ -300,5 +304,6 @@ class DataSplitter:
             cell_labeling_app_host=self._cell_labeling_app_host,
             is_train=is_train,
             n_frames=self._n_frames,
-            temporal_downsampling_factor=self._temporal_downsampling_factor
+            temporal_downsampling_factor=self._temporal_downsampling_factor,
+            clip_len=self._clip_len
         )
