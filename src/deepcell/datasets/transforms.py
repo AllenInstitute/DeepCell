@@ -69,3 +69,12 @@ class SubselectClip:
             x = torch.concatenate([x[:wrap_len], x])
 
         return x
+
+
+class ReduceFrameRate:
+    """Downsample video in time"""
+    def __init__(self, temporal_downsampling: int = 6):
+        self._temporal_downsampling = temporal_downsampling
+
+    def __call__(self, x: torch.tensor):
+        return x[torch.arange(0, len(x), self._temporal_downsampling)]

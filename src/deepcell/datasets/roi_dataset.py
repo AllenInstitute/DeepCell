@@ -24,7 +24,7 @@ from deepcell.util.construct_dataset.vote_tallying_strategy import \
 from deepcell.util.construct_dataset.construct_dataset_utils import construct_dataset
 from deepcell.datasets.model_input import ModelInput
 from deepcell.datasets.transforms import RandomRotate90, ReverseVideo, \
-    RandomRollVideo, RandomClip, SubselectClip
+    RandomRollVideo, RandomClip, SubselectClip, ReduceFrameRate
 from deepcell.transform import Transform
 
 
@@ -160,6 +160,7 @@ class RoiDataset(Dataset):
             crop_size: Tuple[int, int],
             is_train: bool,
             clip_len: int = 64 * 3,
+            temporal_downsampling_factor: int = 6,
             means: List[float] = None,
             stds: List[float] = None
     ) -> Transform:
@@ -189,8 +190,9 @@ class RoiDataset(Dataset):
         if is_train:
             all_transform = transforms.Compose([
                 ReverseVideo(p=0.5),
-                RandomRollVideo(p=0.5),
                 RandomClip(len=clip_len),
+                ReduceFrameRate(
+                    temporal_downsampling=temporal_downsampling_factor),
                 transforms_video.ToTensorVideo(),
                 RandomRotate90(),
                 transforms.RandomHorizontalFlip(p=0.5),
