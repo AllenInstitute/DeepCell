@@ -24,7 +24,7 @@ from deepcell.util.construct_dataset.vote_tallying_strategy import \
 from deepcell.util.construct_dataset.construct_dataset_utils import construct_dataset
 from deepcell.datasets.model_input import ModelInput
 from deepcell.datasets.transforms import RandomRotate90, ReverseVideo, \
-    RandomRollVideo, RandomClip, SubselectClip, ReduceFrameRate
+    RandomClip, SubselectClip, ReduceFrameRate
 from deepcell.transform import Transform
 
 
@@ -51,7 +51,9 @@ class RoiDataset(Dataset):
                  test_use_highest_peak: bool = False,
                  limit_to_n_highest_peaks: Optional[int] = 5,
                  fov_shape: Tuple[int, int] = (512, 512),
-                 read_clip_from_full_movie: bool = False
+                 read_clip_from_full_movie: bool = False,
+                 clip_len: int = 256,
+                 test_n_clips: int = 10
                  ):
         """
         A dataset of segmentation masks as identified by Suite2p with
@@ -107,7 +109,10 @@ class RoiDataset(Dataset):
             read_clip_from_full_movie
                 Whether to construct the clip from the full movie
                 If not, we expect the clip to be provided
-
+            clip_len
+                Length of final clip to construct
+            test_n_clips
+                How many random clips to construct to average predictions
         """
         super().__init__()
 
@@ -130,6 +135,8 @@ class RoiDataset(Dataset):
         self._limit_to_n_highest_peaks = limit_to_n_highest_peaks
         self._fov_shape = fov_shape
         self._read_clip_from_full_movie = read_clip_from_full_movie
+        self._clip_len = clip_len
+        self._test_n_clips = test_n_clips
 
         if weight_samples_by_labeler_confidence:
             if cell_labeling_app_host is None:
@@ -202,12 +209,14 @@ class RoiDataset(Dataset):
 
             return Transform(all_transform=all_transform)
         else:
-            def all_transform(brightest_peak_idx: int):
+            def all_transform(start_idx: int):
                 return transforms.Compose([
                     lambda x: SubselectClip(
                         len=clip_len,
-                        start_idx=max(0, brightest_peak_idx - int(clip_len / 2))
+                        start_idx=start_idx
                     )(x),
+                    ReduceFrameRate(
+                        temporal_downsampling=temporal_downsampling_factor),
                     transforms_video.ToTensorVideo(),
                     transforms_video.NormalizeVideo(mean=means, std=stds)
                 ])
@@ -253,10 +262,18 @@ class RoiDataset(Dataset):
                 if self._is_train:
                     input = self.transform.all_transform(input)
                 else:
-                    # For testing, we require to pass brightest_peak_idx
-                    # to obtain the clip
-                    input = self.transform.all_transform(
-                        brightest_peak_idx=brightest_peak_idx)(input)
+                    # For testing, we construct multiple sub clips in order
+                    # to average the predictions
+                    possible_start_idxs = range(0, len(input) - self._clip_len)
+                    start_idxs = random.choices(possible_start_idxs,
+                                                k=self._test_n_clips)
+                    inputs = []
+                    for start_idx in start_idxs:
+                        inputs.append(
+                            self.transform.all_transform(
+                                start_idx=start_idx)(input)
+                        )
+                    input = torch.stack(inputs, dim=0)
 
         # TODO collate_fn should be used instead
         target = self._y[index]

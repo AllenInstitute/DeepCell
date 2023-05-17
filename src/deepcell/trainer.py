@@ -135,7 +135,8 @@ class Trainer(MLFlowTrackableMixin):
               mlflow_parent_run_id: Optional[str] = None,
               hyperparameters_to_log: Optional[dict] = None,
               log_best_epoch_metrics_to_parent_run: bool = False,
-              mlflow_child_run_id: Optional[str] = None
+              mlflow_child_run_id: Optional[str] = None,
+              test_n_clips: int = 10
               ) -> None:
         """
         Runs the training loop
@@ -155,7 +156,8 @@ class Trainer(MLFlowTrackableMixin):
             epoch metrics to parent run. If using a CLI, this is done after
             k-fold to get mean metrics across runs. If running `train`
             by itself, might need to set this to True
-
+        @param test_n_clips
+            How many random clips to construct to average predictions
         @return: None
         """
         if self.model_load_path is not None:
@@ -264,9 +266,16 @@ class Trainer(MLFlowTrackableMixin):
 
                             # update the average validation loss
                             with torch.no_grad():
-                                output = self.model(data)
-                                output = output.squeeze()
-                                loss = self.criterion(output, target.float())
+                                outputs = torch.zeros(
+                                    test_n_clips, data.shape[0])
+                                losses = torch.zeros(test_n_clips)
+                                for i in range(test_n_clips):
+                                    output = self.model(data[:, i])
+                                    outputs[i] = output.squeeze()
+                                    losses[i] = self.criterion(
+                                        outputs[i], target.float())
+                                loss = losses.mean()
+                                output = outputs.mean(dim=0)
 
                                 if sample_weight is not None:
                                     loss = metrics.Metrics.calc_weighted_loss(
