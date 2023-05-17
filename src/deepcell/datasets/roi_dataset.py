@@ -52,7 +52,7 @@ class RoiDataset(Dataset):
                  limit_to_n_highest_peaks: Optional[int] = 5,
                  fov_shape: Tuple[int, int] = (512, 512),
                  read_clip_from_full_movie: bool = False,
-                 clip_len: int = 256,
+                 clip_len: int = 50,
                  test_n_clips: int = 10
                  ):
         """
