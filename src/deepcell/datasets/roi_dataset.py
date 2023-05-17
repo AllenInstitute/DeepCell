@@ -197,9 +197,9 @@ class RoiDataset(Dataset):
         if is_train:
             all_transform = transforms.Compose([
                 ReverseVideo(p=0.5),
-                RandomClip(len=clip_len),
                 ReduceFrameRate(
                     temporal_downsampling=temporal_downsampling_factor),
+                RandomClip(len=clip_len),
                 transforms_video.ToTensorVideo(),
                 RandomRotate90(),
                 transforms.RandomHorizontalFlip(p=0.5),
@@ -211,12 +211,12 @@ class RoiDataset(Dataset):
         else:
             def all_transform(start_idx: int):
                 return transforms.Compose([
+                    ReduceFrameRate(
+                        temporal_downsampling=temporal_downsampling_factor),
                     lambda x: SubselectClip(
                         len=clip_len,
                         start_idx=start_idx
                     )(x),
-                    ReduceFrameRate(
-                        temporal_downsampling=temporal_downsampling_factor),
                     transforms_video.ToTensorVideo(),
                     transforms_video.NormalizeVideo(mean=means, std=stds)
                 ])
@@ -248,7 +248,6 @@ class RoiDataset(Dataset):
             input, brightest_peak_idx = self._construct_clip(obs=obs)
         else:
             input = read_video(filename=str(obs.clip_path), pts_unit='sec')[0]
-            brightest_peak_idx = obs.brightest_peak_idx
 
         if self.transform:
             if (
@@ -264,7 +263,10 @@ class RoiDataset(Dataset):
                 else:
                     # For testing, we construct multiple sub clips in order
                     # to average the predictions
-                    possible_start_idxs = range(0, len(input) - self._clip_len)
+                    downsampled_clip_len = int(
+                        len(input) / self._temporal_downsampling_factor)
+                    possible_start_idxs = range(
+                        0, downsampled_clip_len - self._clip_len)
                     start_idxs = random.choices(possible_start_idxs,
                                                 k=self._test_n_clips)
                     inputs = []

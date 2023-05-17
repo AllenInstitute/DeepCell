@@ -269,6 +269,9 @@ class Trainer(MLFlowTrackableMixin):
                                 outputs = torch.zeros(
                                     test_n_clips, data.shape[0])
                                 losses = torch.zeros(test_n_clips)
+                                if self.use_cuda:
+                                    outputs, losses = \
+                                        outputs.cuda(), losses.cuda()
                                 for i in range(test_n_clips):
                                     output = self.model(data[:, i])
                                     outputs[i] = output.squeeze()
