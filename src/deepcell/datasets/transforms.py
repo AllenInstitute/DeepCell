@@ -44,8 +44,7 @@ class RandomClip:
 
     def __call__(self, x: torch.tensor):
         if self._len > x.shape[0]:
-            raise ValueError(f'len {self._len} must be less than n frames in '
-                             f'array')
+            raise ValueError(f'len {self._len} must be less than {x.shape[0]}')
         start = random.choice(range(len(x) - self._len + 1))
         return x[start:start+self._len]
 
@@ -58,8 +57,7 @@ class SubselectClip:
 
     def __call__(self, x: torch.tensor):
         if self._len > x.shape[0]:
-            raise ValueError(f'len {self._len} must be less than n frames in '
-                             f'array')
+            raise ValueError(f'len {self._len} must be less than {x.shape[0]}')
         x = x[self._start_idx:self._start_idx + self._len]
 
         # if length of array too short
