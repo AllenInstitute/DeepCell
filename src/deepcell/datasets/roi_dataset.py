@@ -1,5 +1,5 @@
 import random
-from typing import List, Tuple, Optional, Callable
+from typing import List, Tuple, Optional
 
 import cv2
 import h5py
@@ -53,7 +53,8 @@ class RoiDataset(Dataset):
                  fov_shape: Tuple[int, int] = (512, 512),
                  read_clip_from_full_movie: bool = False,
                  clip_len: int = 50,
-                 test_n_clips: int = 10
+                 test_n_clips: int = 10,
+                 train_use_brightest_frame: bool = False
                  ):
         """
         A dataset of segmentation masks as identified by Suite2p with
@@ -113,6 +114,8 @@ class RoiDataset(Dataset):
                 Length of final clip to construct
             test_n_clips
                 How many random clips to construct to average predictions
+            train_use_brightest_frame
+                Whether to construct the clip around the brightest frame
         """
         super().__init__()
 
@@ -137,6 +140,7 @@ class RoiDataset(Dataset):
         self._read_clip_from_full_movie = read_clip_from_full_movie
         self._clip_len = clip_len
         self._test_n_clips = test_n_clips
+        self._train_use_brightest_frame = train_use_brightest_frame
 
         if weight_samples_by_labeler_confidence:
             if cell_labeling_app_host is None:
@@ -169,7 +173,8 @@ class RoiDataset(Dataset):
             clip_len: int = 64 * 3,
             temporal_downsampling_factor: int = 6,
             means: List[float] = None,
-            stds: List[float] = None
+            stds: List[float] = None,
+            use_brightest_frame: bool = False
     ) -> Transform:
         """
         Gets the default transforms
@@ -190,22 +195,36 @@ class RoiDataset(Dataset):
             Clip length to subselect. In tran mode, this will be a randomly
             selected clip. In test mode, this will be around the brightest
             peak
+        temporal_downsampling_factor
+            Amount to downsample clip
+        use_brightest_frame
+            Whether to construct the clip around the brightest frame
+
         Returns
         -------
         Transform
         """
         if is_train:
-            all_transform = transforms.Compose([
-                ReverseVideo(p=0.5),
-                ReduceFrameRate(
-                    temporal_downsampling=temporal_downsampling_factor),
-                RandomClip(len=clip_len),
-                transforms_video.ToTensorVideo(),
-                RandomRotate90(),
-                transforms.RandomHorizontalFlip(p=0.5),
-                transforms.RandomVerticalFlip(p=0.5),
-                transforms_video.NormalizeVideo(mean=means, std=stds)
-            ])
+            def all_transform(start_idx):
+                all_transform = [
+                    ReverseVideo(p=0.5),
+                    ReduceFrameRate(
+                        temporal_downsampling=temporal_downsampling_factor),
+                    transforms_video.ToTensorVideo(),
+                    RandomRotate90(),
+                    transforms.RandomHorizontalFlip(p=0.5),
+                    transforms.RandomVerticalFlip(p=0.5),
+                    transforms_video.NormalizeVideo(mean=means, std=stds)
+                ]
+                if use_brightest_frame:
+                    all_transform.insert(1, lambda x: SubselectClip(
+                        len=clip_len,
+                        start_idx=start_idx
+                    )(x))
+                else:
+                    all_transform.insert(1, RandomClip(len=clip_len))
+
+                return transforms.Compose(all_transform)
 
             return Transform(all_transform=all_transform)
         else:
@@ -259,7 +278,14 @@ class RoiDataset(Dataset):
 
             if self.transform.all_transform:
                 if self._is_train:
-                    input = self.transform.all_transform(input)
+                    if self._train_use_brightest_frame:
+                        start_idx = \
+                            obs.brightest_peak_idx - int(self._clip_len / 2)
+                    else:
+                        # not used
+                        start_idx = None
+                    input = self.transform.all_transform(
+                        start_idx=start_idx)(input)
                 else:
                     # For testing, we construct multiple sub clips in order
                     # to average the predictions
@@ -352,7 +378,6 @@ class RoiDataset(Dataset):
         brightest_peak_idx = \
             frame_idxs.index(obs.get_n_highest_peaks(n=1)[0].peak)
         return input, brightest_peak_idx
-
 
     @staticmethod
     def _get_labeler_agreement(
