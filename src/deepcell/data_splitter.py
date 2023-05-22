@@ -26,7 +26,8 @@ class DataSplitter:
                  n_frames: int = 16,
                  temporal_downsampling_factor: int = 1,
                  clip_len: int = 32,
-                 test_n_clips: int = 10
+                 test_n_clips: int = 10,
+                 train_use_brightest_frame: bool = True
                  ):
         """
         Does splitting of data into train/test or train/validation
@@ -70,6 +71,8 @@ class DataSplitter:
                 Length of subclip
             test_n_clips
                 How many clips to construct for testing
+            train_use_brightest_frame
+                Whether to construct clip around brightest frame
         """
         self._model_inputs = model_inputs
         self.train_transform = train_transform
@@ -87,6 +90,7 @@ class DataSplitter:
         self._temporal_downsampling_factor = temporal_downsampling_factor
         self._clip_len = clip_len
         self._test_n_clips = test_n_clips
+        self._train_use_brightest_frame = train_use_brightest_frame
 
         if center_roi_centroid not in ('test', True, False):
             raise ValueError('Invalid value for center_soma. Valid '
@@ -310,5 +314,6 @@ class DataSplitter:
             n_frames=self._n_frames,
             temporal_downsampling_factor=self._temporal_downsampling_factor,
             clip_len=self._clip_len,
-            test_n_clips=self._test_n_clips
+            test_n_clips=self._test_n_clips,
+            train_use_brightest_frame=self._train_use_brightest_frame
         )
