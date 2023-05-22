@@ -266,19 +266,24 @@ class Trainer(MLFlowTrackableMixin):
 
                             # update the average validation loss
                             with torch.no_grad():
-                                outputs = torch.zeros(
-                                    test_n_clips, data.shape[0])
-                                losses = torch.zeros(test_n_clips)
-                                if self.use_cuda:
-                                    outputs, losses = \
-                                        outputs.cuda(), losses.cuda()
-                                for i in range(test_n_clips):
-                                    output = self.model(data[:, i])
-                                    outputs[i] = output.squeeze()
-                                    losses[i] = self.criterion(
-                                        outputs[i], target.float())
-                                loss = losses.mean()
-                                output = outputs.mean(dim=0)
+                                if len(data.shape) == 6:
+                                    # subsampling multiple clips
+                                    outputs = torch.zeros(
+                                        test_n_clips, data.shape[0])
+                                    losses = torch.zeros(test_n_clips)
+                                    if self.use_cuda:
+                                        outputs, losses = \
+                                            outputs.cuda(), losses.cuda()
+                                    for i in range(test_n_clips):
+                                        output = self.model(data[:, i])
+                                        outputs[i] = output.squeeze()
+                                        losses[i] = self.criterion(
+                                            outputs[i], target.float())
+                                    loss = losses.mean()
+                                    output = outputs.mean(dim=0)
+                                else:
+                                    output = self.model(data).squeeze()
+                                    loss = self.criterion(output, target.float())
 
                                 if sample_weight is not None:
                                     loss = metrics.Metrics.calc_weighted_loss(
