@@ -56,6 +56,7 @@ class InferenceModule(argschema.ArgSchemaParser):
             _, inference_res = inference(
                 model=model,
                 test_loader=test_dataloader,
+                threshold=self.args['classification_threshold'],
                 has_labels=self.args['mode'] == 'test',
                 checkpoint_path=str(self.args['model_load_path']))
         else:

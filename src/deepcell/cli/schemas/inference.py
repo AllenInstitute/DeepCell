@@ -34,3 +34,9 @@ class InferenceSchema(BaseSchema):
         ModelSchema,
         default={}
     )
+
+    classification_threshold = argschema.fields.Float(
+        default=0.5,
+        description='Classification threshold',
+        validate=lambda x: 0 <= x <= 1.0
+    )
