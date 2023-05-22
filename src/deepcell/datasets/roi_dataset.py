@@ -54,7 +54,7 @@ class RoiDataset(Dataset):
                  read_clip_from_full_movie: bool = False,
                  clip_len: int = 50,
                  test_n_clips: int = 10,
-                 train_use_brightest_frame: bool = False
+                 use_brightest_frame: bool = False
                  ):
         """
         A dataset of segmentation masks as identified by Suite2p with
@@ -114,7 +114,7 @@ class RoiDataset(Dataset):
                 Length of final clip to construct
             test_n_clips
                 How many random clips to construct to average predictions
-            train_use_brightest_frame
+            use_brightest_frame
                 Whether to construct the clip around the brightest frame
         """
         super().__init__()
@@ -140,7 +140,7 @@ class RoiDataset(Dataset):
         self._read_clip_from_full_movie = read_clip_from_full_movie
         self._clip_len = clip_len
         self._test_n_clips = test_n_clips
-        self._train_use_brightest_frame = train_use_brightest_frame
+        self._use_brightest_frame = use_brightest_frame
 
         if weight_samples_by_labeler_confidence:
             if cell_labeling_app_host is None:
@@ -277,15 +277,14 @@ class RoiDataset(Dataset):
                                           'not supported anymore')
 
             if self.transform.all_transform:
-                if self._is_train:
-                    if self._train_use_brightest_frame:
-                        start_idx = \
-                            obs.brightest_peak_idx - int(self._clip_len / 2)
-                    else:
-                        # not used
-                        start_idx = None
+                if self._use_brightest_frame:
+                    start_idx = \
+                        obs.brightest_peak_idx - int(self._clip_len / 2)
                     input = self.transform.all_transform(
                         start_idx=start_idx)(input)
+                elif self._is_train:
+                    input = self.transform.all_transform(
+                        start_idx=None)(input)
                 else:
                     # For testing, we construct multiple sub clips in order
                     # to average the predictions
