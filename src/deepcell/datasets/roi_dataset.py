@@ -230,12 +230,12 @@ class RoiDataset(Dataset):
         else:
             def all_transform(start_idx: int):
                 return transforms.Compose([
-                    ReduceFrameRate(
-                        temporal_downsampling=temporal_downsampling_factor),
                     lambda x: SubselectClip(
                         len=clip_len,
                         start_idx=start_idx
                     )(x),
+                    ReduceFrameRate(
+                        temporal_downsampling=temporal_downsampling_factor),
                     transforms_video.ToTensorVideo(),
                     transforms_video.NormalizeVideo(mean=means, std=stds)
                 ])
