@@ -279,7 +279,7 @@ class RoiDataset(Dataset):
             if self.transform.all_transform:
                 if self._use_brightest_frame:
                     start_idx = \
-                        obs.brightest_peak_idx - int(self._clip_len / 2)
+                        max(0, obs.brightest_peak_idx - int(self._clip_len / 2))
                     input = self.transform.all_transform(
                         start_idx=start_idx)(input)
                 elif self._is_train:
