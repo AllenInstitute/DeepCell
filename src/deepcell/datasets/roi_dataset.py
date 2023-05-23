@@ -207,9 +207,9 @@ class RoiDataset(Dataset):
         if is_train:
             def all_transform(start_idx):
                 all_transform = [
-                    ReverseVideo(p=0.5),
                     ReduceFrameRate(
                         temporal_downsampling=temporal_downsampling_factor),
+                    ReverseVideo(p=0.5),
                     transforms_video.ToTensorVideo(),
                     RandomRotate90(),
                     transforms.RandomHorizontalFlip(p=0.5),
@@ -217,12 +217,12 @@ class RoiDataset(Dataset):
                     transforms_video.NormalizeVideo(mean=means, std=stds)
                 ]
                 if use_brightest_frame:
-                    all_transform.insert(1, lambda x: SubselectClip(
+                    all_transform.insert(0, lambda x: SubselectClip(
                         len=clip_len,
                         start_idx=start_idx
                     )(x))
                 else:
-                    all_transform.insert(1, RandomClip(len=clip_len))
+                    all_transform.insert(0, RandomClip(len=clip_len))
 
                 return transforms.Compose(all_transform)
 
