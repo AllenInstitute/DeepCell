@@ -249,6 +249,13 @@ class Trainer(MLFlowTrackableMixin):
                                 self.early_stopping_callback.time_since_best_epoch += 1
                                 if self.early_stopping_callback.time_since_best_epoch \
                                         > self.early_stopping_callback.patience:
+                                    self._logger.info(
+                                        f'Epoch: {epoch + 1}\t'
+                                        f'Train F1: {epoch_train_metrics.F1:.6f}\t'
+                                        f'Val F1: {epoch_val_metrics.F1:.6f}\t'
+                                        f'Train Loss: {epoch_train_metrics.loss:.6f}\t'
+                                        f'Val Loss: { epoch_val_metrics.loss:.6f}'
+                                    )
                                     self._logger.info('Stopping due to early stopping')
                                     self._save_model_and_performance(
                                         eval_fold=eval_fold)
