@@ -1,6 +1,7 @@
 import contextlib
 import os
 import time
+from copy import deepcopy
 from pathlib import Path
 from typing import Optional, Union, List, Dict
 
@@ -306,11 +307,11 @@ class Trainer(MLFlowTrackableMixin):
                             self.early_stopping_callback.on_epoch_end(
                                 epoch=epoch, metrics=self._callback_metrics)
                             if self.early_stopping_callback.best_epoch == epoch:
-                                scheduler_state_dict = self.scheduler.state_dict() if \
+                                scheduler_state_dict = deepcopy(self.scheduler.state_dict()) if \
                                     self.scheduler is not None else None
                                 self._current_best_state_dicts = {
-                                    'model': self.model.state_dict(),
-                                    'optimizer': self.optimizer.state_dict(),
+                                    'model': deepcopy(self.model.state_dict()),
+                                    'optimizer': deepcopy(self.optimizer.state_dict()),
                                     'scheduler': scheduler_state_dict
                                 }
                                 self.early_stopping_callback.time_since_best_epoch = 0
