@@ -237,11 +237,11 @@ class Trainer(MLFlowTrackableMixin):
                             self.early_stopping_callback.on_epoch_end(
                                 epoch=epoch, metrics=self._callback_metrics)
                             if self.early_stopping_callback.best_epoch == epoch:
-                                scheduler_state_dict = self.scheduler.state_dict() if \
+                                scheduler_state_dict = self.scheduler.state_dict().copy() if \
                                     self.scheduler is not None else None
                                 self._current_best_state_dicts = {
-                                    'model': self.model.state_dict(),
-                                    'optimizer': self.optimizer.state_dict(),
+                                    'model': self.model.state_dict().copy(),
+                                    'optimizer': self.optimizer.state_dict().copy(),
                                     'scheduler': scheduler_state_dict
                                 }
                                 self.early_stopping_callback.time_since_best_epoch = 0
