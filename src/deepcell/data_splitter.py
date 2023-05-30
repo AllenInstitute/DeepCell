@@ -201,9 +201,11 @@ class DataSplitter:
     def get_cross_val_split(self, train_dataset: RoiDataset, n_splits=5,
                             shuffle=True):
         for train_index, test_index in self.get_cross_val_split_idxs(
-                model_inputs=train_dataset.model_inputs,
-                n_splits=n_splits,
-                shuffle=shuffle):
+            model_inputs=train_dataset.model_inputs,
+            n_splits=n_splits,
+            shuffle=shuffle,
+            seed=self.seed
+        ):
             train = self._sample_dataset(
                 dataset=train_dataset.model_inputs,
                 index=train_index,
