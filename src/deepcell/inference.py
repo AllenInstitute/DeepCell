@@ -7,8 +7,7 @@ import os
 import pandas as pd
 
 import torch
-from sklearn.metrics import precision_score, recall_score, \
-    average_precision_score
+from sklearn.metrics import precision_score, recall_score, f1_score
 from torch.utils.data import DataLoader
 
 from deepcell.datasets.model_input import ModelInput
@@ -171,7 +170,12 @@ def cv_performance(
         checkpoint_path: Union[str, Path],
         data_splitter: Optional[DataSplitter] = None,
         threshold=0.5,
-        test_transform: Optional[Transform] = None
+        test_transform: Optional[Transform] = None,
+        n_frames: int = 16,
+        temporal_downsampling_factor: int = 1,
+        clip_len: int = 32,
+        test_n_clips: int = 10,
+        use_brightest_frame: bool = True
 ) -> Tuple[pd.DataFrame, Dict]:
     """
     Evaluates each of the k trained models on the respective validation set
@@ -209,11 +213,28 @@ def cv_performance(
     def get_validation_set():
         if data_splitter is None:
             for k in range(len(model_inputs)):
-                yield RoiDataset(model_inputs=model_inputs[k],
-                                 transform=test_transform)
+                yield RoiDataset(
+                    model_inputs=model_inputs[k],
+                    transform=test_transform,
+                    is_train=False,
+                    n_frames=n_frames,
+                    temporal_downsampling_factor=temporal_downsampling_factor,
+                    clip_len=clip_len,
+                    test_n_clips=test_n_clips,
+                    use_brightest_frame=use_brightest_frame
+                )
         else:
             for _, val in data_splitter.get_cross_val_split(
-                    train_dataset=RoiDataset(model_inputs=model_inputs)):
+                train_dataset=RoiDataset(
+                    model_inputs=model_inputs,
+                    is_train=False,
+                    n_frames=n_frames,
+                    temporal_downsampling_factor=temporal_downsampling_factor,
+                    clip_len=clip_len,
+                    test_n_clips=test_n_clips,
+                    use_brightest_frame=use_brightest_frame
+                )
+            ):
                 yield val
 
     y_scores = []
@@ -223,7 +244,7 @@ def cv_performance(
     experiment_ids = []
     precisions = []
     recalls = []
-    auprs = []
+    f1s = []
 
     for k, val in enumerate(get_validation_set()):
         val_loader = DataLoader(dataset=val, shuffle=False, batch_size=64)
@@ -242,11 +263,10 @@ def cv_performance(
 
         precision = precision_score(y_pred=res['y_pred'], y_true=res['y_true'])
         recall = recall_score(y_pred=res['y_pred'], y_true=res['y_true'])
-        aupr = average_precision_score(y_score=res['y_score'],
-                                       y_true=res['y_true'])
+        f1 = f1_score(y_pred=res['y_score'] > threshold, y_true=res['y_true'])
         precisions.append(precision)
         recalls.append(recall)
-        auprs.append(aupr)
+        f1s.append(f1)
 
     df = pd.DataFrame(
         {
@@ -260,10 +280,10 @@ def cv_performance(
 
     precisions = np.array(precisions)
     recalls = np.array(recalls)
-    auprs = np.array(auprs)
+    f1s = np.array(f1s)
     metrics = {
         'precision': (precisions.mean(), precisions.std()),
         'recall': (recalls.mean(), recalls.std()),
-        'aupr': (auprs.mean(), auprs.std())
+        'f1': (f1s.mean(), f1s.std())
     }
     return df.sort_values('error', ascending=False), metrics
