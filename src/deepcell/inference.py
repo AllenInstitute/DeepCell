@@ -175,7 +175,8 @@ def cv_performance(
         temporal_downsampling_factor: int = 1,
         clip_len: int = 32,
         test_n_clips: int = 10,
-        use_brightest_frame: bool = True
+        use_brightest_frame: bool = True,
+        batch_size: int = 8
 ) -> Tuple[pd.DataFrame, Dict]:
     """
     Evaluates each of the k trained models on the respective validation set
@@ -247,7 +248,8 @@ def cv_performance(
     f1s = []
 
     for k, val in enumerate(get_validation_set()):
-        val_loader = DataLoader(dataset=val, shuffle=False, batch_size=64)
+        val_loader = DataLoader(dataset=val, shuffle=False,
+                                batch_size=batch_size)
         _, res = inference(model=model, test_loader=val_loader,
                            threshold=threshold,
                            cv_fold=k, ensemble=False,
