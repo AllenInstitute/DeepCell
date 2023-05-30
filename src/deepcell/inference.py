@@ -101,7 +101,7 @@ def inference(model: torch.nn.Module,
         for iter in range(num_iters):
             prev_start = 0
 
-            for data in tqdm(
+            for data, _ in tqdm(
                     test_loader,
                     desc='testing',
                     total=len(test_loader)):
