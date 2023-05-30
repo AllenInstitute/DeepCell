@@ -152,7 +152,7 @@ def inference(model: torch.nn.Module,
     if has_labels:
         metrics.update_accuracies(y_true=dataset.y, y_score=y_scores, threshold=threshold)
 
-    roi_ids = [x.roi_id for x in dataset.model_inputs]
+    roi_ids = [x.roi.roi_id for x in dataset.model_inputs]
     experiment_ids = [x.experiment_id for x in dataset.model_inputs]
 
     df = pd.DataFrame({
