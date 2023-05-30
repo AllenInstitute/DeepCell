@@ -9,6 +9,7 @@ import pandas as pd
 import torch
 from sklearn.metrics import precision_score, recall_score, f1_score
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from deepcell.datasets.model_input import ModelInput
 from deepcell.metrics import Metrics
@@ -100,7 +101,10 @@ def inference(model: torch.nn.Module,
         for iter in range(num_iters):
             prev_start = 0
 
-            for data, _ in test_loader:
+            for data in tqdm(
+                    test_loader,
+                    desc='testing',
+                    total=len(test_loader)):
                 if use_cuda:
                     data = data.cuda()
 
