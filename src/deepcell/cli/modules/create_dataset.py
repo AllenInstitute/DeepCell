@@ -61,7 +61,10 @@ class CreateDatasetInputSchema(ArgSchema):
         values=fields.InputFile(),
         required=True,
         description='Map between ophys experiment id and path containing roi '
-                    'metadata'
+                    'metadata. This metadata is generated using ophys_etl.'
+                    'modules.roi_cell_classifier.compute_classifier_artifacts.'
+                    'It is a dict mapping roi id to a dictionary with keys:'
+                    '- is_inside_motion_border'
     )
     include_only_rois_inside_motion_border = fields.Bool(
         default=True,
