@@ -1,6 +1,6 @@
 import json
 from enum import Enum
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Tuple, Set
 
 import pandas as pd
 from pathlib import Path
@@ -55,6 +55,17 @@ class CreateDatasetInputSchema(ArgSchema):
         required=True,
         description="Map between ophys experiment id and "
                     "directory containing image artifacts for this experiment",
+    )
+    exp_roi_meta_path_map = fields.Dict(
+        keys=fields.Str(),
+        values=fields.InputFile(),
+        required=True,
+        description='Map between ophys experiment id and path containing roi '
+                    'metadata'
+    )
+    include_only_rois_inside_motion_border = fields.Bool(
+        default=True,
+        description='Include only rois inside motion border'
     )
     channels = fields.List(
         ChannelField(),
@@ -132,6 +143,10 @@ class CreateDataset(ArgSchemaParser):
         labels = _tally_votes(labels=raw_labels,
                               vote_tallying_strategy=vote_tallying_strategy)
 
+        rois_inside_motion_border = _get_rois_inside_motion_border(
+            exp_roi_meta_map=self.args['exp_roi_meta_path_map']
+        )
+
         model_inputs = [
             ModelInput.from_data_dir(
                 data_dir=self.args['artifact_dir'][row.experiment_id],
@@ -143,6 +158,12 @@ class CreateDataset(ArgSchemaParser):
             )
             for row in labels.itertuples(index=False)
         ]
+
+        if self.args['include_only_rois_inside_motion_border']:
+            model_inputs = [
+                x for x in model_inputs
+                if (x.experiment_id, x.roi_id) in rois_inside_motion_border
+            ]
 
         experiment_metadata = \
             _get_experiment_metadata(
@@ -344,6 +365,29 @@ WHERE oe.id in {tuple(experiment_ids)}
     values = res.all()
 
     res = [dict(zip(columns, x)) for x in values]
+
+    return res
+
+
+def _get_rois_inside_motion_border(
+    exp_roi_meta_map: Dict[str, str]
+) -> Set[Tuple[str, str]]:
+    """
+    Returns rois inside motion border
+
+    @param exp_roi_meta_map:
+        Map between ophys experiment id and path containing roi metadata
+
+    @return:
+        Set of Tuple of experiment_id, roi_id inside motion border
+    """
+    res = set()
+    for exp_id, roi_meta_map_path in exp_roi_meta_map.items():
+        with open(roi_meta_map_path) as f:
+            rois_meta = json.load(f)
+        for roi_id, roi_meta in rois_meta.items():
+            if roi_meta['is_inside_motion_border']:
+                res.add((str(exp_id), str(roi_id)))
 
     return res
 

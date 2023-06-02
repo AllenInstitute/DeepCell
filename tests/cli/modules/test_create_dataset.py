@@ -1,3 +1,4 @@
+import random
 from unittest.mock import patch
 
 import pandas as pd
@@ -20,6 +21,7 @@ class TestTrainTestSplitCli:
         file_loc = Path(__file__)
         cls.test_resource_dir = file_loc.parent / 'resources'
         cls.artifact_dir = tempfile.TemporaryDirectory()
+        cls.roi_meta_dir = tempfile.TemporaryDirectory()
 
         cls.n_experiments = 2
         cls.experiment_ids = list(range(cls.n_experiments))
@@ -42,9 +44,19 @@ class TestTrainTestSplitCli:
                 exp_id=str(exp_id),
                 n_rois=cls.n_rois
             )
+            with open(Path(cls.roi_meta_dir.name) /
+                      f'roi_meta_{exp_id}.json', 'w') as f:
+                roi_meta = {
+                    str(i): {
+                        'is_inside_motion_border': random.choice([True, False])
+                    }
+                    for i in range(cls.n_rois)}
+                f.write(json.dumps(roi_meta, indent=2))
 
-    def teardown(self):
-        self.artifact_dir.cleanup()
+    @classmethod
+    def teardown_class(cls):
+        cls.artifact_dir.cleanup()
+        cls.roi_meta_dir.cleanup()
 
     @staticmethod
     def _create_label_data(n_rois: int = 4,
@@ -68,8 +80,14 @@ class TestTrainTestSplitCli:
 
     @patch('deepcell.cli.modules.create_dataset._get_raw_user_labels')
     @patch('deepcell.cli.modules.create_dataset._get_experiment_metadata')
-    def test_create_train_test_split(self, mock_get_experiment_metadata,
-                                     mock_get_raw_user_labels):
+    @pytest.mark.parametrize('include_only_rois_inside_motion_border',
+                             (False, True))
+    def test_create_train_test_split(
+            self,
+            mock_get_experiment_metadata,
+            mock_get_raw_user_labels,
+            include_only_rois_inside_motion_border
+    ):
         """Test that the class loads the data and labels cells properly.
         """
         args = {
@@ -84,12 +102,19 @@ class TestTrainTestSplitCli:
             "artifact_dir": {
                 str(exp_id): str(self.artifact_dir.name)
                 for exp_id in self.experiment_ids},
+            "exp_roi_meta_path_map": {
+                str(exp_id): str(Path(self.roi_meta_dir.name) /
+                                 f'roi_meta_{exp_id}.json')
+                for exp_id in self.experiment_ids},
             "min_labelers_required_per_region": 2,
             "vote_tallying_strategy": 'consensus',
             "test_size": 0.50,
             "n_depth_bins": 1,
             "seed": 1234,
-            "output_dir": str(self.artifact_dir.name)}
+            "output_dir": str(self.artifact_dir.name),
+            "include_only_rois_inside_motion_border": (
+                include_only_rois_inside_motion_border)
+        }
         labels = pd.DataFrame({
             'experiment_id': ['0', '0', '1', '1'],
             'user_id': [0, 1] * 2,
@@ -128,13 +153,33 @@ class TestTrainTestSplitCli:
         with open(Path(self.artifact_dir.name) / "test_rois.json") as jfile:
             test_rois = json.load(jfile)
 
-        for roi_idx, roi in enumerate(train_rois):
-            assert roi['roi_id'] == str(roi_idx)
-            assert roi['experiment_id'] == '0'
+        if include_only_rois_inside_motion_border:
+            with open(Path(self.roi_meta_dir.name) / 'roi_meta_0.json') as f:
+                rois_meta = json.load(f)
 
-        for roi_idx, roi in enumerate(test_rois):
-            assert roi['roi_id'] == str(roi_idx)
-            assert roi['experiment_id'] == '1'
+            expected_train_rois = [
+                roi_id for roi_id, roi_meta in rois_meta.items()
+                if roi_meta['is_inside_motion_border']]
+
+            with open(Path(self.roi_meta_dir.name) / 'roi_meta_1.json') as f:
+                rois_meta = json.load(f)
+
+            expected_test_rois = [
+                roi_id for roi_id, roi_meta in rois_meta.items()
+                if roi_meta['is_inside_motion_border']]
+        else:
+            expected_train_rois = [x['roi_id'] for x in train_rois]
+            expected_test_rois = [x['roi_id'] for x in test_rois]
+
+        assert len(train_rois) == len(expected_train_rois)
+        for roi_id in expected_train_rois:
+            assert roi_id in [x['roi_id'] for x in train_rois]
+        assert all([roi['experiment_id'] == '0' for roi in train_rois])
+
+        assert len(test_rois) == len(expected_test_rois)
+        for roi_id in expected_test_rois:
+            assert roi_id in [x['roi_id'] for x in test_rois]
+        assert all([roi['experiment_id'] == '1' for roi in test_rois])
 
     @pytest.mark.parametrize('labels, expected', (
             (pd.Series(['cell', 'cell', 'cell']), ('cell', 'cell', 'cell')),
