@@ -7,7 +7,7 @@ from pathlib import Path
 
 import requests
 from argschema import ArgSchema, ArgSchemaParser, fields
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.engine import URL
 
 from deepcell.datasets.channel import Channel
@@ -351,7 +351,7 @@ def _get_experiment_metadata(
     )
     query = f'''
 SELECT 
-    oe.id as ophys_experiment_id, 
+    oe.id as experiment_id, 
     imaging_depths.depth as imaging_depth, 
     equipment.name as equipment
 FROM ophys_experiments oe
@@ -363,7 +363,7 @@ WHERE oe.id in {tuple(experiment_ids)}
 
     engine = create_engine(url=url)
     with engine.connect() as conn:
-        res = conn.execute(query=query)
+        res = conn.execute(statement=text(query))
     columns = res.keys()
     values = res.all()
 
