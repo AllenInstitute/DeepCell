@@ -12,7 +12,11 @@ from urllib.parse import urlparse
 import boto3
 import numpy as np
 import pandas as pd
-from croissant.utils import read_jsonlines, json_load_local_or_s3
+
+try:
+    from croissant.utils import read_jsonlines, json_load_local_or_s3
+except ModuleNotFoundError:
+    pass
 from tqdm import tqdm
 
 from deepcell.datasets.model_input import ModelInput

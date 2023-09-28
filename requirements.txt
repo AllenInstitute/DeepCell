@@ -10,7 +10,6 @@ matplotlib
 jsonlines
 boto3~=1.26.0
 tqdm
-croissant-ml
 pytest
 argschema
 marshmallow
