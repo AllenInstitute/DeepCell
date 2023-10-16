@@ -7,7 +7,6 @@ import json
 from pathlib import Path
 import tempfile
 
-
 from deepcell.cli.modules.create_dataset import \
     CreateDataset, _tally_votes_for_observation, VoteTallyingStrategy
 from deepcell.datasets.channel import Channel
@@ -27,10 +26,10 @@ class TestTrainTestSplitCli:
         cls.experiment_ids = list(range(cls.n_experiments))
         cls.n_rois = 4
         cls.exp_metas = [{
-                'experiment_id': str(idx),
-                'imaging_depth': 1,
-                'equipment': '2P',
-                'problem_experiment': False
+            'experiment_id': str(idx),
+            'imaging_depth': 1,
+            'equipment': '2P',
+            'problem_experiment': False
         }
             for idx in range(cls.n_experiments)]
         cls.exp_meta_file = tempfile.NamedTemporaryFile('w', suffix='.json')
@@ -44,14 +43,6 @@ class TestTrainTestSplitCli:
                 exp_id=str(exp_id),
                 n_rois=cls.n_rois
             )
-            with open(Path(cls.roi_meta_dir.name) /
-                      f'roi_meta_{exp_id}.json', 'w') as f:
-                roi_meta = {
-                    str(i): {
-                        'is_inside_motion_border': random.choice([True, False])
-                    }
-                    for i in range(cls.n_rois)}
-                f.write(json.dumps(roi_meta, indent=2))
 
     @classmethod
     def teardown_class(cls):
@@ -102,9 +93,11 @@ class TestTrainTestSplitCli:
             "artifact_dir": {
                 str(exp_id): str(self.artifact_dir.name)
                 for exp_id in self.experiment_ids},
-            "exp_roi_meta_path_map": {
-                str(exp_id): str(Path(self.roi_meta_dir.name) /
-                                 f'roi_meta_{exp_id}.json')
+            "exp_roi_meta_map": {
+                str(exp_id): {
+                    str(roi_id): {
+                        'is_inside_motion_border': random.choice([True, False])
+                        } for roi_id in range(self.n_rois)}
                 for exp_id in self.experiment_ids},
             "min_labelers_required_per_region": 2,
             "vote_tallying_strategy": 'consensus',
@@ -154,15 +147,13 @@ class TestTrainTestSplitCli:
             test_rois = json.load(jfile)
 
         if include_only_rois_inside_motion_border:
-            with open(Path(self.roi_meta_dir.name) / 'roi_meta_0.json') as f:
-                rois_meta = json.load(f)
+            rois_meta = args['exp_roi_meta_map']['0']
 
             expected_train_rois = [
                 roi_id for roi_id, roi_meta in rois_meta.items()
                 if roi_meta['is_inside_motion_border']]
 
-            with open(Path(self.roi_meta_dir.name) / 'roi_meta_1.json') as f:
-                rois_meta = json.load(f)
+            rois_meta = args['exp_roi_meta_map']['1']
 
             expected_test_rois = [
                 roi_id for roi_id, roi_meta in rois_meta.items()
