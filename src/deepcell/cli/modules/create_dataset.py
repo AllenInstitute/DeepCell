@@ -36,6 +36,14 @@ class VoteTallyingStrategy(Enum):
     ANY = 'any'
 
 
+class ROIMetaSchema(ArgSchema):
+    """Per ROI schema representing ROI metadata"""
+    is_inside_motion_border = fields.Bool(
+        required=True,
+        description='Whether ROI is inside the motion border'
+    )
+
+
 class CreateDatasetInputSchema(ArgSchema):
     cell_labeling_app_host = fields.String(
         required=True,
@@ -56,15 +64,18 @@ class CreateDatasetInputSchema(ArgSchema):
         description="Map between ophys experiment id and "
                     "directory containing image artifacts for this experiment",
     )
-    exp_roi_meta_path_map = fields.Dict(
-        keys=fields.Str(),
-        values=fields.InputFile(),
+    exp_roi_meta_map = fields.Dict(
+        keys=fields.Str(),      # ophys experiment id
+        values=fields.Dict(
+            keys=fields.Str(),  # roi id
+            values=fields.Nested(
+                ROIMetaSchema(),
+                required=True
+            ),
+            required=True
+        ),
         required=True,
-        description='Map between ophys experiment id and path containing roi '
-                    'metadata. This metadata is generated using ophys_etl.'
-                    'modules.roi_cell_classifier.compute_classifier_artifacts.'
-                    'It is a dict mapping roi id to a dictionary with keys:'
-                    '- is_inside_motion_border'
+        description='Map between ophys experiment id and roi metadata'
     )
     include_only_rois_inside_motion_border = fields.Bool(
         default=True,
@@ -147,7 +158,7 @@ class CreateDataset(ArgSchemaParser):
                               vote_tallying_strategy=vote_tallying_strategy)
 
         rois_inside_motion_border = _get_rois_inside_motion_border(
-            exp_roi_meta_map=self.args['exp_roi_meta_path_map']
+            exp_roi_meta_map=self.args['exp_roi_meta_map']
         )
 
         model_inputs = [
@@ -373,21 +384,19 @@ WHERE oe.id in {tuple(experiment_ids)}
 
 
 def _get_rois_inside_motion_border(
-    exp_roi_meta_map: Dict[str, str]
+    exp_roi_meta_map: Dict[str, Dict]
 ) -> Set[Tuple[str, str]]:
     """
     Returns rois inside motion border
 
     @param exp_roi_meta_map:
-        Map between ophys experiment id and path containing roi metadata
+        Map between ophys experiment id and roi metadata
 
     @return:
         Set of Tuple of experiment_id, roi_id inside motion border
     """
     res = set()
-    for exp_id, roi_meta_map_path in exp_roi_meta_map.items():
-        with open(roi_meta_map_path) as f:
-            rois_meta = json.load(f)
+    for exp_id, rois_meta in exp_roi_meta_map.items():
         for roi_id, roi_meta in rois_meta.items():
             if roi_meta['is_inside_motion_border']:
                 res.add((str(exp_id), str(roi_id)))
