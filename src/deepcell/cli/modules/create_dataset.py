@@ -232,29 +232,23 @@ def construct_dataset(
     user_labels['labels'] = user_labels['labels'].apply(
         lambda x: json.loads(x))
 
-    experiment_ids = []
-    user_ids = []
-
     def _get_is_user_added_mask(labels: pd.DataFrame):
         # is_segmented is old key, is_user_added is new one
         return ~labels['is_user_added'] if 'is_user_added' in labels else \
             labels['is_segmented']
 
     for row in user_labels.itertuples(index=False):
-        labels = pd.DataFrame(row.labels)
-        labels = labels[_get_is_user_added_mask(labels=labels)]
-
-        if not labels.empty:
-            experiment_ids += [row.experiment_id] * labels.shape[0]
-            user_ids += [row.user_id] * labels.shape[0]
+        for label in row.labels:
+            label['experiment_id'] = row.experiment_id
+            label['user_id'] = row.user_id
+            label['job_name'] = row.job_name
 
     labels = pd.concat([pd.DataFrame(x) for x in user_labels['labels']],
                        ignore_index=True)
 
-    labels = labels[_get_is_user_added_mask(labels=labels)].copy()
+    labels['is_user_added'] = labels['is_user_added'].fillna(False)
 
-    labels['experiment_id'] = experiment_ids
-    labels['user_id'] = user_ids
+    labels = labels[_get_is_user_added_mask(labels=labels)].copy()
 
     n_users_labeled = labels.groupby(['experiment_id', 'roi_id'])[
         'user_id'].nunique().reset_index().rename(
@@ -287,11 +281,14 @@ def _tally_votes(labels: pd.DataFrame,
     @return: labels dataframe with a single record per ROI with the resulting
         label using `vote_threshold`
     """
-    labels = labels.groupby(['experiment_id', 'roi_id'])['label'] \
+    tallied_labels = labels.groupby(['experiment_id', 'roi_id'])['label'] \
         .apply(lambda x: _tally_votes_for_observation(
                labels=x, vote_tallying_strategy=vote_tallying_strategy))
-    labels = labels.reset_index()
-    return labels
+    tallied_labels = tallied_labels.reset_index()
+    tallied_labels = tallied_labels.merge(
+        labels[['experiment_id', 'roi_id', 'job_name']].drop_duplicates(),
+        on=['experiment_id', 'roi_id'])
+    return tallied_labels
 
 
 def _tally_votes_for_observation(
