@@ -4,8 +4,8 @@ FROM 763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:1.10.0-gpu-py
 RUN pip install git+https://github.com/AllenInstitute/DeepCell.git
 
 # fixing issue with multiple opencv versions installed
-RUN pip uninstall opencv-python
-RUN pip uninstall opencv-python-headless
+RUN pip uninstall opencv-python -y
+RUN pip uninstall opencv-python-headless -y
 RUN pip install opencv-python-headless
 
 ENV PATH="/opt/ml/code:${PATH}"
