@@ -232,7 +232,7 @@ def cv_performance(
         if limit_to_project is not None:
             val = RoiDataset(
                 model_inputs=(
-                    [x for x in val if x.project_name in limit_to_project]),
+                    [x for x in val.model_inputs if x.project_name in limit_to_project]),
                 image_dim=val.image_dim,
                 transform=val.transform
             )
