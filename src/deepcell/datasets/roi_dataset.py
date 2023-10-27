@@ -90,6 +90,10 @@ class RoiDataset(Dataset):
     def y(self) -> np.ndarray:
         return self._y
 
+    @property
+    def image_dim(self):
+        return self._image_dim
+
     @staticmethod
     def get_default_transforms(
             crop_size: Tuple[int, int],
