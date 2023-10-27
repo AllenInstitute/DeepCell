@@ -171,7 +171,8 @@ def cv_performance(
         checkpoint_path: Union[str, Path],
         data_splitter: Optional[DataSplitter] = None,
         threshold=0.5,
-        test_transform: Optional[Transform] = None
+        test_transform: Optional[Transform] = None,
+        limit_to_project: Optional[List[str]] = None
 ) -> Tuple[pd.DataFrame, Dict]:
     """
     Evaluates each of the k trained models on the respective validation set
@@ -190,6 +191,8 @@ def cv_performance(
             classification threshold
         test_transform
             Test transform to pass to RoiDataset (in case of no DataSplitter)
+        limit_to_project
+            Limit cv performance to this list of projects
     Returns:
         Dataframe of predictions, precision, recall, aupr (mean, std) across
         folds
@@ -226,6 +229,13 @@ def cv_performance(
     auprs = []
 
     for k, val in enumerate(get_validation_set()):
+        if limit_to_project is not None:
+            val = RoiDataset(
+                model_inputs=(
+                    [x for x in val if x.project_name in limit_to_project]),
+                image_dim=val.image_dim,
+                transform=val.transform
+            )
         val_loader = DataLoader(dataset=val, shuffle=False, batch_size=64)
         _, res = inference(model=model, test_loader=val_loader,
                            threshold=threshold,
