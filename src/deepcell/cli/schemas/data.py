@@ -43,6 +43,10 @@ class ModelInputSchema(argschema.ArgSchema):
         description='label. Null in case of inference.',
         validate=OneOf((None, 'cell', 'not cell'))
     )
+    project_name = argschema.fields.String(
+        required=True,
+        description='Project name'
+    )
 
     @marshmallow.post_load
     def make_model_input(self, data, **kwargs):
