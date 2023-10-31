@@ -120,8 +120,7 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
             train_params: dict,
             model_inputs: Optional[List[ModelInput]] = None,
             k_folds=5,
-            is_trial_run=False,
-            limit_val_to_projects: Optional[List[str]] = None
+            is_trial_run=False
             ):
         """
         Train the model using `model_inputs` on sagemaker
@@ -133,8 +132,6 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
         k_folds: The number of CV splits.
         is_trial_run: Set this to True to only run on a single fold. Useful
                     for trying out a new idea without running on every fold
-        limit_val_to_projects: Limit the validation set to this list of
-            projects
 
         Returns
         -------
