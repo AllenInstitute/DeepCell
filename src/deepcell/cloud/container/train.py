@@ -117,6 +117,8 @@ class TrainingRunner:
         self._train_cfg['validation_model_inputs_path'] = \
             str(VALIDATION_DATA_DIR / 'model_inputs.json')
         self._train_cfg['fold'] = self._fold
+        self._train_cfg['model_load_path'] = (
+            self._load_pretrained_checkpoints_path)
         self._train_cfg['tracking_params']['sagemaker_job_name'] = \
             self._get_input_argument(name='sagemaker_job_name')
         self._train_cfg['tracking_params']['parent_run_id'] = \
