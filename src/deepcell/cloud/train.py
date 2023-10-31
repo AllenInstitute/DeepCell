@@ -7,7 +7,7 @@ import shutil
 import tempfile
 import time
 from pathlib import Path
-from typing import Optional, Union, List, Dict, Iterator
+from typing import Optional, Union, List, Dict, Iterator, Tuple
 
 import boto3.session
 import mlflow
@@ -286,7 +286,7 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
         model_inputs: List[ModelInput],
         n_splits: int,
         limit_val_to_project: Optional[List[str]] = None
-    ) -> Iterator[List[ModelInput], List[ModelInput]]:
+    ) -> Iterator[Tuple[List[ModelInput], List[ModelInput]]]:
         """
 
         @param model_inputs:
