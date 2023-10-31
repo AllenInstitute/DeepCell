@@ -14,7 +14,7 @@ RUN mkdir -p /opt/ml/code
 
 COPY /train.py /opt/ml/code
 COPY /train_input.json /opt/ml/
-COPY /model_checkpoints /opt/ml/
+COPY /model_checkpoints /opt/ml/model_checkpoints
 WORKDIR /opt/ml/code
 
 ENTRYPOINT ["python", "train.py"]
