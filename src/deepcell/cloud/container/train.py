@@ -23,6 +23,7 @@ VALIDATION_DATA_DIR = Path('/opt/ml/input/data/validation')
 HYPERPARAMS_PATH = '/opt/ml/input/config/hyperparameters.json'
 OUTPUT_PATH = Path('/opt/ml/model')
 INPUT_JSON_PATH = '/opt/ml/train_input.json'
+PRETRAINED_CHECKPOINTS_PATH = '/opt/ml/model_checkpoints'
 
 
 class TrainingRunner:
@@ -38,8 +39,8 @@ class TrainingRunner:
         self._train_cfg = train_cfg
         self._hyperparams = hyperparams
         self._fold = self._get_input_argument(name='fold')
-        self._load_pretrained_checkpoints_path = (
-            self._get_input_argument(name='load_pretrained_checkpoints_path'))
+        self._load_pretrained_checkpoints = (
+            self._get_input_argument(name='load_pretrained_checkpoints'))
 
         if self._fold is None:
             raise ValueError('Could not get fold from hyperparams or env.')
@@ -116,8 +117,9 @@ class TrainingRunner:
         self._train_cfg['validation_model_inputs_path'] = \
             str(VALIDATION_DATA_DIR / 'model_inputs.json')
         self._train_cfg['fold'] = self._fold
-        self._train_cfg['model_load_path'] = (
-            self._load_pretrained_checkpoints_path)
+
+        if self._load_pretrained_checkpoints:
+            self._train_cfg['model_load_path'] = PRETRAINED_CHECKPOINTS_PATH
         self._train_cfg['tracking_params']['sagemaker_job_name'] = \
             self._get_input_argument(name='sagemaker_job_name')
         self._train_cfg['tracking_params']['parent_run_id'] = \
