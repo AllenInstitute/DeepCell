@@ -35,7 +35,9 @@ class CloudKFoldTrainRunner(argschema.ArgSchemaParser):
         if model_load_path is not None:
             # Copy checkpoints to container context
             for file in Path(model_load_path).iterdir():
-                shutil.copy(file, self._container_path / 'model_checkpoints')
+                if file.is_file() and file.stem != 'init_model':
+                    shutil.copy(file,
+                                self._container_path / 'model_checkpoints')
 
         if self.args['docker_params']['image_uri'] is None:
             ecr_uploader = ECRUploader(
