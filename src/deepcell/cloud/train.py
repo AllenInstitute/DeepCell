@@ -7,7 +7,7 @@ import shutil
 import tempfile
 import time
 from pathlib import Path
-from typing import Optional, Union, List, Dict
+from typing import Optional, Union, List, Dict, Generator
 
 import boto3.session
 import mlflow
@@ -115,7 +115,9 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
             train_params: dict,
             model_inputs: Optional[List[ModelInput]] = None,
             k_folds=5,
-            is_trial_run=False):
+            is_trial_run=False,
+            limit_val_to_projects: Optional[List[str]] = None
+            ):
         """
         Train the model using `model_inputs` on sagemaker
 
@@ -126,6 +128,8 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
         k_folds: The number of CV splits.
         is_trial_run: Set this to True to only run on a single fold. Useful
                     for trying out a new idea without running on every fold
+        limit_val_to_projects: Limit the validation set to this list of
+            projects
 
         Returns
         -------
@@ -193,15 +197,15 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
         training_jobs = []
 
         with mlflow_run:
-            for k, (train_idx, test_idx) in enumerate(
-                    DataSplitter.get_cross_val_split_idxs(
-                        model_inputs=model_inputs, seed=self._seed,
-                        n_splits=k_folds)):
+            for k, (train, test) in enumerate(
+                    self._get_train_val_split(
+                        model_inputs=model_inputs,
+                        n_splits=k_folds,
+                        limit_val_to_project=limit_val_to_projects
+                    )):
                 if is_trial_run:
                     if k != 0:
                         continue
-                train = [model_inputs[i] for i in train_idx]
-                test = [model_inputs[i] for i in test_idx]
 
                 output_dir = f'file://{Path(self._output_dir) / str(k)}' if \
                     self._local_mode else None
@@ -276,6 +280,54 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
             self._wait_until_training_jobs_have_finished(
                 training_jobs=training_jobs)
             self._log_cross_validation_end_metrics_to_mlflow()
+
+    def _get_train_val_split(
+        self,
+        model_inputs: List[ModelInput],
+        n_splits: int,
+        limit_val_to_project: Optional[List[str]] = None
+    ) -> Generator[List[ModelInput], List[ModelInput]]:
+        """
+
+        @param model_inputs:
+        @param n_splits: How many folds
+        @param limit_val_to_project: If this is set to true, the train set
+            will consist of all training data, while the validation set
+            will only consist of these projects
+        @return: Generator yielding train and val List of ModelInput
+        """
+        if limit_val_to_project is not None:
+            train_other_model_inputs = \
+                [x for x in model_inputs if x.project_name not in
+                 limit_val_to_project]
+            model_inputs = [x for x in model_inputs if x.project_name in
+                            limit_val_to_project]
+            get_train_idx_other = DataSplitter.get_cross_val_split_idxs(
+                model_inputs=train_other_model_inputs,
+                seed=self._seed,
+                n_splits=n_splits)
+            for train_idx, test_idx in DataSplitter.get_cross_val_split_idxs(
+                    model_inputs=model_inputs,
+                    seed=self._seed,
+                    n_splits=n_splits):
+                train_idx_other, _ = next(get_train_idx_other)
+
+                train = [model_inputs[i] for i in train_idx]
+                train_other = \
+                    [train_other_model_inputs[i] for i in train_idx_other]
+                train = train + train_other
+
+                test = [model_inputs[i] for i in test_idx]
+                yield train, test
+        else:
+            for train_idx, test_idx in DataSplitter.get_cross_val_split_idxs(
+                    model_inputs=model_inputs,
+                    seed=self._seed,
+                    n_splits=n_splits):
+
+                train = [model_inputs[i] for i in train_idx]
+                test = [model_inputs[i] for i in test_idx]
+                yield train, test
 
     def _upload_local_data_to_s3(
             self,

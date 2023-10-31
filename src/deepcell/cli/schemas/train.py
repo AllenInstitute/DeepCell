@@ -19,6 +19,13 @@ class _TrainSchema(BaseSchema):
         TrackingSchema,
         default={}
     )
+    limit_validation_set_to_projects = argschema.fields.List(
+        argschema.fields.Str(),
+        default=None,
+        allow_none=True,
+        description='Limit the validation set to only these projects. The'
+                    'rest of the data will be put in the train set'
+    )
 
 
 class TrainSchema(_TrainSchema, BaseSchema):
