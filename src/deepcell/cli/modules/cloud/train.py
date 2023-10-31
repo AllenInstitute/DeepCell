@@ -60,7 +60,9 @@ class CloudKFoldTrainRunner(argschema.ArgSchemaParser):
             model_inputs=self.args['train_params']['model_inputs'],
             k_folds=self.args['train_params']['n_folds'],
             train_params=self.args['train_params'],
-            is_trial_run=self.args['is_trial_run']
+            is_trial_run=self.args['is_trial_run'],
+            limit_val_to_projects=(
+                self.args['train_params']['limit_validation_set_to_projects'])
         )
 
 
