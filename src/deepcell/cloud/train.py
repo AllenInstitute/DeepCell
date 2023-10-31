@@ -7,7 +7,7 @@ import shutil
 import tempfile
 import time
 from pathlib import Path
-from typing import Optional, Union, List, Dict, Generator
+from typing import Optional, Union, List, Dict, Iterator
 
 import boto3.session
 import mlflow
@@ -286,7 +286,7 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
         model_inputs: List[ModelInput],
         n_splits: int,
         limit_val_to_project: Optional[List[str]] = None
-    ) -> Generator[List[ModelInput], List[ModelInput]]:
+    ) -> Iterator[List[ModelInput], List[ModelInput]]:
         """
 
         @param model_inputs:
@@ -294,7 +294,7 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
         @param limit_val_to_project: If this is set to true, the train set
             will consist of all training data, while the validation set
             will only consist of these projects
-        @return: Generator yielding train and val List of ModelInput
+        @return: Iterator yielding train and val List of ModelInput
         """
         if limit_val_to_project is not None:
             train_other_model_inputs = \
