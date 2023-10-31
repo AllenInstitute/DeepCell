@@ -41,6 +41,7 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
                  mlflow_server_uri=None,
                  mlflow_experiment_name: str = 'deepcell-train',
                  s3_data_key: Optional[str] = None,
+                 load_pretrained_checkpoints_path: Optional[Path] = None
                  ):
         """
         Parameters
@@ -73,6 +74,8 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
         s3_data_key: If provided, loads data from this key rather than
             uploading new data
             This is only used if not in "local mode"
+        load_pretrained_checkpoints_path
+            Load pretrained weights for finetuning from this path
         """
         super().__init__(server_uri=mlflow_server_uri,
                          experiment_name=mlflow_experiment_name)
@@ -90,6 +93,8 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
         self._volume_size = volume_size
         self._output_dir = output_dir
         self._seed = seed
+        self._load_pretrained_checkpoints_path = (
+            load_pretrained_checkpoints_path)
         self._logger = logging.getLogger(__name__)
         sh = logging.StreamHandler()
         sh.setLevel(level=logging.INFO)
@@ -213,6 +218,10 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
                     f'deepcell-train-fold-{k}-{int(time.time())}'
                 env_vars = {
                     'fold': f'{k}',
+                    'load_pretrained_checkpoints_path': (
+                        str(self._load_pretrained_checkpoints_path) if
+                        self._load_pretrained_checkpoints_path is not None
+                        else None),
                     'mlflow_server_uri': self._mlflow_server_uri,
                     'mlflow_experiment_name': self._mlflow_experiment_name,
                     'sagemaker_job_name': job_name,
