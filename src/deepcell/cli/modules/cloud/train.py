@@ -66,7 +66,8 @@ class CloudKFoldTrainRunner(argschema.ArgSchemaParser):
             mlflow_server_uri=tracking_params['mlflow_server_uri'],
             mlflow_experiment_name=tracking_params['mlflow_experiment_name'],
             seed=1234,
-            load_pretrained_checkpoints_path=self.args['model_load_path']
+            load_pretrained_checkpoints_path=(
+                self.args['train_params']['model_load_path'])
         )
         runner.run(
             model_inputs=self.args['train_params']['model_inputs'],
