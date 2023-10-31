@@ -142,7 +142,8 @@ class ModelInput:
             'roi_id': self._roi_id,
             'channel_order': channel_order,
             'channel_path_map': channel_path_map,
-            'label': self._label
+            'label': self._label,
+            'project_name': self._project_name
         }
 
     @staticmethod
