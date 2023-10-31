@@ -23,7 +23,7 @@ VALIDATION_DATA_DIR = Path('/opt/ml/input/data/validation')
 HYPERPARAMS_PATH = '/opt/ml/input/config/hyperparameters.json'
 OUTPUT_PATH = Path('/opt/ml/model')
 INPUT_JSON_PATH = '/opt/ml/train_input.json'
-PRETRAINED_CHECKPOINTS_PATH = '/opt/ml/checkpoints'
+PRETRAINED_CHECKPOINTS_PATH = '/opt/ml/model_checkpoints'
 
 
 class TrainingRunner:

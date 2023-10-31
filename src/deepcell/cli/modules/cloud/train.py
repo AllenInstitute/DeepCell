@@ -30,12 +30,12 @@ class CloudKFoldTrainRunner(argschema.ArgSchemaParser):
         with open(self._container_path / 'train_input.json', 'w') as f:
             f.write(TrainSchema().dumps(self.args['train_params']))
 
-        os.makedirs(self._container_path / 'checkpoints')
+        os.makedirs(self._container_path / 'model_checkpoints', exist_ok=True)
         model_load_path = self.args['train_params']['model_load_path']
         if model_load_path is not None:
             # Copy checkpoints to container context
             for file in Path(model_load_path).iterdir():
-                shutil.copy(file, self._container_path / 'checkpoints')
+                shutil.copy(file, self._container_path / 'model_checkpoints')
 
         if self.args['docker_params']['image_uri'] is None:
             ecr_uploader = ECRUploader(
