@@ -423,7 +423,7 @@ class Trainer(MLFlowTrackableMixin):
             # Taking an average of model weights
             ckpts = [checkpoint_path / x for x in os.listdir(checkpoint_path)
                      if Path(x).suffix == '.pt' and
-                     Path(x).name != 'init_model']
+                     Path(x).stem != 'init_model']
             state_dicts = [torch.load(ckpt)['state_dict'] for ckpt in ckpts]
             state_dict = (
                 deepcopy(torch.load(checkpoint_path / ckpts[0])['state_dict']))
