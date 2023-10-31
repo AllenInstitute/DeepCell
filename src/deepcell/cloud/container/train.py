@@ -39,8 +39,9 @@ class TrainingRunner:
         self._train_cfg = train_cfg
         self._hyperparams = hyperparams
         self._fold = self._get_input_argument(name='fold')
-        self._load_pretrained_checkpoints = (
-            self._get_input_argument(name='load_pretrained_checkpoints'))
+        self._load_pretrained_checkpoints = ((
+            self._get_input_argument(name='load_pretrained_checkpoints')) ==
+                                             'True')
 
         if self._fold is None:
             raise ValueError('Could not get fold from hyperparams or env.')

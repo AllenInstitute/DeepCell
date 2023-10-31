@@ -215,7 +215,7 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
                 env_vars = {
                     'fold': f'{k}',
                     'load_pretrained_checkpoints': (
-                        self._load_pretrained_checkpoints),
+                        str(self._load_pretrained_checkpoints)),
                     'mlflow_server_uri': self._mlflow_server_uri,
                     'mlflow_experiment_name': self._mlflow_experiment_name,
                     'sagemaker_job_name': job_name,
