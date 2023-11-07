@@ -132,7 +132,8 @@ class Trainer(MLFlowTrackableMixin):
               sagemaker_job_name: Optional[str] = None,
               mlflow_parent_run_id: Optional[str] = None,
               hyperparameters_to_log: Optional[dict] = None,
-              mlflow_child_run_id: Optional[str] = None
+              mlflow_child_run_id: Optional[str] = None,
+              continue_training: bool = False
               ) -> None:
         """
         Runs the training loop
@@ -148,14 +149,23 @@ class Trainer(MLFlowTrackableMixin):
             continuing training
         @param hyperparameters_to_log: Optional hyperparameters to log using
             mlflow
+        @param continue_training: Continue training, using the previously saved
+            state dicts
         @return: None
         """
         if self.model_load_path is not None:
-            self._load_pretrained_model(
-                checkpoint_path=
-                Path(self.model_load_path) / f'{eval_fold}_model.pt' if
-                eval_fold is not None else
-                Path(self.model_load_path) / 'model.pt')
+            if continue_training:
+                self._load_pretrained_model_continue_training(
+                    checkpoint_path=
+                    Path(self.model_load_path) / f'{eval_fold}_model.pt' if
+                    eval_fold is not None else
+                    Path(self.model_load_path) / 'model.pt')
+            else:
+                self._logger.info(
+                    f'Loading pretrained model weights {self.model_load_path}')
+                self._load_pretrained_model_finetuning(
+                    checkpoint_path=Path(self.model_load_path)
+                )
 
         if not self._callback_metrics:
             self._callback_metrics = {
@@ -398,7 +408,35 @@ class Trainer(MLFlowTrackableMixin):
             d['early_stopping'] = self.early_stopping_callback.to_dict()
         torch.save(d, f'{self.save_path}/{checkpoint_name}.pt')
 
-    def _load_pretrained_model(self, checkpoint_path: Path):
+    def _load_pretrained_model_finetuning(self, checkpoint_path: Path):
+        """
+        Loads a pretrained model for finetuning
+        In the case that a model was trained per fold, the weights for each
+        model are averaged
+
+
+        @param checkpoint_path: Path to model checkpoints. If a dir,
+            the state dicts for all models are averaged
+        @return: None
+        """
+        if checkpoint_path.is_dir():
+            # Taking an average of model weights
+            ckpts = [checkpoint_path / x for x in os.listdir(checkpoint_path)
+                     if Path(x).suffix == '.pt' and
+                     Path(x).stem != 'init_model']
+            state_dicts = [torch.load(ckpt)['state_dict'] for ckpt in ckpts]
+            state_dict = (
+                deepcopy(torch.load(checkpoint_path / ckpts[0])['state_dict']))
+            for key in state_dict:
+                state_dict[key] = (
+                        sum([state_dict[key] for state_dict in state_dicts]) /
+                        len(state_dicts))
+        else:
+            state_dict = torch.load(checkpoint_path)['state_dict']
+
+        self.model.load_state_dict(state_dict=state_dict)
+
+    def _load_pretrained_model_continue_training(self, checkpoint_path: Path):
         """Loads a pretrained model to continue training
 
         Args:

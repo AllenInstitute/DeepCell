@@ -7,7 +7,7 @@ import shutil
 import tempfile
 import time
 from pathlib import Path
-from typing import Optional, Union, List, Dict
+from typing import Optional, Union, List, Dict, Iterator, Tuple
 
 import boto3.session
 import mlflow
@@ -41,6 +41,7 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
                  mlflow_server_uri=None,
                  mlflow_experiment_name: str = 'deepcell-train',
                  s3_data_key: Optional[str] = None,
+                 load_pretrained_checkpoints: bool = False
                  ):
         """
         Parameters
@@ -73,6 +74,8 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
         s3_data_key: If provided, loads data from this key rather than
             uploading new data
             This is only used if not in "local mode"
+        load_pretrained_checkpoints
+            Whether to load pretrained weights for finetuning
         """
         super().__init__(server_uri=mlflow_server_uri,
                          experiment_name=mlflow_experiment_name)
@@ -90,6 +93,7 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
         self._volume_size = volume_size
         self._output_dir = output_dir
         self._seed = seed
+        self._load_pretrained_checkpoints = load_pretrained_checkpoints
         self._logger = logging.getLogger(__name__)
         sh = logging.StreamHandler()
         sh.setLevel(level=logging.INFO)
@@ -115,7 +119,8 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
             train_params: dict,
             model_inputs: Optional[List[ModelInput]] = None,
             k_folds=5,
-            is_trial_run=False):
+            is_trial_run=False
+            ):
         """
         Train the model using `model_inputs` on sagemaker
 
@@ -209,6 +214,8 @@ class KFoldTrainingJobRunner(MLFlowTrackableMixin):
                     f'deepcell-train-fold-{k}-{int(time.time())}'
                 env_vars = {
                     'fold': f'{k}',
+                    'load_pretrained_checkpoints': (
+                        str(self._load_pretrained_checkpoints)),
                     'mlflow_server_uri': self._mlflow_server_uri,
                     'mlflow_experiment_name': self._mlflow_experiment_name,
                     'sagemaker_job_name': job_name,

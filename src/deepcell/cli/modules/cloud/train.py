@@ -1,4 +1,6 @@
 import logging
+import os
+import shutil
 from pathlib import Path
 
 import argschema
@@ -28,6 +30,15 @@ class CloudKFoldTrainRunner(argschema.ArgSchemaParser):
         with open(self._container_path / 'train_input.json', 'w') as f:
             f.write(TrainSchema().dumps(self.args['train_params']))
 
+        os.makedirs(self._container_path / 'model_checkpoints', exist_ok=True)
+        model_load_path = self.args['train_params']['model_load_path']
+        if model_load_path is not None:
+            # Copy checkpoints to container context
+            for file in Path(model_load_path).iterdir():
+                if file.is_file() and file.stem != 'init_model':
+                    shutil.copy(file,
+                                self._container_path / 'model_checkpoints')
+
         if self.args['docker_params']['image_uri'] is None:
             ecr_uploader = ECRUploader(
                 repository_name=repository_name,
@@ -54,7 +65,9 @@ class CloudKFoldTrainRunner(argschema.ArgSchemaParser):
             output_dir=self.args['train_params']['save_path'],
             mlflow_server_uri=tracking_params['mlflow_server_uri'],
             mlflow_experiment_name=tracking_params['mlflow_experiment_name'],
-            seed=1234
+            seed=1234,
+            load_pretrained_checkpoints=(
+                self.args['train_params']['model_load_path'] is not None)
         )
         runner.run(
             model_inputs=self.args['train_params']['model_inputs'],
